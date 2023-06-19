@@ -57,7 +57,7 @@ export const broadcastEvent = (
       + `Точность: \`${event.score}\`\n`
       + `Объект: \`${objectLabel}\``,
       {
-        parse_mode: 'Markdown',
+        parse_mode: 'MarkdownV2',
       }
     )
 

@@ -1,9 +1,10 @@
 import process from 'process'
 
 export const resolveEventUrl = () => {
-  const host = process.env.FRIGATE_HOST
-  // Note: first slash is not trimmable
-  return `${host}/api/events`
+  const host = process.env.FRIGATE_HOST?.trim() ?? ''
+  const normalizedHost = host.endsWith('/') ? host : `${host}/`
+  // NOTE: double slash is intentionally left out
+  return `${normalizedHost}/api/events`
 }
 
 export const resolveSnapshot = (id: string) => {

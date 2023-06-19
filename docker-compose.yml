@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  elercam:
+    build: .
+    container_name: elercam
+    restart: unless-stopped
+    volumes:
+      - .:/home/node/app
+      - ./node_modules:/home/node/app/node_modules
+    networks:
+      - mosquitto
+
+networks:
+  mosquitto:
+    external: true
