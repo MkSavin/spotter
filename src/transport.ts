@@ -12,15 +12,15 @@ export const listenTransport = (
     mqtt,
   } = context
 
-  mqtt.on('message', (topic, payload) => {
+  mqtt.on('message', async (topic, payload) => {
     const message = payload.toString()
     const contents = JSON.parse(message)
 
-    listenEvent(contents, context)
+    await listenEvent(contents, context)
   })
 }
 
-export const broadcastEvent = (
+export const broadcastEvent = async (
   contents: any,
   context: ListenContext,
 ) => {
@@ -36,7 +36,7 @@ export const broadcastEvent = (
     return
   }
 
-  users.data.forEach((user) => {
+  for (const user of users.data) {
     const {
       chatId,
     } = user
@@ -48,40 +48,49 @@ export const broadcastEvent = (
 
     const objectLabel = objectLabels[event.label as keyof typeof objectLabels] ?? event.label
 
-    bot.sendMessage(
+    const snapshotUrl = resolveSnapshot(event.id)
+    const snapshotStream = request.get(snapshotUrl)
+
+    const clipUrl = resolveClip(event.id)
+    const clipStream = request.get(clipUrl)
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000)
+    })
+
+    const message = await bot.sendMessage(
       chatId,
-      `**Обнаружено движение!** \[\`${event.id}\`\]\n\n`
-      + `Время и дата: \`${formattedDateTime}\`\n`
-      + `Камера: \`${event.camera}\`\n`
-      + `Стационарность: \`${event.stationary ? 'да' : 'НЕТ'}\`\n`
-      + `Точность: \`${event.score}\`\n`
-      + `Объект: \`${objectLabel}\``,
+      `<b>Обнаружено движение!</b> [<code>${event.id}</code>]<br />`
+      + `Дата и время: <code>${formattedDateTime}</code><br />`
+      + `Камера: <code>${event.camera}</code><br />`
+      + `Объект: <i>${event.stationary ? 'Стац.' : 'Движ.'}</i> <code>${objectLabel}</code> [<code>${event.score}</code>]`,
       {
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML',
       }
     )
 
-    const snapshotStream = request.get(resolveSnapshot(event.id))
-    const clipStream = request.get(resolveClip(event.id))
-
-    bot.sendPhoto(
+    await bot.sendPhoto(
       chatId,
       snapshotStream,
       {
-        caption: 'Снимок',
+        reply_to_message_id: message.message_id,
+        caption: `<a href="${snapshotUrl}">Снимок</a>`,
+        parse_mode: 'HTML',
         disable_notification: true,
       },
-    {
-      filename: `snapshot-${event.id}.jpg`,
-      contentType: 'application/octet-stream',
-     }
+      {
+        filename: `snapshot-${event.id}.jpg`,
+        contentType: 'application/octet-stream',
+      }
     )
 
-    bot.sendVideo(
+    await bot.sendVideo(
       chatId,
       clipStream,
       {
-        caption: 'Видеоотрезок',
+        reply_to_message_id: message.message_id,
+        caption: `<a href="${clipUrl}">Видеоотрезок</a>`,
+        parse_mode: 'HTML',
         disable_notification: true,
       },
       {
@@ -89,10 +98,10 @@ export const broadcastEvent = (
         contentType: 'application/octet-stream',
       }
     )
-  })
+  }
 }
 
-export const listenEvent = (
+export const listenEvent = async (
   contents: any,
   context: ListenContext,
 ) => {
@@ -124,6 +133,6 @@ export const listenEvent = (
 
   // TODO: If the event has not ended within 10 seconds - send a notification about its start (new)
   if (contents.type === 'end') {
-    broadcastEvent(contents, context)
+    await broadcastEvent(contents, context)
   }
 }

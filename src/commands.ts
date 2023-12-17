@@ -32,7 +32,7 @@ const listenStart = (
     const passwordInput = match?.[1]?.trim()
 
     if (passwordInput !== passwordRequired) {
-      bot.sendMessage(chatId, 'Введен неверный пароль')
+      await bot.sendMessage(chatId, 'Введен неверный пароль')
       return
     }
 
@@ -41,7 +41,7 @@ const listenStart = (
     })
 
     if (listed) {
-      bot.sendMessage(chatId, 'Вы уже зарегистрированы в системе')
+      await bot.sendMessage(chatId, 'Вы уже зарегистрированы в системе')
       return
     }
 
@@ -50,7 +50,7 @@ const listenStart = (
       chatId,
     })
 
-    bot.sendMessage(chatId, 'Вы успешно зарегистрировались в системе удаленного видеонаблюдения')
+    await bot.sendMessage(chatId, 'Вы успешно зарегистрировались в системе удаленного видеонаблюдения')
   })
 }
 
