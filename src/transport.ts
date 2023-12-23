@@ -10,23 +10,7 @@ export const listenTransport = (
 ) => {
   const {
     mqtt,
-  } = context
-
-  mqtt.on('message', async (topic, payload) => {
-    const message = payload.toString()
-    const contents = JSON.parse(message)
-
-    await listenEvent(contents, context)
-  })
-}
-
-export const broadcastEvent = async (
-  contents: any,
-  context: ListenContext,
-) => {
-  const {
     loki,
-    bot
   } = context
 
   const users = loki.getCollection('users')
@@ -36,10 +20,41 @@ export const broadcastEvent = async (
     return
   }
 
+  mqtt.on('message', async (_, payload) => {
+    const message = payload.toString()
+    const contents = JSON.parse(message)
+
+    await listenEvent(contents, context, users)
+  })
+}
+
+export const broadcastEvent = async (
+  contents: any,
+  context: ListenContext,
+  users: Collection<any>,
+) => {
+  const {
+    bot
+  } = context
+
   for (const user of users.data) {
     const {
       chatId,
+      mute,
     } = user
+
+    if (mute !== undefined) {
+      const muteTo = dayjs(mute)
+
+      if (dayjs().isAfter(muteTo)) {
+        users.update({
+          ...user,
+          mute: undefined,
+        })
+      } else {
+        continue
+      }
+    }
 
     const event = contents.after
 
@@ -104,6 +119,7 @@ export const broadcastEvent = async (
 export const listenEvent = async (
   contents: any,
   context: ListenContext,
+  users: Collection<any>,
 ) => {
   const {
     loki,
@@ -133,6 +149,6 @@ export const listenEvent = async (
 
   // TODO: If the event has not ended within 10 seconds - send a notification about its start (new)
   if (contents.type === 'end') {
-    await broadcastEvent(contents, context)
+    await broadcastEvent(contents, context, users)
   }
 }
