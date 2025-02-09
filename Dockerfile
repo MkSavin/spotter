@@ -1,8 +1,7 @@
-FROM node:16-alpine
-WORKDIR /home/node/app
+FROM oven/bun:1.0.20-alpine
+WORKDIR /app
 COPY package.json .
-RUN npm i
+RUN bun install
 COPY . .
-RUN npm run compile
 EXPOSE 4000
-CMD ["npm", "run", "start"]
+CMD ["bun", "run", "start"]

@@ -6,8 +6,8 @@ services:
     container_name: elercam
     restart: unless-stopped
     volumes:
-      - .:/home/node/app
-      - ./node_modules:/home/node/app/node_modules
+      - .:/app
+      - ./node_modules:/app/node_modules
     networks:
       - mosquitto
 

@@ -5,6 +5,10 @@ import { resolveClip, resolveSnapshot } from './mediaResolve'
 import request from 'request'
 import { objectLabels } from './objectLabels'
 
+const timeout = (ms: number) => (
+    new Promise(resolve => setTimeout(resolve, ms))
+)
+
 export const listenTransport = (
   context: ListenContext,
 ) => {
@@ -69,9 +73,7 @@ export const broadcastEvent = async (
     const clipUrl = resolveClip(event.id)
     const clipStream = request.get(clipUrl)
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000)
-    })
+    await timeout(1000)
 
     const message = await bot.sendMessage(
       chatId,
@@ -98,6 +100,8 @@ export const broadcastEvent = async (
         contentType: 'application/octet-stream',
       }
     )
+
+    await timeout(1000)
 
     await bot.sendVideo(
       chatId,
