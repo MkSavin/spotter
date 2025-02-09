@@ -4,12 +4,8 @@ import console from 'console'
 import { resolveClip, resolveSnapshot } from './mediaResolve'
 import request from 'request'
 import { objectLabels } from './objectLabels'
-import {logger} from "./stenograph/log";
-import {User} from "./models";
-
-const timeout = (ms: number) => (
-  new Promise(resolve => setTimeout(resolve, ms))
-)
+import {logger} from './stenograph/log'
+import {User} from './models'
 
 const eventSystemLogger = logger.sub('event')
 
@@ -66,67 +62,54 @@ export const broadcastEvent = async (
     const snapshotUrl = resolveSnapshot(event.id)
     const snapshotRemoteUrl = resolveSnapshot(event.id, true)
     const snapshotStream = request.get(snapshotUrl)
+      .on('error', eventLogger.error)
 
     const clipUrl = resolveClip(event.id)
     const clipRemoteUrl = resolveClip(event.id, true)
     const clipStream = request.get(clipUrl)
+      .on('error', eventLogger.error)
 
-    eventLogger.debug('Snapshot and clip urls: ', snapshotUrl, clipUrl)
+    try {
+      const message = await bot.sendMessage(
+        chatId,
+        `<b>Обнаружено движение!</b> <a href="${snapshotRemoteUrl}">${event.id}</a>\n`
+        + `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n`
+        + `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
+        {
+          parse_mode: 'HTML',
+        }
+      )
 
-    await timeout(1000)
+      await bot.sendPhoto(
+        chatId,
+        snapshotStream,
+        {
+          reply_to_message_id: message.message_id,
+          caption: `<a href="${snapshotRemoteUrl}">Снимок</a>`,
+          parse_mode: 'HTML',
+          disable_notification: true,
+        },
+        {
+          filename: `snapshot-${event.id}.jpg`,
+        }
+      )
 
-    const message = await bot.sendMessage(
-      chatId,
-      `<b>Обнаружено движение!</b> <a href="${snapshotRemoteUrl}">${event.id}</a>\n`
-      + `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n`
-      + `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
-      {
-        parse_mode: 'HTML',
-      }
-    )
-
-    await bot.sendPhoto(
-      chatId,
-      snapshotStream,
-      {
-        reply_to_message_id: message.message_id,
-        caption: `<a href="${snapshotRemoteUrl}">Снимок</a>`,
-        parse_mode: 'HTML',
-        disable_notification: true,
-      },
-      {
-        filename: `snapshot-${event.id}.jpg`,
-      }
-    )
-
-    await bot.sendPhoto(
-      chatId,
-      snapshotStream,
-      {
-        caption: `Unreplied [test] <a href="${snapshotRemoteUrl}">Снимок</a>`,
-        parse_mode: 'HTML',
-        disable_notification: true,
-      },
-      {
-        filename: `snapshot-${event.id}.jpg`,
-      }
-    )
-
-    await timeout(1000)
-
-    await bot.sendVideo(
-      chatId,
-      clipStream,
-      {
-        reply_to_message_id: message.message_id,
-        caption: `<a href="${clipRemoteUrl}">Видеоотрезок</a>`,
-        parse_mode: 'HTML',
-        disable_notification: true,
-      },
-      {
-        filename: `clip-${event.id}.mp4`,
-      }
-    )
+      await bot.sendVideo(
+        chatId,
+        clipStream,
+        {
+          reply_to_message_id: message.message_id,
+          caption: `<a href="${clipRemoteUrl}">Видеоотрезок</a>`,
+          parse_mode: 'HTML',
+          disable_notification: true,
+        },
+        {
+          filename: `clip-${event.id}.mp4`,
+        }
+      )
+    } catch (error) {
+      eventLogger.error(error)
+    }
   }
 }
 

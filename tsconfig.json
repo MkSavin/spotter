@@ -21,7 +21,8 @@
     "jsx": "react-jsx"
   },
   "include": [
-    "src/*"
+    "./src/*",
+    "./src/bun.d.ts"
   ],
   "exclude": [
     "node_modules"

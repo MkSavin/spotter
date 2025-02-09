@@ -1,7 +1,7 @@
 import process from 'process'
 
 export const resolveEventUrl = (remote = false) => {
-  const host = (remote ? process.env.FRIGATE_HOST : process.env.FRIGATE_REMOTE_HOST)
+  const host = (remote ? process.env.FRIGATE_REMOTE_HOST : process.env.FRIGATE_HOST)
     ?.trim() ?? ''
 
   const normalizedHost = host.endsWith('/') ? host : `${host}/`

@@ -16,7 +16,7 @@ export type ListenContext = {
   bot: TelegramBot,
 }
 
-const init = () => {
+export const initialize = (callback: (context: ListenContext) => void): void => {
   const database = initDatabase()
 
   database.options.autoloadCallback = () => {
@@ -27,15 +27,15 @@ const init = () => {
 
     const bot = initBot()
 
-    const context = {
+    callback({
       loki: database,
       mqtt,
       bot,
-    }
-
-    listenInput(context)
-    listenTransport(context)
+    })
   }
 }
 
-init()
+initialize((context) => {
+  listenInput(context)
+  listenTransport(context)
+})

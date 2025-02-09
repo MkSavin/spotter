@@ -7,7 +7,7 @@ export const initTransport = (): mqtt.MqttClient => {
   const frigateHost = process.env.FRIGATE_HOST ?? ''
 
   logger.sub('init').info(`Connecting to MQTT running on ${host}`)
-  logger.sub('init').info(`Connecting to frigate running on ${frigateHost}`)
+  logger.sub('init').info(`Connecting to Frigate running on ${frigateHost}`)
 
   return mqtt.connect(host)
 }
