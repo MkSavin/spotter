@@ -77,9 +77,9 @@ export const broadcastEvent = async (
 
     const message = await bot.sendMessage(
       chatId,
-      `<b>Обнаружено движение!</b> [<code>${event.id}</code>]<br />`
-      + `Дата и время: <code>${formattedDateTime}</code><br />`
-      + `Камера: <code>${event.camera}</code><br />`
+      `<b>Обнаружено движение!</b> [<code>${event.id}</code>]\n`
+      + `Дата и время: <code>${formattedDateTime}</code>\n`
+      + `Камера: <code>${event.camera}</code>\n`
       + `Объект: <i>${event.stationary ? 'Стац.' : 'Движ.'}</i> <code>${objectLabel}</code> [<code>${event.score}</code>]`,
       {
         parse_mode: 'HTML',
