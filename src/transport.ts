@@ -52,7 +52,7 @@ export const broadcastEvent = async (
 
   const eventLogger = eventSystemLogger
     .sub(event.id + ' ' + formattedDateTime)
-    .info('Event received.', 'Camera: ' + event.camera + ', object: ' + (event.stationary ? 'stationary' : 'non-stationary') + ' ' + event.object)
+    .info('Event received.', 'Camera: ' + event.camera + ', object: ' + (event.stationary ? 'stationary' : 'non-stationary') + ' ' + event.label)
 
   for (const user of users.data) {
     const {
@@ -64,16 +64,20 @@ export const broadcastEvent = async (
     const objectLabel = objectLabels[event.label as keyof typeof objectLabels] ?? event.label
 
     const snapshotUrl = resolveSnapshot(event.id)
+    const snapshotRemoteUrl = resolveSnapshot(event.id, true)
     const snapshotStream = request.get(snapshotUrl)
 
     const clipUrl = resolveClip(event.id)
+    const clipRemoteUrl = resolveClip(event.id, true)
     const clipStream = request.get(clipUrl)
+
+    eventLogger.debug('Snapshot and clip urls: ', snapshotUrl, clipUrl)
 
     await timeout(1000)
 
     const message = await bot.sendMessage(
       chatId,
-      `<b>Обнаружено движение!</b> <a href="${snapshotUrl}">${event.id}</a>\n`
+      `<b>Обнаружено движение!</b> <a href="${snapshotRemoteUrl}">${event.id}</a>\n`
       + `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n`
       + `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
       {
@@ -86,7 +90,20 @@ export const broadcastEvent = async (
       snapshotStream,
       {
         reply_to_message_id: message.message_id,
-        caption: `<a href="${snapshotUrl}">Снимок</a>`,
+        caption: `<a href="${snapshotRemoteUrl}">Снимок</a>`,
+        parse_mode: 'HTML',
+        disable_notification: true,
+      },
+      {
+        filename: `snapshot-${event.id}.jpg`,
+      }
+    )
+
+    await bot.sendPhoto(
+      chatId,
+      snapshotStream,
+      {
+        caption: `Unreplied [test] <a href="${snapshotRemoteUrl}">Снимок</a>`,
         parse_mode: 'HTML',
         disable_notification: true,
       },
@@ -102,13 +119,12 @@ export const broadcastEvent = async (
       clipStream,
       {
         reply_to_message_id: message.message_id,
-        caption: `<a href="${clipUrl}">Видеоотрезок</a>`,
+        caption: `<a href="${clipRemoteUrl}">Видеоотрезок</a>`,
         parse_mode: 'HTML',
         disable_notification: true,
       },
       {
         filename: `clip-${event.id}.mp4`,
-        contentType: 'application/octet-stream',
       }
     )
   }

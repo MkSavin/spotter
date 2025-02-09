@@ -1,10 +1,13 @@
 import mqtt from 'mqtt'
 import process from 'process'
+import { logger } from '../stenograph/log'
 
 export const initTransport = (): mqtt.MqttClient => {
   const host = process.env.MQTT_HOST ?? ''
+  const frigateHost = process.env.FRIGATE_HOST ?? ''
 
-  console.info(`Connecting to MQTT running on ${host}`)
+  logger.sub('init').info(`Connecting to MQTT running on ${host}`)
+  logger.sub('init').info(`Connecting to frigate running on ${frigateHost}`)
 
   return mqtt.connect(host)
 }
