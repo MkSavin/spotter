@@ -1,12 +1,12 @@
 import dotenv from 'dotenv'
-import { initTransport, subscribeTransportTopic } from './core/transport'
-import { initBot } from './core/bot'
-import { initDatabase } from './core/database'
-import { listenInput } from './commands'
-import { initCollections } from './models'
+import {initTransport, subscribeTransportTopic} from './core/transport'
+import {initBot} from './core/bot'
+import {initDatabase} from './core/database'
+import {listenInput} from './commands'
+import {initCollections} from './models'
 import mqtt from 'mqtt'
 import TelegramBot from 'node-telegram-bot-api'
-import { listenTransport } from './transport'
+import {listenTransport} from './transport'
 
 dotenv.config()
 

@@ -1,15 +1,16 @@
-import { ListenContext } from './index'
+import {ListenContext} from './index'
 import process from 'process'
-import * as console from 'console'
-import dayjs from 'dayjs'
+import {User} from './models'
+import {logger} from './stenograph/log'
 
 export const listenInput = (
   context: ListenContext,
 ) => {
   listenStart(context)
-  listenMute(context)
   listenTakePhoto()
 }
+
+const authLogger = logger.sub('authorization')
 
 const listenStart = (
   context: ListenContext,
@@ -19,10 +20,10 @@ const listenStart = (
     bot,
   } = context
 
-  const users = loki.getCollection('users')
+  const users = loki.getCollection<User>('users')
 
   if (!users) {
-    console.error('Database error. Users collection not found')
+    authLogger.error('Database error. Users collection not found')
     return
   }
 
@@ -33,7 +34,18 @@ const listenStart = (
     const passwordRequired = process.env.START_PASSWORD?.trim()
     const passwordInput = match?.[1]?.trim()
 
+    const userLogger = authLogger.sub(`${user?.id ?? 'unknown'}`)
+
+    userLogger.debug('New log in attempt')
+
+    if (!user) {
+      userLogger.debug('Log in attempt is aborted due to empty user data')
+      await bot.sendMessage(chatId, 'Информация о пользователе не найдена')
+      return
+    }
+
     if (passwordInput !== passwordRequired) {
+      userLogger.debug('User entered wrong password')
       await bot.sendMessage(chatId, 'Введен неверный пароль')
       return
     }
@@ -43,6 +55,7 @@ const listenStart = (
     })
 
     if (listed) {
+      userLogger.debug('User has already been logged in')
       await bot.sendMessage(chatId, 'Вы уже зарегистрированы в системе')
       return
     }
@@ -52,63 +65,9 @@ const listenStart = (
       chatId,
     })
 
+    userLogger.info('User is successfully registered and logged in')
+
     await bot.sendMessage(chatId, 'Вы успешно зарегистрировались в системе удаленного видеонаблюдения')
-  })
-}
-
-const listenMute = (
-  context: ListenContext,
-) => {
-  const {
-    loki,
-    bot,
-  } = context
-
-  const users = loki.getCollection('users')
-
-  if (!users) {
-    console.error('Database error. Users collection not found')
-    return
-  }
-
-  bot.onText(/\/mute(?:\s(?:(?<h>\d+)h)?(?:(?<m>\d+)(?:m|))?)?/gi, async (message, match) => {
-    const chatId = message.chat.id
-
-    const groups = match?.groups
-
-    const hours = Number(groups?.h ?? 0)
-    const mins = Number(groups?.m ?? (hours === 0 ? 10 : 0))
-
-    const muteTo = dayjs()
-      .add(hours, 'h')
-      .add(mins, 'm')
-
-    const listed = users.findOne({
-      chatId,
-    })
-
-    users.update({
-      ...listed,
-      mute: muteTo
-        .toISOString(),
-    })
-
-    await bot.sendMessage(chatId, `События будут игнорироваться до \`${muteTo.format('DD.MM.YYYY hh:mm')}\``)
-  })
-
-  bot.onText(/\/unmute/gi, async (message, match) => {
-    const chatId = message.chat.id
-
-    const listed = users.findOne({
-      chatId,
-    })
-
-    users.update({
-      ...listed,
-      mute: undefined,
-    })
-
-    await bot.sendMessage(chatId, `Игнорирование событий отключено`)
   })
 }
 

@@ -4,10 +4,14 @@ import console from 'console'
 import { resolveClip, resolveSnapshot } from './mediaResolve'
 import request from 'request'
 import { objectLabels } from './objectLabels'
+import {logger} from "./stenograph/log";
+import {User} from "./models";
 
 const timeout = (ms: number) => (
   new Promise(resolve => setTimeout(resolve, ms))
 )
+
+const eventSystemLogger = logger.sub('event')
 
 export const listenTransport = (
   context: ListenContext,
@@ -17,10 +21,10 @@ export const listenTransport = (
     loki,
   } = context
 
-  const users = loki.getCollection('users')
+  const users = loki.getCollection<User>('users')
 
   if (!users) {
-    console.error('Database error. Users collection not found')
+    eventSystemLogger.error('Database error. Users collection not found')
     return
   }
 
@@ -35,41 +39,27 @@ export const listenTransport = (
 export const broadcastEvent = async (
   contents: any,
   context: ListenContext,
-  users: Collection<any>,
+  users: Collection<User>,
 ) => {
   const {
     bot
   } = context
 
-  console.log('Got event', contents.after.id)
+  const event = contents.after
+
+  const dateTime = dayjs.unix(event.start_time)
+  const formattedDateTime = dateTime.format('DD.MM.YYYY HH:mm:ss')
+
+  const eventLogger = eventSystemLogger
+    .sub(event.id + ' ' + formattedDateTime)
+    .info('Event received.', 'Camera: ' + event.camera + ', object: ' + (event.stationary ? 'stationary' : 'non-stationary') + ' ' + event.object)
 
   for (const user of users.data) {
     const {
       chatId,
-      mute,
     } = user
 
-    if (mute !== undefined) {
-      const muteTo = dayjs(mute)
-
-      if (dayjs().isAfter(muteTo)) {
-        users.update({
-          ...user,
-          mute: undefined,
-        })
-        console.log('Unmuted user ', user.id)
-      } else {
-        console.log('Skipped user ', user.id, ' as it is muted')
-        continue
-      }
-    }
-
-    console.log('Sent event to user ', user.id)
-
-    const event = contents.after
-
-    const dateTime = dayjs.unix(event.start_time)
-    const formattedDateTime = dateTime.format('DD.MM.YYYY HH:mm:ss')
+    eventLogger.debug('Sent to user ', user.id)
 
     const objectLabel = objectLabels[event.label as keyof typeof objectLabels] ?? event.label
 
@@ -83,10 +73,9 @@ export const broadcastEvent = async (
 
     const message = await bot.sendMessage(
       chatId,
-      `<b>Обнаружено движение!</b> [<code>${event.id}</code>]\n`
-      + `Дата и время: <code>${formattedDateTime}</code>\n`
-      + `Камера: <code>${event.camera}</code>\n`
-      + `Объект: <i>${event.stationary ? 'Стац.' : 'Движ.'}</i> <code>${objectLabel}</code> [<code>${event.score}</code>]`,
+      `<b>Обнаружено движение!</b> <a href="${snapshotUrl}">${event.id}</a>\n`
+      + `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n`
+      + `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
       {
         parse_mode: 'HTML',
       }
@@ -103,7 +92,6 @@ export const broadcastEvent = async (
       },
       {
         filename: `snapshot-${event.id}.jpg`,
-        contentType: 'application/octet-stream',
       }
     )
 
