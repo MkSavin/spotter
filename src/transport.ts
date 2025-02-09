@@ -6,7 +6,7 @@ import request from 'request'
 import { objectLabels } from './objectLabels'
 
 const timeout = (ms: number) => (
-    new Promise(resolve => setTimeout(resolve, ms))
+  new Promise(resolve => setTimeout(resolve, ms))
 )
 
 export const listenTransport = (
@@ -41,6 +41,8 @@ export const broadcastEvent = async (
     bot
   } = context
 
+  console.log('Got event', contents.after.id)
+
   for (const user of users.data) {
     const {
       chatId,
@@ -55,10 +57,14 @@ export const broadcastEvent = async (
           ...user,
           mute: undefined,
         })
+        console.log('Unmuted user ', user.id)
       } else {
+        console.log('Skipped user ', user.id, ' as it is muted')
         continue
       }
     }
+
+    console.log('Sent event to user ', user.id)
 
     const event = contents.after
 
