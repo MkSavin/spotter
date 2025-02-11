@@ -1,51 +1,13 @@
-import process from 'node:process'
 import dayjs from 'dayjs'
-import signJWT from 'jwt-encode'
 import type { Collection } from 'lokijs'
-import request from 'request'
+import { FrigateAPI } from './api/FrigateAPI'
 import type { ListenContext } from './index'
 import { resolveEventFile } from './mediaResolve'
 import type { User } from './models'
 import { objectLabels } from './objectLabels'
 import { logger } from './stenograph/log'
 
-type ReceivedFileTuple = {
-  url: string
-  request: request.Request
-}
-
 const eventSystemLogger = logger.sub('event')
-
-const receiveEventFile = (
-  id: string,
-  filename: string,
-  context: {
-    jwt: string
-    onError: (...args: any[]) => void
-  },
-): ReceivedFileTuple => {
-  const url = resolveEventFile(id, filename)
-
-  return {
-    url,
-    request: request
-      .get(url, {
-        headers: {
-          Authorization: `Bearer ${context.jwt}`,
-        },
-      })
-      .on('error', context.onError),
-  }
-}
-
-const generateJWT = (): string =>
-  signJWT(
-    {
-      sub: process.env.FRIGATE_AUTH_USER,
-      exp: dayjs().unix() + 60 * 60,
-    },
-    process.env.FRIGATE_AUTH_SECRET ?? '',
-  )
 
 export const broadcastEvent = async (
   contents: any,
@@ -69,21 +31,15 @@ export const broadcastEvent = async (
   const objectLabel =
     objectLabels[event.label as keyof typeof objectLabels] ?? event.label
 
-  const jwt = generateJWT()
+  const api = new FrigateAPI(eventLogger)
 
-  const snapshotFile = receiveEventFile(event.id, 'snapshot.jpg', {
-    jwt,
-    onError: eventLogger.error,
-  })
-  const clipFile = receiveEventFile(event.id, 'clip.mp4', {
-    jwt,
-    onError: eventLogger.error,
-  })
+  const snapshotFile = api.get(resolveEventFile(event.id, 'snapshot.jpg'))
+  const clipFile = api.get(resolveEventFile(event.id, 'clip.mp4'))
 
   const sendToChat = async (chatId: number): Promise<void> => {
     const message = await bot.sendMessage(
       chatId,
-      `<b>Обнаружено движение!</b> <a href="${snapshotFile.url}">${event.id}</a>\n` +
+      `<b>Обнаружено движение!</b> <a href="${snapshotFile.uri.href}">${event.id}</a>\n` +
         `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n` +
         `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
       {
@@ -93,10 +49,10 @@ export const broadcastEvent = async (
 
     await bot.sendPhoto(
       chatId,
-      snapshotFile.request,
+      snapshotFile,
       {
         reply_to_message_id: message.message_id,
-        caption: `<a href="${snapshotFile.url}">Снимок</a>`,
+        caption: `<a href="${snapshotFile.uri.href}">Снимок</a>`,
         parse_mode: 'HTML',
         disable_notification: true,
       },
@@ -107,10 +63,10 @@ export const broadcastEvent = async (
 
     await bot.sendVideo(
       chatId,
-      clipFile.request,
+      clipFile,
       {
         reply_to_message_id: message.message_id,
-        caption: `<a href="${clipFile.url}">Видеоотрезок</a>`,
+        caption: `<a href="${clipFile.uri.href}">Видеоотрезок</a>`,
         parse_mode: 'HTML',
         disable_notification: true,
       },

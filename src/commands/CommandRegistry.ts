@@ -1,3 +1,4 @@
+import { FrigateAPI } from '../api/FrigateAPI'
 import type { ListenContext } from '../index'
 import type { User } from '../models'
 import type {
@@ -36,9 +37,12 @@ export class CommandRegistry {
           chatId,
         })
 
+        const api = new FrigateAPI(command.logger)
+
         const executionContext: CommandExecutionContext = {
           ...this.context,
 
+          api,
           commandRegistry: this,
 
           message,

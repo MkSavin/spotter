@@ -10,5 +10,8 @@ const constructUrl = (...parts: string[]): URL => {
   return url
 }
 
+export const resolveLatestFrame = (camera: string) =>
+  constructUrl(camera, 'latest.jpg').toString()
+
 export const resolveEventFile = (id: string, filename: string): string =>
   constructUrl('events', id, filename).toString()

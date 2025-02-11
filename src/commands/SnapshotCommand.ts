@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+import { resolveLatestFrame } from '../mediaResolve'
 import { Command, type CommandExecutionContext } from './Command'
 
 export class SnapshotCommand extends Command {
@@ -14,7 +16,32 @@ export class SnapshotCommand extends Command {
     return !!match?.at(1)
   }
 
-  execute(context: CommandExecutionContext): Promise<void> {
-    throw new Error('Method not implemented.')
+  async execute(context: CommandExecutionContext): Promise<void> {
+    const { bot, chatId, api, match } = context
+
+    // validate input
+    const camera = match?.at(1)?.trim()
+
+    if (!camera) {
+      this.logger.debug('Camera name is not valid')
+      await bot.sendMessage(chatId, 'Указано неверное название камеры')
+      return
+    }
+
+    const snapshotRequest = api.get(resolveLatestFrame(camera))
+
+    const formattedDateTime = dayjs().format('DD.MM.YYYY HH:mm:ss')
+
+    await bot.sendPhoto(
+      chatId,
+      snapshotRequest,
+      {
+        caption: `<b>Снимок с камеры</b>\n📆 <code>${formattedDateTime}</code> | 📹 <i>${camera}</i>\n`,
+        parse_mode: 'HTML',
+      },
+      {
+        filename: `snapshot-${camera}-latest.jpg`,
+      },
+    )
   }
 }

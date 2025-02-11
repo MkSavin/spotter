@@ -1,4 +1,5 @@
 import type TelegramBot from 'node-telegram-bot-api'
+import type { FrigateAPI } from '../api/FrigateAPI'
 import type { ListenContext } from '../index'
 import type { User } from '../models'
 import type { Stenograph } from '../stenograph/Stenograph'
@@ -8,6 +9,7 @@ import type { CommandRegistry } from './CommandRegistry'
 export type CommandInitContext = ListenContext
 
 export type CommandExecutionContext = ListenContext & {
+  api: FrigateAPI
   commandRegistry: CommandRegistry
 
   message: TelegramBot.Message
