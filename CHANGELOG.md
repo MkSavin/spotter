@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/MkSavin/elercam/compare/v1.0.0...v1.1.0) (2025-02-11)
+
+
+### Features
+
+* Snapshot command added ([6927dd9](https://github.com/MkSavin/elercam/commit/6927dd94486f31f6d8a40545137b3c2be3d9f46a))
+
 # 1.0.0 (2025-02-11)
 
 
