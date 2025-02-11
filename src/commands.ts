@@ -1,20 +1,13 @@
-import {ListenContext} from './index'
 import process from 'process'
-import {User} from './models'
-import {logger} from './stenograph/log'
-
-export const listenInput = (
-  context: ListenContext,
-) => {
-  listenStart(context)
-  listenTakePhoto()
-}
+import { User } from './models'
+import { logger } from './stenograph/log'
+import { ListenContext } from './index'
 
 const authLogger = logger.sub('authorization')
 
 const listenStart = (
   context: ListenContext,
-) => {
+): void => {
   const {
     loki,
     bot,
@@ -71,6 +64,13 @@ const listenStart = (
   })
 }
 
-const listenTakePhoto = () => {
+const listenTakePhoto = (): void => {
   // TODO: integrate
+}
+
+export const listenInput = (
+  context: ListenContext,
+): void => {
+  listenStart(context)
+  listenTakePhoto()
 }

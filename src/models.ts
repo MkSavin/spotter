@@ -7,7 +7,7 @@ export type User = TelegramBot.User & {
 
 export const initCollections = (
   loki: Loki,
-) => {
+): void => {
   [ 'users', 'events' ].forEach((code) => {
     if (!loki.getCollection(code)) {
       loki.addCollection(code)

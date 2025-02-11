@@ -1,5 +1,5 @@
-import mqtt from 'mqtt'
 import process from 'process'
+import mqtt from 'mqtt'
 import { logger } from '../stenograph/log'
 
 export const initTransport = (): mqtt.MqttClient => {

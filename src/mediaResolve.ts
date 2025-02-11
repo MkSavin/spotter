@@ -1,20 +1,23 @@
 import process from 'process'
+import { URL } from 'url'
+import path from 'path'
 
-export const resolveEventUrl = (remote = false) => {
-  const host = (remote ? process.env.FRIGATE_REMOTE_HOST : process.env.FRIGATE_HOST)
-    ?.trim() ?? ''
+const constructUrl = (...parts: string[]): URL => {
+  const url = new URL(process.env.FRIGATE_REMOTE_HOST ?? '')
 
-  const normalizedHost = host.endsWith('/') ? host : `${host}/`
-  // NOTE: double slash is intentionally left out
-  return `${normalizedHost}/api/events`
+  url.pathname = path.join('api', ...parts)
+
+  return url
 }
 
-export const resolveSnapshot = (id: string, remote = false) => {
-  const eventUrl = resolveEventUrl(remote)
-  return `${eventUrl}/${id}/snapshot.jpg`
-}
+export const resolveEventFile = (id: string, filename: string): string => (
+  constructUrl('events', id, filename).toString()
+)
 
-export const resolveClip = (id: string, remote = false) => {
-  const eventUrl = resolveEventUrl(remote)
-  return `${eventUrl}/${id}/clip.mp4`
-}
+export const resolveSnapshot = (id: string): string => (
+  constructUrl('events', id, 'snapshot.jpg').toString()
+)
+
+export const resolveClip = (id: string): string => (
+  constructUrl('events', id, 'clip.mp4').toString()
+)

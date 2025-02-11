@@ -1,9 +1,9 @@
-import {StenographLevelRepository} from './types'
-import {consoleRenderer, StenographConsole} from './transport/StenographConsole'
-import {pathJoinFormat} from './format/pathJoinFormat'
-import {prefixFormat} from './format/prefixFormat'
-import {Stenograph} from './Stenograph'
-import {combineFormat} from './format/combineFormat'
+import { StenographLevelRepository } from './types'
+import { consoleRenderer, StenographConsole } from './transport/StenographConsole'
+import { pathJoinFormat } from './format/pathJoinFormat'
+import { prefixFormat } from './format/prefixFormat'
+import { Stenograph } from './Stenograph'
+import { combineFormat } from './format/combineFormat'
 
 const levels: StenographLevelRepository = [
   {

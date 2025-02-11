@@ -4,5 +4,5 @@ export const objectLabels = {
   dog: 'Собэмэ',
   cat: 'Котэ',
   horse: 'Лошадка',
-  bear: 'Медведь'
+  bear: 'Медведь',
 }
