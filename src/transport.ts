@@ -1,12 +1,12 @@
 import process from 'process'
 import dayjs from 'dayjs'
-import request from 'request'
-import { Collection } from 'lokijs'
 import signJWT from 'jwt-encode'
+import { Collection } from 'lokijs'
+import request from 'request'
 import { resolveEventFile } from './mediaResolve'
+import { User } from './models'
 import { objectLabels } from './objectLabels'
 import { logger } from './stenograph/log'
-import { User } from './models'
 import { ListenContext } from './index'
 
 type ReceivedFileTuple = {

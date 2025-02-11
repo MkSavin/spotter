@@ -1,6 +1,6 @@
+import path from 'path'
 import process from 'process'
 import { URL } from 'url'
-import path from 'path'
 
 const constructUrl = (...parts: string[]): URL => {
   const url = new URL(process.env.FRIGATE_REMOTE_HOST ?? '')
