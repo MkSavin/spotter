@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/MkSavin/elercam/compare/v1.1.0...v1.1.1) (2025-02-11)
+
+
+### Bug Fixes
+
+* Change test fix ([da8b340](https://github.com/MkSavin/elercam/commit/da8b340674942bd77d3c2d5ce742d1c85a0e6125))
+
 # [1.1.0](https://github.com/MkSavin/elercam/compare/v1.0.0...v1.1.0) (2025-02-11)
 
 
