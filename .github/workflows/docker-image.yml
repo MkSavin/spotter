@@ -16,6 +16,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup Biome
+      uses: biomejs/setup-biome@v2
+      with:
+        version: latest
+
+    - name: Run Biome
+      run: biome ci .
+
     - name: 'Login to GitHub Container Registry'
       uses: docker/login-action@v1
       with:

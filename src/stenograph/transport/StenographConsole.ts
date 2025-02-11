@@ -1,21 +1,28 @@
-/* eslint-disable no-console */
-import { Stenograph } from '../Stenograph'
-import { StenographMessage, StenographRenderer, StenographRenderRepository } from '../types'
-import { StenographTransport, StenographTransportOptions } from './StenographTransport'
+import type { Stenograph } from '../Stenograph'
+import type {
+  StenographMessage,
+  StenographRenderRepository,
+  StenographRenderer,
+} from '../types'
+import {
+  StenographTransport,
+  type StenographTransportOptions,
+} from './StenographTransport'
 
 export class StenographConsole extends StenographTransport {
-  gluedAppendix: Partial<StenographMessage>|undefined
+  gluedAppendix: Partial<StenographMessage> | undefined
 
   constructor(
-    options?: StenographTransportOptions
-      & { gluedAppendix?: Partial<StenographMessage>, },
+    options?: StenographTransportOptions & {
+      gluedAppendix?: Partial<StenographMessage>
+    },
   ) {
     super(options)
     this.gluedAppendix = options?.gluedAppendix
   }
 
   protected log(_: Stenograph, message: StenographMessage): void {
-    const renderer = message.level.console as StenographRenderer|undefined
+    const renderer = message.level.console as StenographRenderer | undefined
 
     if (!renderer) {
       return
@@ -25,14 +32,13 @@ export class StenographConsole extends StenographTransport {
   }
 }
 
-const inlineContent = (message: StenographMessage): any[] => (
-  [
-    message.prefix,
-    ...message.content,
-  ].filter(Boolean)
-)
+const inlineContent = (message: StenographMessage): any[] =>
+  [message.prefix, ...message.content].filter(Boolean)
 
-const baseRenderer = (out: (...data: any[]) => void, message: StenographMessage): void => {
+const baseRenderer = (
+  out: (...data: any[]) => void,
+  message: StenographMessage,
+): void => {
   if (message.group) {
     console.group(message.group)
   }
@@ -49,8 +55,12 @@ const baseRenderer = (out: (...data: any[]) => void, message: StenographMessage)
 }
 
 export const consoleRenderer: StenographRenderRepository = {
-  error: (message: StenographMessage): void => baseRenderer(console.error, message),
-  warn: (message: StenographMessage): void => baseRenderer(console.warn, message),
-  info: (message: StenographMessage): void => baseRenderer(console.info, message),
-  debug: (message: StenographMessage): void => baseRenderer(console.debug, message),
+  error: (message: StenographMessage): void =>
+    baseRenderer(console.error, message),
+  warn: (message: StenographMessage): void =>
+    baseRenderer(console.warn, message),
+  info: (message: StenographMessage): void =>
+    baseRenderer(console.info, message),
+  debug: (message: StenographMessage): void =>
+    baseRenderer(console.debug, message),
 }

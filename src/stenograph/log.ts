@@ -1,9 +1,12 @@
+import { Stenograph } from './Stenograph'
 import { combineFormat } from './format/combineFormat'
 import { pathJoinFormat } from './format/pathJoinFormat'
 import { prefixFormat } from './format/prefixFormat'
-import { Stenograph } from './Stenograph'
-import { consoleRenderer, StenographConsole } from './transport/StenographConsole'
-import { StenographLevelRepository } from './types'
+import {
+  StenographConsole,
+  consoleRenderer,
+} from './transport/StenographConsole'
+import type { StenographLevelRepository } from './types'
 
 const levels: StenographLevelRepository = [
   {
@@ -13,12 +16,12 @@ const levels: StenographLevelRepository = [
   },
   {
     name: 'warn',
-    icon: '⚠️',
+    icon: '!',
     console: consoleRenderer.warn,
   },
   {
     name: 'info',
-    icon: 'ℹ️',
+    icon: 'i',
     console: consoleRenderer.info,
   },
   {
@@ -35,9 +38,10 @@ const levels: StenographLevelRepository = [
 
 export const pathJoin = pathJoinFormat(' » ')
 
-export const prefix = prefixFormat((message, oldPrefix) => (
-  `${oldPrefix ? `${oldPrefix} ` : ''}[${message.path}] ${message.level.icon ?? message.level.name}`
-))
+export const prefix = prefixFormat(
+  (message, oldPrefix) =>
+    `${oldPrefix ? `${oldPrefix} ` : ''}[${message.path}] ${message.level.icon ?? message.level.name}`,
+)
 
 export const logger = new Stenograph({
   levels,
@@ -46,8 +50,5 @@ export const logger = new Stenograph({
       fromLevel: 'debug',
     }),
   ],
-  format: combineFormat([
-    pathJoin,
-    prefix,
-  ]),
+  format: combineFormat([pathJoin, prefix]),
 })

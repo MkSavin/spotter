@@ -4,9 +4,7 @@
     "outDir": "./lib",
     "target": "esnext",
     "module": "commonjs",
-    "lib": [
-      "esnext"
-    ],
+    "lib": ["esnext"],
     "declaration": true,
     "allowJs": true,
     "skipLibCheck": true,
@@ -20,11 +18,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx"
   },
-  "include": [
-    "./src/*",
-    "./src/bun.d.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["./src/*", "./src/bun.d.ts"],
+  "exclude": ["node_modules"]
 }

@@ -1,17 +1,17 @@
-import process from 'process'
+import process from 'node:process'
 import dayjs from 'dayjs'
 import signJWT from 'jwt-encode'
-import { Collection } from 'lokijs'
+import type { Collection } from 'lokijs'
 import request from 'request'
+import type { ListenContext } from './index'
 import { resolveEventFile } from './mediaResolve'
-import { User } from './models'
+import type { User } from './models'
 import { objectLabels } from './objectLabels'
 import { logger } from './stenograph/log'
-import { ListenContext } from './index'
 
 type ReceivedFileTuple = {
-  url: string,
-  request: request.Request,
+  url: string
+  request: request.Request
 }
 
 const eventSystemLogger = logger.sub('event')
@@ -20,41 +20,43 @@ const receiveEventFile = (
   id: string,
   filename: string,
   context: {
-    jwt: string,
-    onError: (...args: any[]) => void,
+    jwt: string
+    onError: (...args: any[]) => void
   },
 ): ReceivedFileTuple => {
   const url = resolveEventFile(id, filename)
 
   return {
     url,
-    request: request.get(url, {
-      headers: {
-        Authorization: `Bearer ${context.jwt}`,
-      },
-    })
+    request: request
+      .get(url, {
+        headers: {
+          Authorization: `Bearer ${context.jwt}`,
+        },
+      })
       .on('error', context.onError),
   }
 }
 
-const generateJWT = (): string => (
-  signJWT({
-    sub: process.env.FRIGATE_AUTH_USER,
-    exp: dayjs().unix() + 60 * 60,
-  }, process.env.FRIGATE_AUTH_SECRET ?? '', {
-    typ: 'JWT',
-    alg: 'HS256',
-  })
-)
+const generateJWT = (): string =>
+  signJWT(
+    {
+      sub: process.env.FRIGATE_AUTH_USER,
+      exp: dayjs().unix() + 60 * 60,
+    },
+    process.env.FRIGATE_AUTH_SECRET ?? '',
+    {
+      typ: 'JWT',
+      alg: 'HS256',
+    },
+  )
 
 export const broadcastEvent = async (
   contents: any,
   context: ListenContext,
   users: Collection<User>,
 ): Promise<void> => {
-  const {
-    bot,
-  } = context
+  const { bot } = context
 
   const event = contents.after
 
@@ -63,9 +65,13 @@ export const broadcastEvent = async (
 
   const eventLogger = eventSystemLogger
     .sub(`${event.id} ${formattedDateTime}`)
-    .info('Event received.', `Camera: ${event.camera}, object: ${event.stationary ? 'stationary' : 'non-stationary'} ${event.label}`)
+    .info(
+      'Event received.',
+      `Camera: ${event.camera}, object: ${event.stationary ? 'stationary' : 'non-stationary'} ${event.label}`,
+    )
 
-  const objectLabel = objectLabels[event.label as keyof typeof objectLabels] ?? event.label
+  const objectLabel =
+    objectLabels[event.label as keyof typeof objectLabels] ?? event.label
 
   const jwt = generateJWT()
 
@@ -81,9 +87,9 @@ export const broadcastEvent = async (
   const sendToChat = async (chatId: number): Promise<void> => {
     const message = await bot.sendMessage(
       chatId,
-      `<b>Обнаружено движение!</b> <a href="${snapshotFile.url}">${event.id}</a>\n`
-      + `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n`
-      + `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
+      `<b>Обнаружено движение!</b> <a href="${snapshotFile.url}">${event.id}</a>\n` +
+        `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n` +
+        `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
       {
         parse_mode: 'HTML',
       },
@@ -132,10 +138,9 @@ export const broadcastEvent = async (
     users.data.map(async (user) => {
       eventLogger.debug('Sent to user ', user.id)
 
-      return sendToChat(user.chatId)
-        .catch((error) => {
-          eventLogger.error(error.message)
-        })
+      return sendToChat(user.chatId).catch((error) => {
+        eventLogger.error(error.message)
+      })
     }),
   )
 }
@@ -143,11 +148,9 @@ export const broadcastEvent = async (
 export const listenEvent = async (
   contents: any,
   context: ListenContext,
-  users: Collection<any>,
+  users: Collection,
 ): Promise<void> => {
-  const {
-    loki,
-  } = context
+  const { loki } = context
 
   const events = loki.getCollection('events')
 
@@ -164,12 +167,15 @@ export const listenEvent = async (
     return
   }
 
-  events.findAndUpdate({
-    id: contents.after.id,
-  }, (event) => ({
-    ...event.after,
-    type: event.type,
-  }))
+  events.findAndUpdate(
+    {
+      id: contents.after.id,
+    },
+    (event) => ({
+      ...event.after,
+      type: event.type,
+    }),
+  )
 
   // TODO: If the event has not ended within 10 seconds - send a notification about its start (new)
   if (contents.type === 'end') {
@@ -177,13 +183,8 @@ export const listenEvent = async (
   }
 }
 
-export const listenTransport = (
-  context: ListenContext,
-): void => {
-  const {
-    mqtt,
-    loki,
-  } = context
+export const listenTransport = (context: ListenContext): void => {
+  const { mqtt, loki } = context
 
   const users = loki.getCollection<User>('users')
 

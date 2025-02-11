@@ -1,8 +1,11 @@
+import { Stenograph } from '../Stenograph'
 import { combineFormat } from '../format/combineFormat'
 import { prefixFormat } from '../format/prefixFormat'
-import { Stenograph } from '../Stenograph'
-import { consoleRenderer, StenographConsole } from '../transport/StenographConsole'
-import { StenographLevelRepository } from '../types'
+import {
+  StenographConsole,
+  consoleRenderer,
+} from '../transport/StenographConsole'
+import type { StenographLevelRepository } from '../types'
 
 const levels: StenographLevelRepository = [
   {
@@ -32,19 +35,15 @@ const levels: StenographLevelRepository = [
   },
 ]
 
-export const baseInliner = prefixFormat((message) => (
-  `${message.level.icon ?? message.level.name} ${message.content}`
-))
+export const baseInliner = prefixFormat(
+  (message) => `${message.level.icon ?? message.level.name} ${message.content}`,
+)
 
 const logger = new Stenograph({
   path: 'API',
   levels,
-  transport: [
-    new StenographConsole(),
-  ],
-  format: combineFormat([
-    baseInliner,
-  ]),
+  transport: [new StenographConsole()],
+  format: combineFormat([baseInliner]),
 })
 
 logger.sub('test')

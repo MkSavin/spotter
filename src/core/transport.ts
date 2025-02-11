@@ -1,4 +1,4 @@
-import process from 'process'
+import process from 'node:process'
 import mqtt from 'mqtt'
 import { logger } from '../stenograph/log'
 
@@ -15,7 +15,7 @@ export const initTransport = (): mqtt.MqttClient => {
 export const subscribeTransportTopic = (
   transport: mqtt.MqttClient,
   topic: string,
-): Promise<string> => (
+): Promise<string> =>
   new Promise((resolve, reject) => {
     transport.on('connect', () => {
       transport.subscribe(topic, (error) => {
@@ -28,4 +28,3 @@ export const subscribeTransportTopic = (
       })
     })
   })
-)

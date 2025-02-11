@@ -1,6 +1,6 @@
-import path from 'path'
-import process from 'process'
-import { URL } from 'url'
+import path from 'node:path'
+import process from 'node:process'
+import { URL } from 'node:url'
 
 const constructUrl = (...parts: string[]): URL => {
   const url = new URL(process.env.FRIGATE_REMOTE_HOST ?? '')
@@ -10,14 +10,5 @@ const constructUrl = (...parts: string[]): URL => {
   return url
 }
 
-export const resolveEventFile = (id: string, filename: string): string => (
+export const resolveEventFile = (id: string, filename: string): string =>
   constructUrl('events', id, filename).toString()
-)
-
-export const resolveSnapshot = (id: string): string => (
-  constructUrl('events', id, 'snapshot.jpg').toString()
-)
-
-export const resolveClip = (id: string): string => (
-  constructUrl('events', id, 'clip.mp4').toString()
-)

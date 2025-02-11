@@ -1,6 +1,7 @@
-import { StenographFormatter } from '../types'
+import type { StenographFormatter } from '../types'
 
-export const combineFormat = (formatters: StenographFormatter[]): StenographFormatter => (
+export const combineFormat =
+  (formatters: StenographFormatter[]): StenographFormatter =>
   (message) => {
     let skipMessage = false
     let currentMessage = { ...message }
@@ -25,4 +26,3 @@ export const combineFormat = (formatters: StenographFormatter[]): StenographForm
 
     return currentMessage
   }
-)

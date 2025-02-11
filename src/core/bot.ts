@@ -1,4 +1,4 @@
-import process from 'process'
+import process from 'node:process'
 import TelegramBot from 'node-telegram-bot-api'
 import { logger } from '../stenograph/log'
 

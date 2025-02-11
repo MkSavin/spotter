@@ -8,13 +8,20 @@ dotenv.config()
 const mqtt = initTransport()
 
 mqtt.on('connect', () => {
-  mqtt.publish('frigate/events', JSON.stringify(message), { qos: 2, retain: true }, (error) => {
-    if (error) {
-      logger.error(error)
-    }
+  mqtt.publish(
+    'frigate/events',
+    JSON.stringify(message),
+    {
+      qos: 2,
+      retain: true,
+    },
+    (error) => {
+      if (error) {
+        logger.error(error)
+      }
 
-    logger.info('Message sent')
-    // eslint-disable-next-line unicorn/no-process-exit
-    process.exit(0)
-  })
+      logger.info('Message sent')
+      process.exit(0)
+    },
+  )
 })

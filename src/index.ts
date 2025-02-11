@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
-import Loki from 'lokijs'
-import mqtt from 'mqtt'
-import TelegramBot from 'node-telegram-bot-api'
+import type Loki from 'lokijs'
+import type mqtt from 'mqtt'
+import type TelegramBot from 'node-telegram-bot-api'
 import { listenInput } from './commands'
 import { initBot } from './core/bot'
 import { initDatabase } from './core/database'
@@ -12,12 +12,14 @@ import { listenTransport } from './transport'
 dotenv.config()
 
 export type ListenContext = {
-  loki: Loki,
-  mqtt: mqtt.MqttClient,
-  bot: TelegramBot,
+  loki: Loki
+  mqtt: mqtt.MqttClient
+  bot: TelegramBot
 }
 
-export const initialize = (callback: (context: ListenContext) => void): void => {
+export const initialize = (
+  callback: (context: ListenContext) => void,
+): void => {
   const database = initDatabase()
 
   database.options.autoloadCallback = () => {

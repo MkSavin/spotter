@@ -1,5 +1,5 @@
-import { StenographTransport } from './transport/StenographTransport'
-import {
+import type { StenographTransport } from './transport/StenographTransport'
+import type {
   StenographFormatter,
   StenographLevel,
   StenographLevelDefinition,
@@ -14,15 +14,14 @@ export class Stenograph {
 
   levels: StenographLevelRepository = []
   transport: StenographTransport[] = []
-  format: StenographFormatter|undefined = undefined
+  format: StenographFormatter | undefined = undefined
 
   gluedMessage: Partial<StenographSimplifiedMessage> = {}
 
   constructor(options: StenographOptions) {
     if (options.path) {
-      this.pathParts = typeof options.path === 'string'
-        ? [ options.path ]
-        : options.path
+      this.pathParts =
+        typeof options.path === 'string' ? [options.path] : options.path
     }
 
     this.levels = options.levels ?? []
@@ -35,10 +34,11 @@ export class Stenograph {
    *
    * @param path
    */
-  appendPath(path: string|string[]): this {
-    this.pathParts = typeof path === 'string'
-      ? [ ...this.pathParts, path ]
-      : [ ...this.pathParts, ...path ]
+  appendPath(path: string | string[]): this {
+    this.pathParts =
+      typeof path === 'string'
+        ? [...this.pathParts, path]
+        : [...this.pathParts, ...path]
     return this
   }
 
@@ -59,7 +59,7 @@ export class Stenograph {
    *
    * @param flag
    */
-  trace(flag: boolean = true): this {
+  trace(flag = true): this {
     this.gluedMessage.trace = flag
     return this
   }
@@ -88,8 +88,7 @@ export class Stenograph {
    * @param path
    */
   sub(...path: string[]): Stenograph {
-    return this.clone()
-      .appendPath(path)
+    return this.clone().appendPath(path)
   }
 
   /**
@@ -97,7 +96,9 @@ export class Stenograph {
    *
    * @param level
    */
-  findDefinition(level: StenographLevel): StenographLevelDefinition|undefined {
+  findDefinition(
+    level: StenographLevel,
+  ): StenographLevelDefinition | undefined {
     return this.levels.find((definition) => definition.name === level)
   }
 

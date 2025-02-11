@@ -1,17 +1,12 @@
-import process from 'process'
-import { User } from './models'
+import process from 'node:process'
+import type { ListenContext } from './index'
+import type { User } from './models'
 import { logger } from './stenograph/log'
-import { ListenContext } from './index'
 
 const authLogger = logger.sub('authorization')
 
-const listenStart = (
-  context: ListenContext,
-): void => {
-  const {
-    loki,
-    bot,
-  } = context
+const listenStart = (context: ListenContext): void => {
+  const { loki, bot } = context
 
   const users = loki.getCollection<User>('users')
 
@@ -60,7 +55,10 @@ const listenStart = (
 
     userLogger.info('User is successfully registered and logged in')
 
-    await bot.sendMessage(chatId, 'Вы успешно зарегистрировались в системе удаленного видеонаблюдения')
+    await bot.sendMessage(
+      chatId,
+      'Вы успешно зарегистрировались в системе удаленного видеонаблюдения',
+    )
   })
 }
 
@@ -68,9 +66,7 @@ const listenTakePhoto = (): void => {
   // TODO: integrate
 }
 
-export const listenInput = (
-  context: ListenContext,
-): void => {
+export const listenInput = (context: ListenContext): void => {
   listenStart(context)
   listenTakePhoto()
 }

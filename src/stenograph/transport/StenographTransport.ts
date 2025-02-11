@@ -1,12 +1,12 @@
-import { Stenograph } from '../Stenograph'
-import { StenographLevel, StenographMessage } from '../types'
+import type { Stenograph } from '../Stenograph'
+import type { StenographLevel, StenographMessage } from '../types'
 
 export type StenographTransportOptions = {
-  fromLevel?: StenographLevel,
+  fromLevel?: StenographLevel
 }
 
 export abstract class StenographTransport {
-  fromLevel: StenographLevel|undefined
+  fromLevel: StenographLevel | undefined
 
   protected constructor(options?: StenographTransportOptions) {
     this.fromLevel = options?.fromLevel
@@ -19,10 +19,7 @@ export abstract class StenographTransport {
    * @param message
    * @protected
    */
-  public push(
-    stenograph: Stenograph,
-    message: StenographMessage,
-  ): void {
+  public push(stenograph: Stenograph, message: StenographMessage): void {
     if (!this.testMessageLevel(stenograph, message)) {
       return
     }
@@ -50,10 +47,12 @@ export abstract class StenographTransport {
       return true
     }
 
-    const fromLevelIndex = stenograph.levels
-      .findIndex((level) => level.name === this.fromLevel)
-    const messageLevelIndex = stenograph.levels
-      .findIndex((level) => level.name === message.level.name)
+    const fromLevelIndex = stenograph.levels.findIndex(
+      (level) => level.name === this.fromLevel,
+    )
+    const messageLevelIndex = stenograph.levels.findIndex(
+      (level) => level.name === message.level.name,
+    )
 
     return messageLevelIndex <= fromLevelIndex
   }

@@ -1,11 +1,12 @@
-import { StenographFormatter, StenographMessage } from '../types'
+import type { StenographFormatter, StenographMessage } from '../types'
 
 export type StenographPrefixInliner = (
   message: StenographMessage,
   oldPrefix?: string,
-) => string|undefined|boolean
+) => string | undefined | boolean
 
-export const prefixFormat = (inliner: StenographPrefixInliner): StenographFormatter => (
+export const prefixFormat =
+  (inliner: StenographPrefixInliner): StenographFormatter =>
   (message) => {
     const result = inliner(message, message.prefix)
 
@@ -18,4 +19,3 @@ export const prefixFormat = (inliner: StenographPrefixInliner): StenographFormat
 
     return result
   }
-)

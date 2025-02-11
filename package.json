@@ -10,21 +10,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@elerance/eslint-config-react": "0.0.2-beta.4",
+    "@biomejs/biome": "1.9.4",
     "@types/jwt-encode": "^1.0.3",
     "@types/lokijs": "^1.5.14",
     "@types/node-telegram-bot-api": "^0.64.7",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/utils": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
-    "@typescript-eslint/scope-manager": "^7.2.0",
-    "eslint": "^8.57.0",
-    "eslint-find-rules": "^4.1.0",
-    "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-jsx-a11y": "^6.7.1",
-    "eslint-plugin-react": "^7.32.2",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-unicorn": "^47.0.0",
     "globals": "^15.14.0"
   },
   "dependencies": {
