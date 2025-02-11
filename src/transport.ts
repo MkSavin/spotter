@@ -45,10 +45,6 @@ const generateJWT = (): string =>
       exp: dayjs().unix() + 60 * 60,
     },
     process.env.FRIGATE_AUTH_SECRET ?? '',
-    {
-      typ: 'JWT',
-      alg: 'HS256',
-    },
   )
 
 export const broadcastEvent = async (
@@ -94,16 +90,6 @@ export const broadcastEvent = async (
         parse_mode: 'HTML',
       },
     )
-
-    // bot.sendMediaGroup(
-    //   chatId,
-    //   [
-    //
-    //   ],
-    //   {
-    //     disable_notification: true,
-    //   }
-    // )
 
     await bot.sendPhoto(
       chatId,

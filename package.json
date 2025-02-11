@@ -4,19 +4,23 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "start:watch": "bun --watch src/index.ts",
+    "test:pipe-message": "bun src/tests/testMessage.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@types/bun": "^1.2.2",
     "@types/jwt-encode": "^1.0.3",
     "@types/lokijs": "^1.5.14",
     "@types/node-telegram-bot-api": "^0.64.7",
     "globals": "^15.14.0"
   },
   "dependencies": {
+    "bun": "^1.2.2",
     "@types/request": "^2.48.12",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",

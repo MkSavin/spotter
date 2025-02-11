@@ -16,8 +16,10 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
-  "include": ["./src/*", "./src/bun.d.ts"],
+  "include": ["./src/*"],
   "exclude": ["node_modules"]
 }

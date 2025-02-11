@@ -7,6 +7,8 @@ dotenv.config()
 
 const mqtt = initTransport()
 
+const testLogger = logger.sub('test')
+
 mqtt.on('connect', () => {
   mqtt.publish(
     'frigate/events',
@@ -17,10 +19,10 @@ mqtt.on('connect', () => {
     },
     (error) => {
       if (error) {
-        logger.error(error)
+        testLogger.error(error)
       }
 
-      logger.info('Message sent')
+      testLogger.info('Message sent')
       process.exit(0)
     },
   )
