@@ -18,7 +18,7 @@ jobs:
 
     - name: 'Configure NPM token'
       run: |
-        tee .npmrc <<EOF
+        tee .npmrc <<'EOF'
         @elerance:registry=https://npm.pkg.github.com
         //npm.pkg.github.com/:_authToken=${{secrets.GITHUB_TOKEN}}
         EOF
