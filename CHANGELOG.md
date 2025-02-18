@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/MkSavin/elercam/compare/v1.1.1...v1.2.0) (2025-02-18)
+
+
+### Features
+
+* **transport:** Media message stream improvements ([3dee6ca](https://github.com/MkSavin/elercam/commit/3dee6cafbbfbcf805c9c92a5b97bcf5c79161075))
+
 ## [1.1.1](https://github.com/MkSavin/elercam/compare/v1.1.0...v1.1.1) (2025-02-11)
 
 
