@@ -1,10 +1,10 @@
 import process from 'node:process'
-import type { User } from '../models'
 import {
   Command,
   type CommandExecutionContext,
   type CommandInitContext,
-} from './Command'
+} from '../framework/commands/Command'
+import type { User } from '../models'
 
 export class AuthorizeCommand extends Command {
   signature = 'auth [password]'

@@ -1,4 +1,7 @@
-import { Command, type CommandExecutionContext } from './Command'
+import {
+  Command,
+  type CommandExecutionContext,
+} from '../framework/commands/Command'
 
 export class HelpCommand extends Command {
   signature = 'help'
@@ -10,7 +13,7 @@ export class HelpCommand extends Command {
 
     const description = (
       await Promise.all(
-        commandRegistry.list.map(async (command) => ({
+        commandRegistry.commands.map(async (command) => ({
           command,
           filter: await command.authorize(context),
         })),

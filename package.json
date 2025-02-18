@@ -6,8 +6,9 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:watch": "bun --watch src/index.ts",
-    "test:pipe-message": "bun src/tests/testMessage.ts"
+    "test:pipe-event": "bun src/tests/pipeEvent.ts"
   },
+  "private": "true",
   "keywords": [],
   "author": "",
   "license": "ISC",

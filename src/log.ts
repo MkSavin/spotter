@@ -1,12 +1,12 @@
-import { Stenograph } from './Stenograph'
-import { combineFormat } from './format/combineFormat'
-import { pathJoinFormat } from './format/pathJoinFormat'
-import { prefixFormat } from './format/prefixFormat'
+import { Stenograph } from './framework/stenograph/Stenograph'
+import { combineFormat } from './framework/stenograph/format/combineFormat'
+import { pathJoinFormat } from './framework/stenograph/format/pathJoinFormat'
+import { prefixFormat } from './framework/stenograph/format/prefixFormat'
 import {
   StenographConsole,
   consoleRenderer,
-} from './transport/StenographConsole'
-import type { StenographLevelRepository } from './types'
+} from './framework/stenograph/transport/StenographConsole'
+import type { StenographLevelRepository } from './framework/stenograph/types'
 
 const levels: StenographLevelRepository = [
   {

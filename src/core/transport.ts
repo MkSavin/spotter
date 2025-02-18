@@ -1,6 +1,6 @@
 import process from 'node:process'
 import mqtt from 'mqtt'
-import { logger } from '../stenograph/log'
+import { logger } from '../log'
 
 export const initTransport = (): mqtt.MqttClient => {
   const host = process.env.MQTT_HOST ?? ''

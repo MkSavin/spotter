@@ -2,12 +2,12 @@ import dotenv from 'dotenv'
 import type Loki from 'lokijs'
 import type mqtt from 'mqtt'
 import type TelegramBot from 'node-telegram-bot-api'
-import { listenInput } from './commands'
 import { initBot } from './core/bot'
 import { initDatabase } from './core/database'
 import { initTransport, subscribeTransportTopic } from './core/transport'
 import { initCollections } from './models'
-import { listenTransport } from './transport'
+import './commands/VersionCommand'
+import { service } from './service'
 
 dotenv.config()
 
@@ -38,7 +38,4 @@ export const initialize = (
   }
 }
 
-initialize((context) => {
-  listenInput(context)
-  listenTransport(context)
-})
+initialize(service)

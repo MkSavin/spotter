@@ -1,6 +1,6 @@
 import process from 'node:process'
 import TelegramBot from 'node-telegram-bot-api'
-import { logger } from '../stenograph/log'
+import { logger } from '../log'
 
 export const initBot = (): TelegramBot => {
   const token = process.env.TELEGRAM_TOKEN ?? ''

@@ -1,4 +1,7 @@
-import { Command, type CommandExecutionContext } from './Command'
+import {
+  Command,
+  type CommandExecutionContext,
+} from '../framework/commands/Command'
 
 export class StartCommand extends Command {
   signature = 'start'

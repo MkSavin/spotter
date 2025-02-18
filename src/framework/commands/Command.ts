@@ -1,9 +1,9 @@
 import type TelegramBot from 'node-telegram-bot-api'
+import type { ListenContext } from '../../index'
+import { logger } from '../../log'
+import type { User } from '../../models'
 import type { FrigateAPI } from '../api/FrigateAPI'
-import type { ListenContext } from '../index'
-import type { User } from '../models'
 import type { Stenograph } from '../stenograph/Stenograph'
-import { logger } from '../stenograph/log'
 import type { CommandRegistry } from './CommandRegistry'
 
 export type CommandInitContext = ListenContext
@@ -27,17 +27,17 @@ export abstract class Command {
 
   logger: Stenograph
 
-  constructor(_: CommandInitContext) {
+  constructor(_context: CommandInitContext) {
     this.logger = logger
   }
 
-  async testArguments(context: CommandExecutionContext): Promise<boolean> {
+  async testArguments(_context: CommandExecutionContext): Promise<boolean> {
     return true
   }
 
-  async authorize(context: CommandExecutionContext): Promise<boolean> {
+  async authorize(_context: CommandExecutionContext): Promise<boolean> {
     return true
   }
 
-  abstract execute(context: CommandExecutionContext): Promise<void>
+  abstract execute(_context: CommandExecutionContext): Promise<void>
 }

@@ -1,6 +1,9 @@
 import Bun from 'bun'
 import information from '../../package.json'
-import { Command, type CommandExecutionContext } from './Command'
+import {
+  Command,
+  type CommandExecutionContext,
+} from '../framework/commands/Command'
 
 export class VersionCommand extends Command {
   signature = 'version'

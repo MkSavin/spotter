@@ -1,6 +1,9 @@
 import dayjs from 'dayjs'
+import {
+  Command,
+  type CommandExecutionContext,
+} from '../framework/commands/Command'
 import { resolveLatestFrame } from '../mediaResolve'
-import { Command, type CommandExecutionContext } from './Command'
 
 export class SnapshotCommand extends Command {
   signature = 'snapshot'

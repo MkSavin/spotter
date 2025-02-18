@@ -1,6 +1,6 @@
 import dotenv from 'dotenv'
 import { initTransport } from '../core/transport'
-import { logger } from '../stenograph/log'
+import { logger } from '../log'
 import message from './message-1.json'
 
 dotenv.config()

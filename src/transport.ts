@@ -1,11 +1,11 @@
 import dayjs from 'dayjs'
 import type { Collection } from 'lokijs'
-import { FrigateAPI } from './api/FrigateAPI'
+import { FrigateAPI } from './framework/api/FrigateAPI'
 import type { ListenContext } from './index'
+import { logger } from './log'
 import { resolveEventFile } from './mediaResolve'
 import type { User } from './models'
 import { objectLabels } from './objectLabels'
-import { logger } from './stenograph/log'
 
 const eventSystemLogger = logger.sub('event')
 
@@ -31,15 +31,15 @@ export const broadcastEvent = async (
   const objectLabel =
     objectLabels[event.label as keyof typeof objectLabels] ?? event.label
 
-  const api = new FrigateAPI(eventLogger)
+  const api = new FrigateAPI()
 
-  const snapshotFile = api.get(resolveEventFile(event.id, 'snapshot.jpg'))
-  const clipFile = api.get(resolveEventFile(event.id, 'clip.mp4'))
+  const snapshotFile = await api.get(resolveEventFile(event.id, 'snapshot.jpg'))
+  const clipFile = await api.get(resolveEventFile(event.id, 'clip.mp4'))
 
   const sendToChat = async (chatId: number): Promise<void> => {
     const message = await bot.sendMessage(
       chatId,
-      `<b>Обнаружено движение!</b> <a href="${snapshotFile.uri.href}">${event.id}</a>\n` +
+      `<b>Обнаружено движение!</b> <a href="${snapshotFile.url}">${event.id}</a>\n` +
         `👀 ${event.stationary ? 'Стац.' : 'Движ.'} <code>${objectLabel}</code> [${event.score}]\n` +
         `📆 <code>${formattedDateTime}</code> | 📹 <i>${event.camera}</i>\n`,
       {
@@ -47,31 +47,23 @@ export const broadcastEvent = async (
       },
     )
 
-    await bot.sendPhoto(
+    await bot.sendMediaGroup(
       chatId,
-      snapshotFile,
+      [
+        {
+          type: 'photo',
+          // @ts-ignore
+          media: Buffer.from(await snapshotFile.arrayBuffer()),
+        },
+        {
+          type: 'video',
+          // @ts-ignore
+          media: Buffer.from(await clipFile.arrayBuffer()),
+        },
+      ],
       {
-        reply_to_message_id: message.message_id,
-        caption: `<a href="${snapshotFile.uri.href}">Снимок</a>`,
-        parse_mode: 'HTML',
         disable_notification: true,
-      },
-      {
-        filename: `snapshot-${event.id}.jpg`,
-      },
-    )
-
-    await bot.sendVideo(
-      chatId,
-      clipFile,
-      {
         reply_to_message_id: message.message_id,
-        caption: `<a href="${clipFile.uri.href}">Видеоотрезок</a>`,
-        parse_mode: 'HTML',
-        disable_notification: true,
-      },
-      {
-        filename: `clip-${event.id}.mp4`,
       },
     )
   }

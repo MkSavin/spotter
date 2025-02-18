@@ -1,6 +1,6 @@
+import type { ListenContext } from '../../index'
+import type { User } from '../../models'
 import { FrigateAPI } from '../api/FrigateAPI'
-import type { ListenContext } from '../index'
-import type { User } from '../models'
 import type {
   Command,
   CommandExecutionContext,
@@ -8,28 +8,37 @@ import type {
 } from './Command'
 
 export class CommandRegistry {
-  list: Command[] = []
+  static instance: CommandRegistry = new CommandRegistry()
 
-  context: ListenContext
+  private commandClasses: (typeof Command)[] = []
+  private commandInstances: Command[] = []
 
-  constructor(context: ListenContext, list: (typeof Command)[] = []) {
-    this.context = context
+  public get commands(): Command[] {
+    return this.commandInstances
+  }
 
-    this.list = list.map((commandClass) => {
+  public enrich(classes: (typeof Command)[]): void {
+    this.commandClasses = classes
+  }
+
+  public register(commandClass: typeof Command): void {
+    this.commandClasses.push(commandClass)
+  }
+
+  public listen(context: ListenContext): void {
+    const { bot, loki } = context
+
+    this.commandInstances = this.commandClasses.map((commandClass) => {
       const Class = commandClass as {
         new (context: CommandInitContext): Command
       }
 
-      return new Class(this.context)
+      return new Class(context)
     })
-  }
 
-  listen(): void {
-    const { bot } = this.context
+    const users = loki.getCollection<User>('users')
 
-    const users = this.context.loki.getCollection<User>('users')
-
-    this.list.forEach((command) => {
+    for (const command of this.commandInstances) {
       bot.onText(command.regexp, async (message, match) => {
         const chatId = message.chat.id
 
@@ -40,7 +49,7 @@ export class CommandRegistry {
         const api = new FrigateAPI(command.logger)
 
         const executionContext: CommandExecutionContext = {
-          ...this.context,
+          ...context,
 
           api,
           commandRegistry: this,
@@ -76,6 +85,6 @@ export class CommandRegistry {
 
         await command.execute(executionContext)
       })
-    })
+    }
   }
 }
