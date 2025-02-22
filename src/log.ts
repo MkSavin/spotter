@@ -16,12 +16,14 @@ const levels: StenographLevelRepository = [
   },
   {
     name: 'warn',
-    icon: '!',
+    // /!\ - biome replaces with incorrect char
+    icon: '\u{26a0}\u{fe0f}',
     console: consoleRenderer.warn,
   },
   {
     name: 'info',
-    icon: 'i',
+    // [i] - biome replaces with incorrect char
+    icon: '\u{2139}\u{fe0f}',
     console: consoleRenderer.info,
   },
   {
