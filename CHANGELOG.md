@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/MkSavin/elercam/compare/v1.2.0...v1.2.1) (2025-02-22)
+
+
+### Bug Fixes
+
+* **log:** Logging emojis fixed ([409dc39](https://github.com/MkSavin/elercam/commit/409dc390a6d577174c65de9558c1f429c74de069))
+
 # [1.2.0](https://github.com/MkSavin/elercam/compare/v1.1.1...v1.2.0) (2025-02-18)
 
 
