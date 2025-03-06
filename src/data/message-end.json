@@ -1,0 +1,69 @@
+{
+  "type": "end",
+  "before": {
+    "id": "1740682122.991277-4k5zd1",
+    "camera": "front",
+    "frame_time": 1607123961.837752,
+    "snapshot_time": 1607123961.837752,
+    "label": "person",
+    "sub_label": null,
+    "top_score": 0.958984375,
+    "false_positive": false,
+    "start_time": 1607123955.475377,
+    "end_time": null,
+    "score": 0.7890625,
+    "box": [424, 500, 536, 712],
+    "area": 23744,
+    "ratio": 2.113207,
+    "region": [264, 450, 667, 853],
+    "current_zones": ["driveway"],
+    "entered_zones": ["yard", "driveway"],
+    "thumbnail": null,
+    "has_snapshot": false,
+    "has_clip": false,
+    "active": true,
+    "stationary": false,
+    "motionless_count": 0,
+    "position_changes": 2,
+    "attributes": {
+      "face": 0.64
+    },
+    "current_attributes": []
+  },
+  "after": {
+    "id": "1740682122.991277-4k5zd1",
+    "camera": "front",
+    "frame_time": 1607123962.082975,
+    "snapshot_time": 1607123961.837752,
+    "label": "person",
+    "sub_label": ["Ivan Ivanov", 0.79],
+    "top_score": 0.958984375,
+    "false_positive": false,
+    "start_time": 1607123955.475377,
+    "end_time": 1607124955.475377,
+    "score": 0.87890625,
+    "box": [432, 496, 544, 854],
+    "area": 40096,
+    "ratio": 1.251397,
+    "region": [218, 440, 693, 915],
+    "current_zones": ["yard", "driveway"],
+    "entered_zones": ["yard", "driveway"],
+    "thumbnail": null,
+    "has_snapshot": true,
+    "has_clip": true,
+    "active": true,
+    "stationary": false,
+    "motionless_count": 0,
+    "position_changes": 2,
+    "attributes": {
+      "face": 0.86
+    },
+    "current_attributes": [
+      {
+        "label": "face",
+        "box": [442, 506, 534, 524],
+        "score": 0.86
+      }
+    ]
+  }
+}

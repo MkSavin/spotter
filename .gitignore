@@ -8,4 +8,6 @@ package-lock.json
 .env.test.local
 .env.production.local
 *.db
+*.db-journal
 .idea
+/.docker
