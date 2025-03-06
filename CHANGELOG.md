@@ -1,3 +1,18 @@
+# [2.0.0](https://github.com/MkSavin/elercam/compare/v1.2.1...v2.0.0) (2025-03-06)
+
+
+* feat!: Version bump ([d5dd8c4](https://github.com/MkSavin/elercam/commit/d5dd8c49ab6e1029a6d37335e24d42a2fd3a927d))
+
+
+### Bug Fixes
+
+* jwt-encode package removed ([ba3b39e](https://github.com/MkSavin/elercam/commit/ba3b39e8c38044c2c009457ee5d099ae896f83c6))
+
+
+### BREAKING CHANGES
+
+* Bot workflow reworked
+
 ## [1.2.1](https://github.com/MkSavin/elercam/compare/v1.2.0...v1.2.1) (2025-02-22)
 
 
