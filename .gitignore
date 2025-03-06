@@ -11,3 +11,4 @@ package-lock.json
 *.db-journal
 .idea
 /.docker
+config.ts

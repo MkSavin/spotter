@@ -4,7 +4,9 @@ WORKDIR /app
 
 COPY . .
 
-RUN apt-get update && apt-get install -y ffmpeg
+RUN apk update
+RUN apk upgrade
+RUN apk add --no-cache ffmpeg
 
 EXPOSE 4000
 
