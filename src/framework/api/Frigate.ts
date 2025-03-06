@@ -1,6 +1,6 @@
 import process from 'node:process'
 import dayjs from 'dayjs'
-import signJWT from 'jwt-encode'
+import jwt from 'jsonwebtoken'
 
 export const frigateMedia = {
   event: {
@@ -16,12 +16,13 @@ const host = process.env.FRIGATE_REMOTE_URL?.trim() ?? ''
 
 export class Frigate {
   public static generateJWT(): string {
-    return signJWT(
+    return jwt.sign(
       {
         sub: process.env.FRIGATE_AUTH_USER,
         exp: dayjs().unix() + 60 * 60,
       },
       process.env.FRIGATE_AUTH_SECRET ?? '',
+      { algorithm: 'HS256' },
     )
   }
 
