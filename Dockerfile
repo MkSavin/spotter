@@ -8,6 +8,8 @@ RUN apk update
 RUN apk upgrade
 RUN apk add --no-cache ffmpeg
 
+RUN bunx prisma generate
+
 EXPOSE 4000
 
 CMD ["bun", "run", "start"]
