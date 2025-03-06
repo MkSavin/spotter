@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/MkSavin/elercam/compare/v2.0.0...v2.0.1) (2025-03-06)
+
+
+### Bug Fixes
+
+* Prisma generator targets assigned ([057b39b](https://github.com/MkSavin/elercam/commit/057b39b20c9358d0d32c711d7fabe1607c195dc9))
+
 # [2.0.0](https://github.com/MkSavin/elercam/compare/v1.2.1...v2.0.0) (2025-03-06)
 
 
