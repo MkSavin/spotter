@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/MkSavin/elercam/compare/v2.0.1...v2.0.2) (2025-03-07)
+
+
+### Bug Fixes
+
+* Camera name translation added to snapshot command ([e138b37](https://github.com/MkSavin/elercam/commit/e138b37f01cdaefda6855087b1f964a0128eb762))
+
 ## [2.0.1](https://github.com/MkSavin/elercam/compare/v2.0.0...v2.0.1) (2025-03-06)
 
 
