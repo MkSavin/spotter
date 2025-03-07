@@ -6,10 +6,10 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:watch": "bun --watch src/index.ts",
+    "sign:token": "bun src/cli/sign.ts",
     "prisma:generate": "bunx prisma generate",
-    "dev:startup": "docker compose -f docker-compose-development.yml up -d --force-recreate",
-    "dev:list": "docker compose -f docker-compose-development.yml ps",
-    "dev:stop": "docker compose -f docker-compose-development.yml stop"
+    "docker:dev": "ln -sf docker-compose.development.yml docker-compose.yml",
+    "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml"
   },
   "private": "true",
   "keywords": [],
@@ -20,7 +20,6 @@
     "@types/bun": "^1.2.2",
     "@types/lodash": "^4.17.15",
     "@types/tmp": "^0.2.6",
-    "globals": "^15.14.0",
     "prisma": "^6.4.1"
   },
   "dependencies": {
@@ -31,7 +30,6 @@
     "@prisma/client": "^6.4.1",
     "@types/fluent-ffmpeg": "^2.1.27",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/request": "^2.48.12",
     "bun": "^1.2.2",
     "c12": "^3.0.2",
     "dayjs": "^1.11.13",
