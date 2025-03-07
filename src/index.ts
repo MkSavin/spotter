@@ -41,6 +41,10 @@ const initialize = (initContext: InitContext): Bot<Context> => {
     context.prisma = prisma
     context.frigate = initContext.frigate
     context.mqtt = initContext.mqtt
+    context.content = {
+      cameraLabels: initContext.cameraLabels,
+      objectLabels: initContext.objectLabels,
+    }
     await next()
   })
 

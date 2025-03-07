@@ -44,6 +44,8 @@ export type ShiftedContext = {
   mqtt: mqtt.MqttClient
   frigate: Frigate
 
+  content: ContentConfig
+
   auth: AuthorizationContext | null
 }
 

@@ -1,6 +1,7 @@
 import { Command } from '@grammyjs/commands'
 import dayjs from 'dayjs'
 import { InputFile } from 'grammy'
+import get from 'lodash/get'
 import type { Context } from '../../context'
 import { frigateMedia } from '../../framework/api/Frigate'
 import { processSnapshot } from '../../media/processing/processMedia'
@@ -21,7 +22,7 @@ export const snapshotCommand = new Command<Context>(
       return next()
     }
 
-    const camera = context.match.trim().toLowerCase()
+    const cameraName = context.match.trim().toLowerCase()
 
     const message = await context.replyWithHTML(
       '🖼 <b>Получаем снимок с камеры...</b>',
@@ -30,7 +31,7 @@ export const snapshotCommand = new Command<Context>(
     await context.replyWithChatAction('upload_photo')
 
     const image = await context.frigate.get(frigateMedia.camera.latest, {
-      camera,
+      camera: cameraName,
     })
 
     if (image.status !== 200) {
@@ -53,10 +54,16 @@ export const snapshotCommand = new Command<Context>(
 
       const processedBuffer = await processSnapshot(buffer)
 
+      const camera = get(
+        context.content.cameraLabels,
+        context.match.trim().toLowerCase(),
+        cameraName,
+      )
+
       await message.editMedia({
         type: 'photo',
         media: new InputFile(processedBuffer),
-        caption: `<b>Снимок с камеры</b> | 📆 ${dayjs().format('DD.MM HH:mm')} | 📹 ${camera}`,
+        caption: `<b>Снимок с камеры</b> | 📆 ${dayjs().format('DD.MM HH:mm')} | ${camera}`,
         parse_mode: 'HTML',
       })
     } catch {
