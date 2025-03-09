@@ -1,7 +1,7 @@
 import type { Event } from '@prisma/client'
 import dayjs from 'dayjs'
-import get from 'lodash/get'
 import type { InitContext } from '../../context'
+import { get } from '../../helpers/get'
 import type { MediaTuple } from './feedMedia'
 
 export const renderEvent = (
@@ -25,8 +25,8 @@ export const renderEvent = (
 
   const duration = endDate?.diff(startDate, 'minutes')
 
-  const label = get(context.objectLabels, event.label ?? 'неизв. объект')
-  const camera = get(context.cameraLabels, event.camera ?? 'неизв. камера')
+  const label = get(context.objectLabels, event.label ?? '', 'неизв. объект')
+  const camera = get(context.cameraLabels, event.camera, 'неизв. камера')
 
   const score = Math.round(event.score * 1000) / 10
 

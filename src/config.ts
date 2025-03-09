@@ -1,6 +1,29 @@
+import path from 'node:path'
 import process from 'node:process'
-import { loadConfig } from 'c12'
 import type { Config, ContentConfig } from './context'
+import { logger as baseLogger } from './log'
+
+const logger = baseLogger.sub('config')
+
+const tryReadContentConfig = async (
+  filePath: string,
+  defaultConfig: ContentConfig,
+): Promise<ContentConfig> => {
+  try {
+    const imported = await import(filePath)
+
+    logger.debug(`Using config file on path ${filePath}`)
+
+    return {
+      ...defaultConfig,
+      ...imported.default,
+    }
+  } catch (e) {
+    logger.debug('Config file not found. Falling back to default settings')
+
+    return defaultConfig
+  }
+}
 
 export const pullConfig = async (): Promise<Config> => {
   const token = process.env.TELEGRAM_TOKEN
@@ -21,8 +44,9 @@ export const pullConfig = async (): Promise<Config> => {
     throw new Error('Bad configuration. Frigate remote host is not assigned')
   }
 
-  const { config } = await loadConfig<ContentConfig>({
-    defaults: {
+  const config: ContentConfig = await tryReadContentConfig(
+    path.resolve(process.cwd(), 'config.ts'),
+    {
       objectLabels: {
         person: '🧍 человек',
         car: '🚗 машина',
@@ -36,7 +60,7 @@ export const pullConfig = async (): Promise<Config> => {
         side: '🎥 боковая',
       },
     },
-  })
+  )
 
   return {
     token,

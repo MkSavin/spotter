@@ -18,12 +18,12 @@ jobs:
         fetch-depth: 0
         persist-credentials: false
 
-    - name: Setup Biome
+    - name: 'Setup Biome'
       uses: biomejs/setup-biome@v2
       with:
         version: latest
 
-    - name: Run Biome
+    - name: 'Run Biome'
       run: biome ci .
 
     - name: 'Login to GitHub Container Registry'
@@ -43,6 +43,9 @@ jobs:
       run: bunx semantic-release
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+    - name: 'Build application'
+      run: bun run build
 
     - name: 'Build Inventory Image'
       run: |

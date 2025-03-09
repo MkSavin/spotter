@@ -1,7 +1,7 @@
 import type { Event } from '@prisma/client'
 import type { Bot } from 'grammy'
-import omit from 'lodash/omit'
 import type { Context, InitContext } from '../../context'
+import { omit } from '../../helpers/omit'
 import { feedMedia, resolveMedia } from './feedMedia'
 import { renderEvent } from './renderEvent'
 import type { EventMessage } from '.prisma/client'
