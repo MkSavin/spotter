@@ -25,7 +25,10 @@ RUN apk update
 RUN apk upgrade
 RUN apk add --no-cache ffmpeg
 
+# Copy binary tooling
 COPY --from=bundle /app/node_modules/@img ./node_modules/@img
+COPY --from=bundle /app/node_modules/.prisma/client ./node_modules/.prisma/client
+
 COPY --from=bundle /app/dist/index.js ./
 COPY --from=bundle /app/package.json ./
 
