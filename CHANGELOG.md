@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/MkSavin/elercam/compare/v2.1.1...v2.1.2) (2025-03-09)
+
+
+### Bug Fixes
+
+* Dockerfile tooling copying fixed ([ba0fc96](https://github.com/MkSavin/elercam/commit/ba0fc96d7e3365979089d50b203bb7b81fb2f695))
+
 ## [2.1.1](https://github.com/MkSavin/elercam/compare/v2.1.0...v2.1.1) (2025-03-09)
 
 
