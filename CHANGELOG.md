@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/MkSavin/elercam/compare/v2.1.0...v2.1.1) (2025-03-09)
+
+
+### Bug Fixes
+
+* Build fixed and fully reworked ([058af1e](https://github.com/MkSavin/elercam/commit/058af1eaa4e85617bea637cc8623fdf196e612ca))
+
 # [2.1.0](https://github.com/MkSavin/elercam/compare/v2.0.2...v2.1.0) (2025-03-09)
 
 
