@@ -1,0 +1,39 @@
+# IDE files
+/.idea
+/.vscode
+
+# Bundles
+/dist
+
+# System-related
+/.DS_Store
+
+# Deployment
+/.deployment
+/.docker
+/.github
+
+# GIT
+/.git
+.gitignore
+.gitattributes
+
+# Environments and configuration
+.env.example
+config.ts
+
+# Development configurations
+biome.json
+.releaserc
+
+# Testing
+coverage*
+
+# Docker
+docker-compose*
+Dockerfile*
+.dockerignore
+
+# Other
+CHANGELOG.md
+LICENSE.md

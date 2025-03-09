@@ -44,9 +44,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-    - name: 'Build application'
-      run: bun run build
-
     - name: 'Build Inventory Image'
       run: |
         docker build . --build-arg NPM_TOKEN=${{secrets.GITHUB_TOKEN}} --file Dockerfile --tag ghcr.io/mksavin/elercam:latest

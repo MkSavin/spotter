@@ -6,11 +6,13 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:watch": "bun --watch src/index.ts",
-    "build": "bun ./src/build.ts",
+    "build": "bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable",
     "sign:token": "bun src/cli/sign.ts",
     "prisma:generate": "bunx prisma generate",
     "docker:dev": "ln -sf docker-compose.development.yml docker-compose.yml",
-    "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml"
+    "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml",
+    "docker:build": "docker build . --file Dockerfile",
+    "docker:run": "docker run -it --rm $(docker build . -q --file Dockerfile)"
   },
   "private": "true",
   "keywords": [],
@@ -30,7 +32,6 @@
     "@grammyjs/parse-mode": "^1.11.1",
     "@grammyjs/runner": "^2.0.3",
     "@prisma/client": "^6.4.1",
-    "bun": "^1.2.2",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
     "fluent-ffmpeg": "^2.1.3",
