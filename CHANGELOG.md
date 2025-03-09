@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/MkSavin/elercam/compare/v2.0.2...v2.1.0) (2025-03-09)
+
+
+### Features
+
+* Application bundling added ([08b4078](https://github.com/MkSavin/elercam/commit/08b4078c85f8505c74c5de9e4a4fdf83356820f9))
+
 ## [2.0.2](https://github.com/MkSavin/elercam/compare/v2.0.1...v2.0.2) (2025-03-07)
 
 
