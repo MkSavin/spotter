@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/MkSavin/elercam/compare/v2.1.2...v2.1.3) (2025-03-11)
+
+
+### Bug Fixes
+
+* Event transport verbose log added ([b17f11f](https://github.com/MkSavin/elercam/commit/b17f11f7820cb9a66faeab9ca29ee1671b7d9ec4))
+
 ## [2.1.2](https://github.com/MkSavin/elercam/compare/v2.1.1...v2.1.2) (2025-03-09)
 
 
