@@ -12,6 +12,7 @@
 /.deployment
 /.docker
 /.github
+/.turbo
 
 # Caching
 /.turbo
