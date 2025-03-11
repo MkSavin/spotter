@@ -2,12 +2,13 @@ version: '3.8'
 
 services:
   elercam:
-    image: ghcr.io/mksavin/elercam:latest
+    image: ghcr.io/mksavin/elercam-bot:latest
     # build: .
     container_name: elercam
     restart: unless-stopped
     volumes:
       - ./.env:/app/.env
+#      - ./media:/media
       - ./config.ts:/app/config.ts
     networks:
       - mongo
@@ -50,6 +51,26 @@ services:
       #  ME_CONFIG_MONGODB_ADMINPASSWORD: example
       ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
       ME_CONFIG_BASICAUTH: false
+
+  elercam-media-1:
+    image: ghcr.io/mksavin/elercam-media:latest
+    restart: unless-stopped
+    volumes:
+      - ./media:/media
+    environment:
+      FRIGATE_LOCAL_URL: http://localhost:3080/ # warning: use host without authorization!
+      MEDIA_PUBLIC_PATH: /media
+      MEDIA_TEMP_PATH: /tmp
+
+  elercam-media-2:
+    image: ghcr.io/mksavin/elercam-media:latest
+    restart: unless-stopped
+    volumes:
+      - ./media:/media
+    environment:
+      FRIGATE_LOCAL_URL: http://localhost:3080/ # warning: use host without authorization!
+      MEDIA_PUBLIC_PATH: /media
+      MEDIA_TEMP_PATH: /tmp
 
 networks:
   mongo:

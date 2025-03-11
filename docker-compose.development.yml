@@ -36,13 +36,89 @@ services:
       ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
       ME_CONFIG_BASICAUTH: false
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    restart: unless-stopped
+    networks:
+      - kafka
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    restart: unless-stopped
+    networks:
+      - kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - '9092:9092'
+      - '9997:9997'
+      - '29092:29092'
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_HOSTNAME: kafka
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    networks:
+      - kafka
+    ports:
+      - '8082:8080'
+    depends_on:
+      - zookeeper
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+
+  kafka-init:
+    image: confluentinc/cp-kafka:latest
+    networks:
+      - kafka
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka:29092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter-media-event --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter-media-lastFrame --replication-factor 1 --partitions 1
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter-media-processed --replication-factor 1 --partitions 1
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:29092 --list
+      "
+
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - 1883:1883
-      - 8883:8883
-      - 9001:9001
+      - '1883:1883'
+      - '8883:8883'
+      - '9001:9001'
     volumes:
       - ./.deployment/mosquitto/config:/mosquitto/config
       - ./.docker/mosquitto/data:/mosquitto/data
+
+networks:
+  kafka:
+    driver: bridge

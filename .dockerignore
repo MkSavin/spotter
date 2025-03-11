@@ -37,7 +37,7 @@ coverage*
 
 # Docker
 docker-compose*
-Dockerfile*
+apps/bot/Dockerfile
 .dockerignore
 
 # Other

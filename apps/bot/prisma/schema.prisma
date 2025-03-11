@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Chat {
+  id            String   @id @map("_id")
+  token         String
+  authorized_at DateTime @default(now())
+}
+
+model User {
+  id            String   @id @map("_id")
+  chat_id       String
+  role          Role     @default(USER)
+  token         String
+  authorized_at DateTime @default(now())
+
+  @@unique([id, chat_id])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+type EventMessage {
+  id                Int
+  chat_id           String
+}
+
+model Event {
+  id                String  @id @map("_id")
+  camera            String
+  label             String?
+  start_time        Float
+  end_time          Float?
+  score             Float
+  stationary        Boolean @default(false)
+  has_clip          Boolean @default(false)
+  has_snapshot      Boolean @default(false)
+  type              String  @default("start")
+  messages          EventMessage[]
+}

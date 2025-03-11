@@ -1,0 +1,10 @@
+{
+  "name": "stenograph",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.ts",
+  "private": "true",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT"
+}
