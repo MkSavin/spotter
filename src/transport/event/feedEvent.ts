@@ -13,6 +13,7 @@ export const feedEvent = async (
   const event = validateEvent(contents)
 
   if (!event) {
+    context.logger.verbose('Bad event!')
     return
   }
 
@@ -20,7 +21,7 @@ export const feedEvent = async (
     `${event.code} (${dayjs.unix(event.start_time).format('YYYY-MM-DD HH:mm')}) [${event.type}]`,
   )
 
-  logger.debug('Trying to feed received event')
+  logger.debug('Trying to feed received event', event)
 
   const nextContext = {
     ...context,
