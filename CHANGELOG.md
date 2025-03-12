@@ -1,3 +1,10 @@
+## [2.1.5](https://github.com/MkSavin/elercam/compare/v2.1.4...v2.1.5) (2025-03-12)
+
+
+### Bug Fixes
+
+* Buggy event recognition added ([6de8b0b](https://github.com/MkSavin/elercam/commit/6de8b0b27155678701353b54f8da3a36e89f5f50))
+
 ## [2.1.4](https://github.com/MkSavin/elercam/compare/v2.1.3...v2.1.4) (2025-03-12)
 
 
