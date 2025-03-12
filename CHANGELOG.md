@@ -1,3 +1,10 @@
+## [2.1.4](https://github.com/MkSavin/elercam/compare/v2.1.3...v2.1.4) (2025-03-12)
+
+
+### Bug Fixes
+
+* Event type recognition logic fixes ([6b6ec2c](https://github.com/MkSavin/elercam/commit/6b6ec2c4b84e769d71f4a83beb35bfe31efd44ae))
+
 ## [2.1.3](https://github.com/MkSavin/elercam/compare/v2.1.2...v2.1.3) (2025-03-11)
 
 
