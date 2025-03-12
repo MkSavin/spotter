@@ -8,6 +8,9 @@ export const validateEvent = (contents: any): Event | null => {
     return null
   }
 
+  const type =
+    contents.type === 'start' || contents.type === 'new' ? 'start' : 'end'
+
   return {
     id: event.id,
     code: event.id?.split('-').at(1) ?? event.id,
@@ -24,7 +27,7 @@ export const validateEvent = (contents: any): Event | null => {
     stationary: event.stationary,
     has_clip: event.has_clip,
     has_snapshot: event.has_snapshot,
-    type: contents.type,
+    type,
     messages: [],
   }
 }

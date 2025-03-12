@@ -40,14 +40,14 @@ export const eventTransport = async (
 
   const dequeue = async (): Promise<void> => {
     if (dequeuing) {
-      context.logger.verbose('Already dequeuing!')
+      logger.verbose('Already dequeuing!')
       return
     }
 
     dequeuing = true
     while (queue.length > 0) {
       const message = queue.shift()
-      context.logger.verbose('Dequeued message', message)
+      logger.verbose('Dequeued message', message)
       await feedEvent(bot, propagatedContext, message)
     }
     dequeuing = false
@@ -55,7 +55,7 @@ export const eventTransport = async (
 
   mqtt.on('message', async (_, payload) => {
     const message = JSON.parse(payload.toString())
-    context.logger.verbose('Piped message to queue', message)
+    logger.verbose('Piped message to queue', message)
     queue.push(message)
     await dequeue()
   })

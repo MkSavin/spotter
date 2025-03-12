@@ -28,9 +28,10 @@ export const feedEvent = async (
     logger,
   }
 
-  if (event.type === 'start') {
-    await feedStartEvent(bot, nextContext, event)
-  } else {
+  if (event.type === 'end') {
     await feedEndEvent(bot, nextContext, event)
+    return
   }
+
+  await feedStartEvent(bot, nextContext, event)
 }
