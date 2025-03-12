@@ -1,3 +1,10 @@
+## [2.1.7](https://github.com/MkSavin/elercam/compare/v2.1.6...v2.1.7) (2025-03-12)
+
+
+### Bug Fixes
+
+* Empty snapshot buffer message added ([f6a570e](https://github.com/MkSavin/elercam/commit/f6a570e9d3ba8ce5b87f6742c7074eefd475d085))
+
 ## [2.1.6](https://github.com/MkSavin/elercam/compare/v2.1.5...v2.1.6) (2025-03-12)
 
 
