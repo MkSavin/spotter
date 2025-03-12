@@ -25,7 +25,7 @@ export const signCommand = new Command<Context>(
       {
         role,
       },
-      process.env.AUTH_SECRET ?? '',
+      process.env.AUTH_SECRET || '',
       { algorithm: 'HS256' },
     )
 

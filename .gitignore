@@ -9,6 +9,8 @@
 /*/**/.turbo
 /*/**/.vite
 
+/*/**/temp
+
 # Databases
 *.db
 *.db-journal

@@ -1,4 +1,3 @@
-import path from 'node:path'
 import dotenv from 'dotenv'
 import { Kafka } from 'kafkajs'
 import information from '../package.json'
@@ -8,16 +7,24 @@ import {
 } from './actions/eventMediaAction'
 import { ConsumeController } from './helpers/ConsumeController'
 import { bufferToJson } from './helpers/bufferToJson'
+import { env } from './helpers/env'
+import {
+  actionInterval,
+  actionTimeout,
+  intervalHeartbeat,
+} from './helpers/intervalHeartbeat'
 import { depotLogger, logging } from './log'
 
 dotenv.config()
 
 const run = async (): Promise<void> => {
-  const clientId = process.env.KAFKA_CLIENT_ID ?? information.name
-  const brokers = (process.env.KAFKA_BROKER_HOST ?? '').split(',')
-  const groupId = process.env.KAFKA_GROUP_ID ?? 'spotter-depot'
+  const config = {
+    clientId: env.string('KAFKA_CLIENT_ID', information.name),
+    brokers: env.stringArray('KAFKA_BROKER_HOST', []),
+    groupId: env.string('KAFKA_GROUP_ID', 'spotter-depot'),
+  }
 
-  if (!brokers.length) {
+  if (!config.brokers.length) {
     throw new Error('No brokers found.')
   }
 
@@ -25,26 +32,24 @@ const run = async (): Promise<void> => {
     `Initializing ${information.name} v${information.version}...`,
   )
 
-  depotLogger.verbose('Using core configuration:', {
-    clientId,
-    brokers,
-    groupId,
-  })
+  depotLogger.verbose('Using core configuration:', config)
 
   const kafka = new Kafka({
-    clientId,
-    brokers,
+    clientId: config.clientId,
+    brokers: config.brokers,
     logCreator: logging,
   })
 
   // const producer = kafka.producer()
-  const consumer = kafka.consumer({ groupId })
+  const consumer = kafka.consumer({
+    groupId: config.groupId,
+    heartbeatInterval: actionInterval,
+    sessionTimeout: actionTimeout * 2,
+  })
 
   const consumeController = new ConsumeController()
-    .on('spotter-media-event', async ({ message }) => {
+    .on('spotter-media-event', async ({ message, heartbeat }) => {
       const value = bufferToJson(message.value)
-
-      console.log(value)
 
       if (!value) {
         return
@@ -54,9 +59,12 @@ const run = async (): Promise<void> => {
         eventId: value.eventId ?? '',
         clipUrl: value.clipUrl ?? undefined,
         snapshotUrl: value.snapshotUrl ?? undefined,
+        endpointAuthorization: value.endpointAuthorization,
       }
 
-      await eventMediaAction(payload)
+      await intervalHeartbeat(heartbeat, async () => {
+        await eventMediaAction(payload)
+      })
     })
     .on('spotter-media-lastFrame', async ({ topic, message }) => {
       console.log(topic, message.key, message.value?.toString())

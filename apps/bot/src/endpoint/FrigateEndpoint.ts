@@ -10,7 +10,7 @@ export const frigateMedia: Record<ResourceType, string> = {
 
 export class FrigateEndpoint extends Endpoint {
   get hostUrl(): string {
-    return process.env.FRIGATE_LOCAL_URL ?? ''
+    return process.env.FRIGATE_LOCAL_URL || ''
   }
 
   resolveResource(type: ResourceType, parameters: ResourceParams): string {

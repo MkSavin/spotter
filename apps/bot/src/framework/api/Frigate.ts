@@ -21,7 +21,7 @@ export class Frigate {
         sub: process.env.FRIGATE_AUTH_USER,
         exp: dayjs().unix() + 60 * 60,
       },
-      process.env.FRIGATE_AUTH_SECRET ?? '',
+      process.env.FRIGATE_AUTH_SECRET || '',
       { algorithm: 'HS256' },
     )
   }

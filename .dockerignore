@@ -25,6 +25,9 @@
 .gitignore
 .gitattributes
 
+# Temporary
+/*/**/temp
+
 # Environments and configuration
 .env.example
 config.ts

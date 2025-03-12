@@ -28,7 +28,7 @@ export const loginCommand = new Command<Context>(
     let role: $Enums.Role
 
     try {
-      const payload = jwt.verify(publicToken, process.env.AUTH_SECRET ?? '', {
+      const payload = jwt.verify(publicToken, process.env.AUTH_SECRET || '', {
         algorithms: ['HS256'],
       })
       role =

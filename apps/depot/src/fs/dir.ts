@@ -13,7 +13,7 @@ export const dir = async (path: string): Promise<DirectoryController> => {
   let exists = false
 
   try {
-    await fs.mkdir(path)
+    await fs.mkdir(path, { recursive: true })
     exists = true
   } catch (error) {
     logger.error(error)
@@ -23,6 +23,9 @@ export const dir = async (path: string): Promise<DirectoryController> => {
     directory: path,
     exists,
     remove: async (): Promise<void> => {
+      if (!exists) {
+        return
+      }
       try {
         await fs.rm(path, {
           recursive: true,

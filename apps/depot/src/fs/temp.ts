@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { defaultLogger } from 'stenograph'
 
@@ -17,9 +18,7 @@ export const temp = async (
   let exists = false
 
   try {
-    directory = await fs.mkdtemp(
-      path.resolve('/tmp/spotter-depot/', Bun.hash(prefix).toString()),
-    )
+    directory = await fs.mkdtemp(path.join(tmpdir(), prefix))
     exists = true
   } catch (error) {
     logger.error(error)
@@ -29,17 +28,18 @@ export const temp = async (
     directory,
     exists,
     remove: async (): Promise<void> => {
-      if (directory) {
-        try {
-          await fs.rm(directory, {
-            recursive: true,
-            force: true,
-          })
-        } catch (error) {
-          logger.error(error)
-        }
-        exists = false
+      if (!directory || !exists) {
+        return
       }
+      try {
+        await fs.rm(directory, {
+          recursive: true,
+          force: true,
+        })
+      } catch (error) {
+        logger.error(error)
+      }
+      exists = false
     },
   }
 }
