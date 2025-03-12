@@ -1,10 +1,24 @@
 import type { Event } from '@prisma/client'
+import type { Stenograph } from '../../framework/stenograph/Stenograph'
 
-export const validateEvent = (contents: any): Event | null => {
+export const validateEvent = (
+  contents: any,
+  baseLogger: Stenograph,
+): Event | null => {
   // TODO: add data validation and normalization
   const event = contents?.after
 
+  const logger = baseLogger.sub(`${event?.code ?? 'empty'}`, 'validator')
+
   if (!event || !event.id || !event.camera || !event.label) {
+    logger.verbose('Bad event message')
+    return null
+  }
+
+  // Possibly a buggy event
+  // Look: https://github.com/blakeblackshear/frigate/discussions/9974
+  if (event.position_changes === 0) {
+    logger.verbose('Event has no position changes, skipping due to suspicion')
     return null
   }
 

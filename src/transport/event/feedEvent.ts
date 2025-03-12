@@ -10,10 +10,9 @@ export const feedEvent = async (
   context: InitContext,
   contents: any,
 ): Promise<void> => {
-  const event = validateEvent(contents)
+  const event = validateEvent(contents, context.logger)
 
   if (!event) {
-    context.logger.verbose('Bad event!')
     return
   }
 
