@@ -139,9 +139,16 @@ const resolveSnapshot = async (
   const logger = context.logger.sub('snapshot-processing')
 
   try {
-    const processedBuffer = await processSnapshot(
-      await mediaResponse.arrayBuffer(),
-    )
+    const arrayBuffer = await mediaResponse.arrayBuffer()
+
+    if (arrayBuffer.byteLength === 0) {
+      logger.debug(
+        `Snapshot "${mediaResponse.url}" buffer is empty, skipping...`,
+      )
+      return null
+    }
+
+    const processedBuffer = await processSnapshot(arrayBuffer)
     return new InputFile(processedBuffer)
   } catch (error) {
     logger.error(error)

@@ -47,18 +47,3 @@ export const validateEvent = (
     messages: [],
   }
 }
-
-/*
-/ # mosquitto_sub -t 'frigate/events' --remove-retained --retained-only
-/ # mosquitto_sub --remote-retained -t 'frigate/events' -W 1
-Error: Unknown option '--remote-retained'.
-
-Use 'mosquitto_sub --help' to see usage.
-/ # mosquitto_sub --remove-retained -t 'frigate/events' -W 1
-Timed out
-/ # mosquitto_sub --remove-retained -t 'frigate/events' -W 1
-Timed out
-/ # mosquitto_sub -t 'frigate/events' --remove-retained --retained-only
-/ # mosquitto_sub -t frigate/events
-*
-*/
