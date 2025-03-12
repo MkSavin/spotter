@@ -8,7 +8,9 @@ export const validateEvent = (
   // TODO: add data validation and normalization
   const event = contents?.after
 
-  const logger = baseLogger.sub(`${event?.code ?? 'empty'}`, 'validator')
+  const code = event?.id?.split('-').at(1)
+
+  const logger = baseLogger.sub(code ?? 'empty', 'validator')
 
   if (!event || !event.id || !event.camera || !event.label) {
     logger.verbose('Bad event message')
@@ -27,7 +29,7 @@ export const validateEvent = (
 
   return {
     id: event.id,
-    code: event.id?.split('-').at(1) ?? event.id,
+    code: code ?? event.id,
     camera: event.camera,
     frame_time: event.frame_time,
     label: event.label,
