@@ -1,18 +1,16 @@
 import type { Event } from '@prisma/client'
 import dayjs from 'dayjs'
-import type { InitContext } from '../../context'
+import type { CoreContext } from '../../context'
 import { get } from '../../helpers/get'
-import type { MediaTuple } from './feedMedia'
-
-// id, type, label, camera, score, start_time, end_time, stationary, has_clip, has_snapshot
+import type { MediaTuple } from '../helpers/resolveFrigateMedia'
 
 export const renderEvent = (
   event: Event,
-  context: InitContext,
+  context: CoreContext,
   mediaTuple?: MediaTuple,
 ): string => {
-  const startDate = dayjs.unix(event.start_time)
-  const endDate = event.end_time ? dayjs.unix(event.end_time) : undefined
+  const startDate = dayjs.unix(event.startTime)
+  const endDate = event.endTime ? dayjs.unix(event.endTime) : undefined
 
   const dateRange = [
     startDate.format('DD.MM HH:mm'),
@@ -27,8 +25,12 @@ export const renderEvent = (
 
   const duration = endDate?.diff(startDate, 'minutes')
 
-  const label = get(context.objectLabels, event.label ?? '', 'неизв. объект')
-  const camera = get(context.cameraLabels, event.camera, 'неизв. камера')
+  const label = get(
+    context.config.objectLabels,
+    event.label ?? '',
+    'неизв. объект',
+  )
+  const camera = get(context.config.cameraLabels, event.camera, 'неизв. камера')
 
   const score = Math.round(event.score * 1000) / 10
 

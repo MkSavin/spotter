@@ -1,9 +1,9 @@
 import dayjs from 'dayjs'
 import type { Middleware } from 'grammy'
 import { defaultLogger } from 'stenograph'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 
-const subLogger = (context: Context): string[] => {
+const subLogger = (context: BotContext): string[] => {
   const from = context.from
   const chat = context.chat
   const message = context.message
@@ -29,7 +29,7 @@ const subLogger = (context: Context): string[] => {
   return [who, what, when]
 }
 
-export const logging: Middleware<Context> = (context, next) => {
+export const logging: Middleware<BotContext> = (context, next) => {
   context.logger = defaultLogger.sub(...subLogger(context))
 
   return next()

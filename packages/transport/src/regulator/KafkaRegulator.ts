@@ -1,6 +1,6 @@
 import type { Consumer, EachMessagePayload, Producer } from 'kafkajs'
 
-export type MessageController<Context> = (
+export type KafkaMessageController<Context> = (
   payload: EachMessagePayload,
   context: Context,
 ) => Promise<void>
@@ -11,9 +11,9 @@ type BaseContext = {
 }
 
 export class KafkaRegulator<Context extends BaseContext> {
-  subscribed: Record<string, MessageController<Context>> = {}
+  subscribed: Record<string, KafkaMessageController<Context>> = {}
 
-  on(topic: string, callback: MessageController<Context>): this {
+  on(topic: string, callback: KafkaMessageController<Context>): this {
     this.subscribed[topic] = callback
     return this
   }

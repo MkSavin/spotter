@@ -2,7 +2,7 @@ import type { CommandGroup } from '@grammyjs/commands'
 import { $Enums } from '@prisma/client'
 import type { Middleware } from 'grammy'
 import type { Context as BaseContext } from 'grammy/out/context'
-import type { Context as GeneralContext } from '../../context'
+import type { BotContext as GeneralContext } from '../../context'
 
 type CommandListPack<Context extends GeneralContext> = {
   anonymous: CommandGroup<Context>

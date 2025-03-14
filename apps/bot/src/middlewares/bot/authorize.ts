@@ -1,8 +1,8 @@
 import type { Chat, User } from '@prisma/client'
 import type { Middleware } from 'grammy'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 
-export const authorize: Middleware<Context> = async (context, next) => {
+export const authorize: Middleware<BotContext> = async (context, next) => {
   let chat: Chat | null = null
   let user: User | null = null
 

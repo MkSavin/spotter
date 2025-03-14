@@ -1,23 +1,23 @@
 import type { MqttClient } from 'mqtt'
 
-type EachMessagePayload = {
+type MqttMessagePayload = {
   topic: string
-  payload: Buffer
+  contents: Buffer
 }
 
-export type MessageController<Context> = (
-  payload: EachMessagePayload,
+export type MqttMessageController<Context> = (
+  payload: MqttMessagePayload,
   context: Context,
 ) => Promise<void>
 
-type BaseContext = {
+export type BaseContext = {
   mqtt: MqttClient
 }
 
 export class MqttRegulator<Context extends BaseContext> {
-  subscribed: Record<string, MessageController<Context>> = {}
+  subscribed: Record<string, MqttMessageController<Context>> = {}
 
-  on(topic: string, callback: MessageController<Context>): this {
+  on(topic: string, callback: MqttMessageController<Context>): this {
     this.subscribed[topic] = callback
     return this
   }
@@ -27,7 +27,7 @@ export class MqttRegulator<Context extends BaseContext> {
   }
 
   async consumeMessages(
-    payload: EachMessagePayload,
+    payload: MqttMessagePayload,
     context: Context,
   ): Promise<void> {
     await Promise.all(
@@ -50,7 +50,7 @@ export class MqttRegulator<Context extends BaseContext> {
     await context.mqtt.subscribeAsync(this.topics)
 
     context.mqtt.on('message', async (topic, payload) =>
-      this.consumeMessages({ topic, payload }, context),
+      this.consumeMessages({ topic, contents: payload }, context),
     )
   }
 }

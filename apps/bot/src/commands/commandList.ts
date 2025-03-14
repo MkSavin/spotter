@@ -1,5 +1,5 @@
 import { CommandGroup } from '@grammyjs/commands'
-import type { Context } from '../context'
+import type { BotContext } from '../context'
 import { eventsClearCommand } from './admin/eventsClearCommand'
 import { statsCommand } from './admin/statsCommand'
 import { loginCommand } from './auth/loginCommand'
@@ -11,17 +11,17 @@ import { startCommand } from './general/startCommand'
 import { versionCommand } from './general/versionCommand'
 import { testPublishCommand } from './testing/testPublishCommand'
 
-export const anonymousCommands = new CommandGroup<Context>().add([
+export const anonymousCommands = new CommandGroup<BotContext>().add([
   startCommand,
   loginCommand,
 ])
 
-export const userCommands = new CommandGroup<Context>().add([
+export const userCommands = new CommandGroup<BotContext>().add([
   logoutCommand,
   meCommand,
 ])
 
-export const adminCommands = new CommandGroup<Context>().add([
+export const adminCommands = new CommandGroup<BotContext>().add([
   logoutCommand,
   meCommand,
   snapshotCommand,
@@ -62,7 +62,7 @@ export const adminCommands = new CommandGroup<Context>().add([
   /event_info [event]
 * */
 
-export const allCommands = new CommandGroup<Context>().add(
+export const allCommands = new CommandGroup<BotContext>().add(
   [
     ...anonymousCommands.commands,
     ...userCommands.commands,

@@ -1,12 +1,12 @@
 import { Command } from '@grammyjs/commands'
 import { $Enums } from '@prisma/client'
 import jwt from 'jsonwebtoken'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
 
-export const signCommand = new Command<Context>(
+export const signCommand = new Command<BotContext>(
   'sign',
   'Создать код доступа',
 ).addToScope(commandScopes.private, [

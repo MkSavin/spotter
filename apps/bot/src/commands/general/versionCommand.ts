@@ -2,11 +2,11 @@ import { Command } from '@grammyjs/commands'
 import { $Enums } from '@prisma/client'
 import Bun from 'bun'
 import information from '../../../../../package.json'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
 
-export const versionCommand = new Command<Context>(
+export const versionCommand = new Command<BotContext>(
   'version',
   'Узнать информацию о версии бота и платформы',
 ).addToScope(commandScopes.private, [

@@ -1,5 +1,5 @@
-import path from 'node:path'
 import type { CoreContext } from '../context'
+import type { ProcessFileContext } from '../processing/processFile'
 import { processImage } from '../processing/processImage'
 import { processVideo } from '../processing/processVideo'
 
@@ -13,8 +13,8 @@ export type EventMediaPayload = {
 
 type EventMediaResult = {
   eventId: string
-  clipPath?: string
-  snapshotPath?: string
+  clipUrl?: string
+  snapshotUrl?: string
 }
 
 export const eventMediaAction = async (
@@ -26,9 +26,10 @@ export const eventMediaAction = async (
   try {
     context.logger.info('Starting to perform event media conversion')
 
-    const processingContext = {
+    const processingContext: ProcessFileContext = {
       ...context,
       ...payload,
+      bucket: 'event-media',
       filePrefix: `event-${eventCode}`,
     }
 
@@ -41,15 +42,15 @@ export const eventMediaAction = async (
             context.logger.error(error)
             return undefined
           })
-          .then((path) => ({ type: 'video', path })),
+          .then((url) => ({ type: 'video', url })),
         processImage(snapshotUrl, processingContext)
           .catch((error) => {
             context.logger.error(error)
             return undefined
           })
-          .then((path) => ({ type: 'image', path })),
+          .then((url) => ({ type: 'image', url })),
       ])
-    ).filter((entry) => !!entry.path)
+    ).filter((entry) => !!entry.url)
 
     if (media.length === 0) {
       context.logger.warn('No media returned in result of conversion')
@@ -63,14 +64,10 @@ export const eventMediaAction = async (
     const clip = media.find((entry) => entry.type === 'video')
     const snapshot = media.find((entry) => entry.type === 'image')
 
-    const destination = context.directory.destination.directory
-
     return {
       eventId,
-      clipPath: clip?.path ? path.relative(destination, clip.path) : undefined,
-      snapshotPath: snapshot?.path
-        ? path.relative(destination, snapshot.path)
-        : undefined,
+      clipUrl: clip?.url,
+      snapshotUrl: snapshot?.url,
     }
   } catch (error) {
     context.logger.error(error)

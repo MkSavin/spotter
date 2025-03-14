@@ -1,26 +1,36 @@
 import process from 'node:process'
-import { KafkaRegulator } from '@spotter/transport'
+import { kafkaLogging, KafkaRegulator } from '@spotter/transport'
 import { Kafka, Partitioners } from 'kafkajs'
+import { Client as MinioClient } from 'minio'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
 import { cameraFrameController } from './controllers/cameraFrameController'
 import { eventMediaController } from './controllers/eventMediaController'
-import { dir } from './fs/dir'
 import { temp } from './fs/temp'
-import { depotLogger, logging } from './log'
+import { defaultLogger } from 'stenograph'
+
+export const applicationLogger = defaultLogger.sub('depot')
 
 const run = async (): Promise<void> => {
-  depotLogger.info(
+  applicationLogger.info(
     `Initializing ${information.name} v${information.version}...`,
   )
 
   const config = resolveConfig()
 
+  const minio = new MinioClient({
+    endPoint: config.minio.host,
+    port: config.minio.port,
+    useSSL: config.minio.ssl,
+    accessKey: config.minio.accessKey,
+    secretKey: config.minio.secretKey,
+  })
+
   const kafka = new Kafka({
     clientId: config.kafka.clientId,
     brokers: config.kafka.brokers,
-    logCreator: logging,
+    logCreator: kafkaLogging(applicationLogger),
   })
 
   const producer = kafka.producer({
@@ -28,21 +38,16 @@ const run = async (): Promise<void> => {
   })
   const consumer = kafka.consumer({
     groupId: config.kafka.groupId,
-    heartbeatInterval: config.action.heartbeat,
-    sessionTimeout: config.action.timeout * 2,
+    heartbeatInterval: config.kafka.heartbeat,
+    sessionTimeout: config.kafka.timeout * 2,
   })
 
-  const regulator = new KafkaRegulator<CoreContext>()
-    .on('spotter.event.media_requested', eventMediaController)
-    .on('spotter.camera.frame_requested', cameraFrameController)
-
   const tempDir = await temp('spotter-depot-media-')
-  const destinationDir = await dir(config.media.publicPath)
 
   const shutdown = async (signal: NodeJS.Signals) => {
-    depotLogger.info(`Shutting down due to ${signal}...`)
-    producer.disconnect()
-    consumer.disconnect()
+    applicationLogger.info(`Shutting down due to ${signal}...`)
+    await producer.disconnect()
+    await consumer.disconnect()
     process.exit(1)
   }
 
@@ -52,22 +57,27 @@ const run = async (): Promise<void> => {
   try {
     await producer.connect()
 
-    await regulator.run({
-      directory: {
-        temp: tempDir,
-        destination: destinationDir,
-      },
-      logger: depotLogger,
-      config,
-      consumer,
-      producer,
-    })
+    await new KafkaRegulator<CoreContext>()
+      .on('spotter.event.media_requested', eventMediaController)
+      .on('spotter.camera.frame_requested', cameraFrameController)
+      .run({
+        directory: {
+          temp: tempDir,
+        },
+        logger: applicationLogger,
+        config,
+        minio,
+        consumer,
+        producer,
+      })
+
+    applicationLogger.info('Application successfully started up')
   } finally {
     await tempDir.remove()
   }
 }
 
 run().catch((error) => {
-  depotLogger.error(error)
+  applicationLogger.error(error)
   process.exit(1)
 })

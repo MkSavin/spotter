@@ -1,10 +1,10 @@
 import { Command } from '@grammyjs/commands'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
 
-export const logoutCommand = new Command<Context>(
+export const logoutCommand = new Command<BotContext>(
   'logout',
   'Деавторизация из бота',
 ).addToScope(commandScopes.private, [

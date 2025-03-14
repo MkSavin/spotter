@@ -20,6 +20,22 @@ export const env = {
     return value.split(splitter)
   },
 
+  enum: <Values extends ReadonlyArray<Lowercase<string>>>(
+    variable: string,
+    values: Values,
+    defaultValue: Values[number],
+  ): Values[number] => {
+    const value = process.env[variable] ?? undefined
+
+    if (!value) {
+      return defaultValue
+    }
+
+    const normalized = value.trim().toLowerCase() as Values[number]
+
+    return values.includes(normalized) ? normalized : defaultValue
+  },
+
   number: (variable: string, defaultValue: number): number => {
     const value = process.env[variable] ?? undefined
 

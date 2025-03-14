@@ -1,11 +1,11 @@
 import { Command } from '@grammyjs/commands'
 import { $Enums } from '@prisma/client'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
 
-export const statsCommand = new Command<Context>(
+export const statsCommand = new Command<BotContext>(
   'stats',
   'Статистика базы данных',
 ).addToScope(commandScopes.private, [

@@ -1,7 +1,5 @@
 import { type logCreator, logLevel } from 'kafkajs'
-import { type StenographLevel, defaultLogger } from 'stenograph'
-
-export const depotLogger = defaultLogger.sub('depot')
+import type { Stenograph, StenographLevel } from 'stenograph'
 
 const translateLevel = (level: logLevel): StenographLevel => {
   switch (level) {
@@ -17,13 +15,16 @@ const translateLevel = (level: logLevel): StenographLevel => {
   }
 }
 
-export const logging: logCreator =
+export const kafkaLogging =
+  (logger: Stenograph): logCreator =>
   () =>
   ({ namespace, level, log }) => {
     const namespaceCode =
-      typeof namespace === 'string' ? namespace.toLowerCase() : undefined
+      typeof (namespace as unknown) === 'string'
+        ? namespace.toLowerCase()
+        : undefined
 
-    depotLogger
+    logger
       .sub(namespaceCode ?? 'unknown', log.timestamp)
       .some(translateLevel(level), log.message)
   }

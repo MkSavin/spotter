@@ -4,9 +4,7 @@ import { hydrate } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import { PrismaClient } from '@prisma/client'
-import dotenv from 'dotenv'
 import { Bot, session } from 'grammy'
-import mqtt from 'mqtt'
 import { defaultLogger } from 'stenograph'
 import information from '../../../package.json'
 import {
@@ -15,8 +13,8 @@ import {
   anonymousCommands,
   userCommands,
 } from './commands/commandList'
-import { pullConfig } from './config'
-import type { Context, InitContext } from './context'
+import { resolveConfig } from './config'
+import type { BotContext, CoreContext } from './context'
 import { Frigate } from './framework/api/Frigate'
 import { timeout } from './helpers/timeout'
 import { authorize } from './middlewares/bot/authorize'
@@ -24,27 +22,21 @@ import { logging } from './middlewares/bot/logging'
 import { switchCommandList } from './middlewares/bot/switchCommandList'
 import type { Session } from './session'
 import { eventTransport } from './transport/eventTransport'
+import { Kafka, Partitioners } from 'kafkajs'
+import { kafkaLogging } from '@spotter/transport'
 
-const logger = defaultLogger.sub('core')
-
-dotenv.config()
+export const applicationLogger = defaultLogger.sub('bot')
 
 const prisma = new PrismaClient()
 
-const initialize = (initContext: InitContext): Bot<Context> => {
-  const bot = new Bot<Context>(initContext.token)
+const initialize = (coreContext: CoreContext): Bot<BotContext> => {
+  const bot = new Bot<BotContext>(coreContext.config.telegram.token)
 
-  bot.catch(logger.error)
+  bot.catch(applicationLogger.error)
 
   bot.use(logging)
   bot.use(async (context, next) => {
-    context.prisma = prisma
-    context.frigate = initContext.frigate
-    context.mqtt = initContext.mqtt
-    context.content = {
-      cameraLabels: initContext.cameraLabels,
-      objectLabels: initContext.objectLabels,
-    }
+    Object.assign(context, coreContext)
     await next()
   })
 
@@ -81,25 +73,42 @@ const initialize = (initContext: InitContext): Bot<Context> => {
 }
 
 const polling = async (): Promise<void> => {
-  const coreConfig = await pullConfig()
+  applicationLogger.info(
+    `Initializing ${information.name} v${information.version}...`,
+  )
 
-  logger.info(`Initializing ${information.name} v${information.version}...`)
+  const config = await resolveConfig()
 
-  const mqttClient = mqtt.connect(coreConfig.mqttUrl)
   const frigate = new Frigate()
 
-  const coreContext: InitContext = {
-    ...coreConfig,
-    logger: defaultLogger,
+  const kafka = new Kafka({
+    clientId: config.kafka.clientId,
+    brokers: config.kafka.brokers,
+    logCreator: kafkaLogging(applicationLogger),
+  })
+
+  const producer = kafka.producer({
+    createPartitioner: Partitioners.DefaultPartitioner,
+  })
+  const consumer = kafka.consumer({
+    groupId: config.kafka.groupId,
+    heartbeatInterval: config.kafka.heartbeat,
+    sessionTimeout: config.kafka.timeout * 2,
+  })
+
+  const coreContext: CoreContext = {
+    config,
+    logger: applicationLogger,
     prisma,
-    mqtt: mqttClient,
     frigate,
+    producer,
+    consumer,
     runner: undefined,
   }
 
   const shutdown = async (signal: NodeJS.Signals) => {
     if (coreContext.runner?.isRunning()) {
-      logger.info(`Shutting down due to ${signal}...`)
+      applicationLogger.info(`Shutting down due to ${signal}...`)
       await coreContext.runner?.stop()
     }
     await prisma.$disconnect()
@@ -108,8 +117,6 @@ const polling = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
-
-  logger.verbose('Using core configuration: ', coreConfig)
 
   const bot = initialize(coreContext)
 
@@ -122,22 +129,22 @@ const polling = async (): Promise<void> => {
     }),
   )
 
-  logger.debug('Starting up...')
+  applicationLogger.debug('Starting up...')
 
   coreContext.runner = run(bot, {})
 
-  logger.debug('Bot is successfully started up!')
+  applicationLogger.debug('Bot is successfully started up!')
 
-  // Wait bot+runner to fully startup before mqtt initializing transport
+  // Wait bot+runner to fully startup before initializing transport
   await timeout(500)
 
   await eventTransport(bot, coreContext)
 
-  logger.debug('Bot is successfully connected to mqtt transport!')
+  applicationLogger.debug('Bot is successfully connected to message transport!')
 }
 
 polling().catch(async (error) => {
-  logger.error(error)
+  applicationLogger.error(error)
   await prisma.$disconnect()
   process.exit(1)
 })

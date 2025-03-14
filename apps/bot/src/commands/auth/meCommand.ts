@@ -1,10 +1,10 @@
 import { Command } from '@grammyjs/commands'
 import dayjs from 'dayjs'
-import type { Context } from '../../context'
+import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 
-export const meCommand = new Command<Context>(
+export const meCommand = new Command<BotContext>(
   'me',
   'Информация об авторизации',
 ).addToScope({ type: 'all_private_chats' }, [

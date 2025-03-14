@@ -50,7 +50,7 @@ export class Frigate {
     parameters: Record<string, string> = {},
   ): Promise<Response> {
     return fetch(this.resolveUrl(url, parameters), {
-      method: 'GET',
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${Frigate.generateJWT()}`,
       },

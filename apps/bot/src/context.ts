@@ -3,18 +3,29 @@ import type { HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
 import type { Chat, PrismaClient, User } from '@prisma/client'
-import type { SessionFlavor } from 'grammy'
-import type { Context as BaseContext } from 'grammy/out/context'
-import type mqtt from 'mqtt'
+import type { Bot, SessionFlavor } from 'grammy'
+import type { Context as GrammyContext } from 'grammy/out/context'
 import type { Frigate } from './framework/api/Frigate'
-import type { Stenograph } from './framework/stenograph/Stenograph'
 import type { Session } from './session'
+import type { Stenograph } from 'stenograph'
+import type { Consumer, Producer } from 'kafkajs'
+import type { HeartbeatProps } from '@spotter/transport'
 
-export type InitConfig = {
-  token: string
-  mqttUrl: string
-  databaseUrl: string
-  frigateRemoteUrl: string
+export type EnvironmentConfig = {
+  telegram: {
+    token: string
+  }
+  database: {
+    url: string
+  }
+  frigate: {
+    remoteUrl: string
+  }
+  kafka: HeartbeatProps & {
+    clientId: string
+    brokers: string[]
+    groupId: string
+  }
 }
 
 export type ContentConfig = {
@@ -22,13 +33,17 @@ export type ContentConfig = {
   cameraLabels: Record<string, string>
 }
 
-export type Config = InitConfig & ContentConfig
+export type Config = EnvironmentConfig & ContentConfig
 
-export type InitContext = Config & {
+export type CoreContext = {
+  config: Config
+
   logger: Stenograph
+
   prisma: PrismaClient
-  mqtt: mqtt.MqttClient
   frigate: Frigate
+  consumer: Consumer
+  producer: Producer
 
   runner: RunnerHandle | undefined
 }
@@ -38,19 +53,16 @@ export type AuthorizationContext = {
   chat: Chat | null
 }
 
-export type ShiftedContext = {
-  logger: Stenograph
-  prisma: PrismaClient
-  mqtt: mqtt.MqttClient
-  frigate: Frigate
-
-  content: ContentConfig
-
+export type ShiftedContext = CoreContext & {
   auth: AuthorizationContext | null
 }
 
-export type Context = ParseModeFlavor<
+export type BotContext = ParseModeFlavor<
   HydrateFlavor<
-    CommandsFlavor<BaseContext> & SessionFlavor<Session> & ShiftedContext
+    CommandsFlavor<GrammyContext> & SessionFlavor<Session> & ShiftedContext
   >
 >
+
+export type TransportContext = CoreContext & {
+  bot: Bot<BotContext>
+}

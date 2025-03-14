@@ -1,4 +1,4 @@
-import type { Context as BaseContext } from '../../context'
+import type { BotContext as BaseContext } from '../../context'
 import type { CommandMiddleware } from '../types'
 
 type ArgumentMatcher = <Context extends BaseContext>(

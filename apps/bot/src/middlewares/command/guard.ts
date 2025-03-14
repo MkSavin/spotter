@@ -1,5 +1,5 @@
 import { $Enums } from '@prisma/client'
-import type { Context as BaseContext } from '../../context'
+import type { BotContext as BaseContext } from '../../context'
 import type { CommandMiddleware } from '../types'
 
 export const guard = <Context extends BaseContext>(

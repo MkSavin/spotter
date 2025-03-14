@@ -1,5 +1,5 @@
 import {
-  type MessageController,
+  type KafkaMessageController,
   bufferToJson,
   intervalHeartbeat,
 } from '@spotter/transport'
@@ -8,8 +8,9 @@ import {
   eventMediaAction,
 } from '../actions/eventMediaAction'
 import type { CoreContext } from '../context'
+import type { Message } from 'kafkajs'
 
-export const eventMediaController: MessageController<CoreContext> = async (
+export const eventMediaController: KafkaMessageController<CoreContext> = async (
   payload,
   context,
 ) => {
@@ -38,27 +39,29 @@ export const eventMediaController: MessageController<CoreContext> = async (
 
   logger.verbose('Action contents:', actionPayload)
 
-  await intervalHeartbeat(heartbeat, config.action, async () => {
+  await intervalHeartbeat(heartbeat, config.kafka, async () => {
     const result = await eventMediaAction(actionPayload, {
       ...context,
       logger,
     })
 
-    if (result) {
-      logger.verbose('Back-message contents: ', result)
-
-      const message = {
-        value: JSON.stringify(result),
-      }
-
-      const sent = await producer.send({
-        topic: 'spotter.event.media_processed',
-        messages: [message],
-      })
-
-      logger.info(
-        `Back-message send to topic "${sent.at(0)?.topicName ?? 'unknown'}"`,
-      )
+    if (!result) {
+      return
     }
+
+    logger.verbose('Back-message contents: ', result)
+
+    const message: Message = {
+      value: JSON.stringify(result),
+    }
+
+    const sent = await producer.send({
+      topic: 'spotter.event.media_processed',
+      messages: [message],
+    })
+
+    logger.info(
+      `Back-message send to topic "${sent.at(0)?.topicName ?? 'unknown'}"`,
+    )
   })
 }

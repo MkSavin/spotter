@@ -12,6 +12,7 @@ type NamedBunFile = Omit<BunFile, 'name'> & {
 
 export type ProcessFileContext = CoreContext & {
   filePrefix: string
+  bucket: string
   endpointAuthorization?: string
 }
 
@@ -38,8 +39,10 @@ export const processFile = async (
   }
 
   const {
+    minio,
     logger: baseLogger = defaultLogger,
     filePrefix,
+    bucket,
     directory,
     endpointAuthorization,
   } = context
@@ -71,8 +74,10 @@ export const processFile = async (
     `${directory.temp.directory}/${filePrefix}-${hash}-raw.${extension}`,
   )
   const processed = Bun.file(
-    `${directory.destination.directory}/${filePrefix}-${hash}-processed.${extension}`,
+    `${directory.temp.directory}/${filePrefix}-${hash}-processed.${extension}`,
   )
+
+  const objectFile = `${filePrefix}-${hash}.${extension}`
 
   logger.debug(`Processing ${mimeType}...`)
   logger.verbose('Directory structure:', {
@@ -108,5 +113,23 @@ export const processFile = async (
     processed: processed.name,
   })
 
-  return processed.name
+  if (!(await minio.bucketExists(bucket))) {
+    await minio.makeBucket(bucket)
+    logger.debug('Bucket successfully created')
+  }
+
+  const uploadInfo = await minio.fPutObject(
+    bucket,
+    objectFile,
+    processed.name,
+    { 'Content-Type': mimeType },
+  )
+
+  logger.debug('File successfully uploaded to minio', uploadInfo)
+
+  if (context.config.directory.cleanupStrategy === 'file-processed') {
+    await Promise.all([raw.delete(), processed.delete()])
+  }
+
+  return minio.presignedGetObject(bucket, objectFile)
 }

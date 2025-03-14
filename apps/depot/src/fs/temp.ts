@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { depotLogger } from '../log'
+import { applicationLogger } from '../index'
 
-const logger = depotLogger.sub('fs', 'temp')
+const logger = applicationLogger.sub('fs', 'temp')
 
 export type TempDirectoryController = {
   directory: string
