@@ -1,3 +1,10 @@
+## [2.1.8](https://github.com/MkSavin/elercam/compare/v2.1.7...v2.1.8) (2025-03-14)
+
+
+### Bug Fixes
+
+* **bot:** Added video processing skip flag ([8a1d7bd](https://github.com/MkSavin/elercam/commit/8a1d7bd4a013ef27a3a483a81699b1a3cf51e6d2))
+
 ## [2.1.7](https://github.com/MkSavin/elercam/compare/v2.1.6...v2.1.7) (2025-03-12)
 
 
