@@ -1,3 +1,10 @@
+## [2.1.10](https://github.com/MkSavin/elercam/compare/v2.1.9...v2.1.10) (2025-03-14)
+
+
+### Bug Fixes
+
+* Fixed link to snapshot ([7b0313b](https://github.com/MkSavin/elercam/commit/7b0313be6caae3cc3b3edfcc5adaa47c9e074899))
+
 ## [2.1.9](https://github.com/MkSavin/elercam/compare/v2.1.8...v2.1.9) (2025-03-14)
 
 
