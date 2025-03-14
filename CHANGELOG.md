@@ -1,3 +1,10 @@
+## [2.1.9](https://github.com/MkSavin/elercam/compare/v2.1.8...v2.1.9) (2025-03-14)
+
+
+### Bug Fixes
+
+* **bot:** Fixed "update" type event ([17bdd82](https://github.com/MkSavin/elercam/commit/17bdd82f764a33035200514a53a59ecbc7639837))
+
 ## [2.1.8](https://github.com/MkSavin/elercam/compare/v2.1.7...v2.1.8) (2025-03-14)
 
 
