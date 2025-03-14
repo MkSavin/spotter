@@ -13,6 +13,12 @@
 /.docker
 /.github
 
+# Caching
+/.turbo
+/.vite
+/*/**/.turbo
+/*/**/.vite
+
 # GIT
 /.git
 .gitignore

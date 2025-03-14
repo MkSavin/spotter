@@ -86,6 +86,10 @@ const resolveClip = async (
       createPath: true,
     })
 
+    if (process.env.VIDEO_SKIP_PROCESSING === 'true') {
+      return new InputFile(await raw.bytes())
+    }
+
     await new Promise<void>((resolve, reject) => {
       if (!raw?.name || !processed?.name) {
         reject(new Error('Clip files is not assigned correctly'))

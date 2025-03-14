@@ -4,6 +4,10 @@
 /coverage
 /.docker
 /.idea
+/.turbo
+/.vite
+/*/**/.turbo
+/*/**/.vite
 
 # Databases
 *.db
