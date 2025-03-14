@@ -19,6 +19,7 @@
     "@types/jsonwebtoken": "^9.0.9"
   },
   "dependencies": {
+    "@spotter/transport": "*",
     "stenograph": "*",
     "@grammyjs/commands": "^1.0.5",
     "@grammyjs/hydrate": "^1.4.1",

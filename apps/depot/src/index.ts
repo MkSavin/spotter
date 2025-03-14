@@ -1,90 +1,70 @@
-import dotenv from 'dotenv'
-import { Kafka } from 'kafkajs'
+import process from 'node:process'
+import { KafkaRegulator } from '@spotter/transport'
+import { Kafka, Partitioners } from 'kafkajs'
 import information from '../package.json'
-import {
-  type EventMediaPayload,
-  eventMediaAction,
-} from './actions/eventMediaAction'
-import { ConsumeController } from './helpers/ConsumeController'
-import { bufferToJson } from './helpers/bufferToJson'
-import { env } from './helpers/env'
-import {
-  actionInterval,
-  actionTimeout,
-  intervalHeartbeat,
-} from './helpers/intervalHeartbeat'
+import { resolveConfig } from './config'
+import type { CoreContext } from './context'
+import { cameraFrameController } from './controllers/cameraFrameController'
+import { eventMediaController } from './controllers/eventMediaController'
+import { dir } from './fs/dir'
+import { temp } from './fs/temp'
 import { depotLogger, logging } from './log'
 
-dotenv.config()
-
 const run = async (): Promise<void> => {
-  const config = {
-    clientId: env.string('KAFKA_CLIENT_ID', information.name),
-    brokers: env.stringArray('KAFKA_BROKER_HOST', []),
-    groupId: env.string('KAFKA_GROUP_ID', 'spotter-depot'),
-  }
-
-  if (!config.brokers.length) {
-    throw new Error('No brokers found.')
-  }
-
   depotLogger.info(
     `Initializing ${information.name} v${information.version}...`,
   )
 
-  depotLogger.verbose('Using core configuration:', config)
+  const config = resolveConfig()
 
   const kafka = new Kafka({
-    clientId: config.clientId,
-    brokers: config.brokers,
+    clientId: config.kafka.clientId,
+    brokers: config.kafka.brokers,
     logCreator: logging,
   })
 
-  // const producer = kafka.producer()
+  const producer = kafka.producer({
+    createPartitioner: Partitioners.DefaultPartitioner,
+  })
   const consumer = kafka.consumer({
-    groupId: config.groupId,
-    heartbeatInterval: actionInterval,
-    sessionTimeout: actionTimeout * 2,
+    groupId: config.kafka.groupId,
+    heartbeatInterval: config.action.heartbeat,
+    sessionTimeout: config.action.timeout * 2,
   })
 
-  const consumeController = new ConsumeController()
-    .on('spotter-media-event', async ({ message, heartbeat }) => {
-      const value = bufferToJson(message.value)
+  const regulator = new KafkaRegulator<CoreContext>()
+    .on('spotter.event.media_requested', eventMediaController)
+    .on('spotter.camera.frame_requested', cameraFrameController)
 
-      if (!value) {
-        return
-      }
+  const tempDir = await temp('spotter-depot-media-')
+  const destinationDir = await dir(config.media.publicPath)
 
-      const payload: EventMediaPayload = {
-        eventId: value.eventId ?? '',
-        clipUrl: value.clipUrl ?? undefined,
-        snapshotUrl: value.snapshotUrl ?? undefined,
-        endpointAuthorization: value.endpointAuthorization,
-      }
+  const shutdown = async (signal: NodeJS.Signals) => {
+    depotLogger.info(`Shutting down due to ${signal}...`)
+    producer.disconnect()
+    consumer.disconnect()
+    process.exit(1)
+  }
 
-      await intervalHeartbeat(heartbeat, async () => {
-        await eventMediaAction(payload)
-      })
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
+
+  try {
+    await producer.connect()
+
+    await regulator.run({
+      directory: {
+        temp: tempDir,
+        destination: destinationDir,
+      },
+      logger: depotLogger,
+      config,
+      consumer,
+      producer,
     })
-    .on('spotter-media-lastFrame', async ({ topic, message }) => {
-      console.log(topic, message.key, message.value?.toString())
-      /*
-      0. create temp dir
-      1. download image to temp dir
-      2. process image to new file
-      3. return link to new image
-      */
-    })
-
-  await consumer.connect()
-  await consumer.subscribe({
-    topics: consumeController.topics,
-    fromBeginning: true,
-  })
-
-  await consumer.run({
-    eachMessage: (message) => consumeController.consumeMessages(message),
-  })
+  } finally {
+    await tempDir.remove()
+  }
 }
 
 run().catch((error) => {

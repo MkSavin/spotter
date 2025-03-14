@@ -1,6 +1,8 @@
+import { bufferToJson } from '@spotter/transport'
 import type { Bot } from 'grammy'
 import type { Context, InitContext } from '../context'
 import { feedEvent } from './event/feedEvent'
+import { MqttRegulator } from './regulators/MqttRegulator'
 
 const subscribeToTopic = async (
   context: InitContext,
@@ -24,10 +26,6 @@ export const eventTransport = async (
   bot: Bot<Context>,
   context: InitContext,
 ): Promise<void> => {
-  const mqtt = context.mqtt
-
-  await subscribeToTopic(context, 'frigate/events')
-
   const logger = context.logger.sub('transport')
 
   const propagatedContext = {
@@ -51,17 +49,22 @@ export const eventTransport = async (
     dequeuing = false
   }
 
-  mqtt.on('message', async (topic, payload) => {
-    if (topic !== 'frigate/events') {
-      return
-    }
+  const regulator = new MqttRegulator<InitContext>().on(
+    'frigate/events',
+    async (payload) => {
+      const value = bufferToJson(payload.payload)
 
-    // double-queued logic: firstly start events, then end events
+      if (!value) {
+        return
+      }
 
-    const message = payload.toString()
-    queue.push(JSON.parse(message))
-    await dequeue()
-  })
+      // TODO: add double-queued logic: firstly start events, then end events
+      queue.push(value)
+      await dequeue()
+    },
+  )
+
+  await regulator.run(context)
 
   // Elercam Bot
   //

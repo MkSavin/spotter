@@ -20,7 +20,10 @@ const translateLevel = (level: logLevel): StenographLevel => {
 export const logging: logCreator =
   () =>
   ({ namespace, level, log }) => {
+    const namespaceCode =
+      typeof namespace === 'string' ? namespace.toLowerCase() : undefined
+
     depotLogger
-      .sub(namespace.toLowerCase(), log.timestamp)
+      .sub(namespaceCode ?? 'unknown', log.timestamp)
       .some(translateLevel(level), log.message)
   }

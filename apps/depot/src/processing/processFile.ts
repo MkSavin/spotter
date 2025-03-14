@@ -1,6 +1,7 @@
 import Bun, { type BunFile } from 'bun'
 import { type Stenograph, defaultLogger } from 'stenograph'
-import { mime, type mimeExtensions } from '../fs/extension'
+import type { CoreContext } from '../context'
+import { mime, type mimeExtensions } from '../fs/mime'
 
 type NamedBunFile = Omit<BunFile, 'name'> & {
   /**
@@ -9,11 +10,8 @@ type NamedBunFile = Omit<BunFile, 'name'> & {
   readonly name: string
 }
 
-export type ProcessFileContext = {
-  logger?: Stenograph
+export type ProcessFileContext = CoreContext & {
   filePrefix: string
-  tempDirectory: string
-  destinationDirectory: string
   endpointAuthorization?: string
 }
 
@@ -42,8 +40,7 @@ export const processFile = async (
   const {
     logger: baseLogger = defaultLogger,
     filePrefix,
-    tempDirectory,
-    destinationDirectory,
+    directory,
     endpointAuthorization,
   } = context
 
@@ -71,10 +68,10 @@ export const processFile = async (
   const extension = mimeHelper.type === 'image' ? 'jpg' : 'mp4'
 
   const raw = Bun.file(
-    `${tempDirectory}/${filePrefix}-${hash}-raw.${extension}`,
+    `${directory.temp.directory}/${filePrefix}-${hash}-raw.${extension}`,
   )
   const processed = Bun.file(
-    `${destinationDirectory}/${filePrefix}-${hash}-processed.${extension}`,
+    `${directory.destination.directory}/${filePrefix}-${hash}-processed.${extension}`,
   )
 
   logger.debug(`Processing ${mimeType}...`)
@@ -83,7 +80,13 @@ export const processFile = async (
     processed: processed.name,
   })
 
-  await Bun.write(raw, await response.arrayBuffer(), {
+  const arrayBuffer = await response.arrayBuffer()
+
+  if (arrayBuffer.byteLength === 0) {
+    throw new Error('File buffer is empty, skipping...')
+  }
+
+  await Bun.write(raw, arrayBuffer, {
     createPath: true,
   })
 

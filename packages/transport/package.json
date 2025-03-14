@@ -1,0 +1,14 @@
+{
+  "name": "@spotter/transport",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.ts",
+  "private": "true",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "dotenv": "^16.4.7"
+  }
+}

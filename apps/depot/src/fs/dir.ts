@@ -3,7 +3,7 @@ import { defaultLogger } from 'stenograph'
 
 const logger = defaultLogger.sub('fs', 'dir')
 
-type DirectoryController = {
+export type DirectoryController = {
   directory: string
   exists: boolean
   remove: () => Promise<void>

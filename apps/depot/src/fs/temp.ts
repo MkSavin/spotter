@@ -1,11 +1,11 @@
 import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { defaultLogger } from 'stenograph'
+import { depotLogger } from '../log'
 
-const logger = defaultLogger.sub('fs', 'temp')
+const logger = depotLogger.sub('fs', 'temp')
 
-type TempDirectoryController = {
+export type TempDirectoryController = {
   directory: string
   exists: boolean
   remove: () => Promise<void>
