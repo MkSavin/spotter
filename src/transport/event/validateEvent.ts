@@ -25,7 +25,9 @@ export const validateEvent = (
   }
 
   const type =
-    contents.type === 'start' || contents.type === 'new' ? 'start' : 'end'
+    contents.type === 'new' || contents.type === 'start'
+      ? 'start'
+      : contents.type
 
   return {
     id: event.id,
