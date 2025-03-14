@@ -1,6 +1,7 @@
 {
   "branches": [
     { "name": "master" },
+    { "name": "major-microservices" },
     { "name": "feat-.*", "channel": "beta", "prerelease": true }
   ],
   "plugins": [

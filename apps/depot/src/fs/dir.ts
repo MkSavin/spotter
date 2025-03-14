@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
-import { defaultLogger } from 'stenograph'
+import { applicationLogger } from '../log'
 
-const logger = defaultLogger.sub('fs', 'dir')
+const logger = applicationLogger.sub('fs', 'dir')
 
 export type DirectoryController = {
   directory: string

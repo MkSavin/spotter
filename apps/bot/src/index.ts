@@ -5,7 +5,6 @@ import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import { PrismaClient } from '@prisma/client'
 import { Bot, session } from 'grammy'
-import { defaultLogger } from 'stenograph'
 import information from '../../../package.json'
 import {
   adminCommands,
@@ -24,8 +23,7 @@ import type { Session } from './session'
 import { eventTransport } from './transport/eventTransport'
 import { Kafka, Partitioners } from 'kafkajs'
 import { kafkaLogging } from '@spotter/transport'
-
-export const applicationLogger = defaultLogger.sub('bot')
+import { applicationLogger } from './log'
 
 const prisma = new PrismaClient()
 

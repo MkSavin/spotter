@@ -15,7 +15,6 @@
   "author": "me@mksav.in",
   "license": "MIT",
   "devDependencies": {
-    "@types/tmp": "^0.2.6",
     "@types/jsonwebtoken": "^9.0.9"
   },
   "dependencies": {
@@ -29,7 +28,6 @@
     "dotenv": "^16.4.7",
     "dayjs": "^1.11.13",
     "grammy": "^1.35.0",
-    "jsonwebtoken": "^9.0.2",
-    "tmp": "^0.2.3"
+    "jsonwebtoken": "^9.0.2"
   }
 }

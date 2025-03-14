@@ -7,6 +7,11 @@ export const parseFrigateEvent = (contents: any): SpotterEvent | null => {
     return null
   }
 
+  const type =
+    contents.type === 'new' || contents.type === 'start'
+      ? 'start'
+      : contents.type
+
   return {
     id: event.id,
     camera: event.camera,
@@ -17,6 +22,6 @@ export const parseFrigateEvent = (contents: any): SpotterEvent | null => {
     stationary: event.stationary,
     hasClip: event.has_clip,
     hasSnapshot: event.has_snapshot,
-    type: contents.type,
+    type,
   }
 }

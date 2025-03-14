@@ -7,22 +7,13 @@ FROM base AS install
 COPY package.json bun.lock .npmrc ./
 RUN bun install
 
-FROM base AS schema
-
-COPY --from=install /app/node_modules ./node_modules
-COPY ./prisma /app/prisma/
-RUN bunx prisma generate
-
 FROM base AS bundle
 
-COPY --from=schema /app/node_modules node_modules
+COPY --from=install /app/node_modules node_modules
 COPY . .
 RUN bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable
 
 FROM base AS release
-
-# Copy binary tooling
-COPY --from=bundle /app/node_modules/.prisma/client ./node_modules/.prisma/client
 
 COPY --from=bundle /app/dist/index.js ./
 COPY --from=bundle /app/package.json ./

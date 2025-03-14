@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { applicationLogger } from '../index'
+import { applicationLogger } from '../log'
 
 const logger = applicationLogger.sub('fs', 'temp')
 

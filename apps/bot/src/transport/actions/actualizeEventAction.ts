@@ -1,13 +1,15 @@
 import type { SpotterEvent } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { renderEvent } from '../view/renderEvent'
-import type { EventMessage } from '.prisma/client'
+import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
+import type { MediaTuple } from '../helpers/resolveFrigateMedia'
 
-export const intermediateEventAction = async (
+export const actualizeEventAction = async (
   event: SpotterEvent,
   context: TransportContext,
+  mediaTuple: MediaTuple | undefined = undefined,
 ): Promise<void> => {
-  const { bot, logger, prisma } = context
+  const { logger, prisma } = context
   const { id, ...eventData } = event
 
   let storedEvent = await prisma.event.findUnique({
@@ -36,35 +38,9 @@ export const intermediateEventAction = async (
     },
   })
 
-  const contents = renderEvent(storedEvent, context)
+  const contents = renderEvent(storedEvent, context, mediaTuple)
 
-  const chats = await prisma.chat.findMany({
-    select: {
-      id: true,
-    },
-  })
-
-  const options = { parse_mode: 'HTML' as const }
-
-  const messages = await Promise.all(
-    chats.map(
-      (chat): Promise<EventMessage> =>
-        bot.api.sendMessage(chat.id, contents, options).then((message) => ({
-          id: message.message_id,
-          chatId: chat.id,
-        })),
-    ),
-  )
-
-  await prisma.event.update({
-    where: {
-      id,
-    },
-
-    data: {
-      messages,
-    },
-  })
+  await actualizeSentMessages(id, storedEvent.messages, contents, context)
 
   logger.debug(`Feeding ${event.type} event successfully finished`)
 }

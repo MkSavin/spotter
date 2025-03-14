@@ -1,4 +1,3 @@
-import { defaultLogger } from 'stenograph'
 import { kafkaLogging, KafkaRegulator } from '@spotter/transport'
 import process from 'node:process'
 import { Kafka, Partitioners } from 'kafkajs'
@@ -9,8 +8,7 @@ import { MqttRegulator } from './regulators/MqttRegulator'
 import type { CoreContext } from './context'
 import { frigateEventController } from './mqtt/controllers/frigateEventController'
 import { eventTestController } from './kafka/controllers/eventTestController'
-
-export const applicationLogger = defaultLogger.sub('sink')
+import { applicationLogger } from './log'
 
 const run = async (): Promise<void> => {
   applicationLogger.info(

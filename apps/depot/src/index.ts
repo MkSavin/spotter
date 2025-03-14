@@ -8,9 +8,7 @@ import type { CoreContext } from './context'
 import { cameraFrameController } from './controllers/cameraFrameController'
 import { eventMediaController } from './controllers/eventMediaController'
 import { temp } from './fs/temp'
-import { defaultLogger } from 'stenograph'
-
-export const applicationLogger = defaultLogger.sub('depot')
+import { applicationLogger } from './log'
 
 const run = async (): Promise<void> => {
   applicationLogger.info(

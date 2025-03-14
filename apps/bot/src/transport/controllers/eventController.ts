@@ -5,8 +5,7 @@ import {
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { parseSpotterEvent } from '../parsing/parseSpotterEvent'
-import { intermediateEventAction } from '../actions/intermediateEventAction'
-import { endEventAction } from '../actions/endEventAction'
+import { actualizeEventAction } from '../actions/actualizeEventAction'
 import dayjs from 'dayjs'
 import { resolveFrigateMedia } from '../helpers/resolveFrigateMedia'
 import type { Message } from 'kafkajs'
@@ -41,13 +40,13 @@ export const eventController: KafkaMessageController<TransportContext> = async (
 
   await intervalHeartbeat(heartbeat, config.kafka, async () => {
     if (event.type !== 'end') {
-      await intermediateEventAction(event, nextContext)
+      await actualizeEventAction(event, nextContext)
       return
     }
 
     const mediaTuple = await resolveFrigateMedia(event, context)
 
-    await endEventAction(event, mediaTuple, nextContext)
+    await actualizeEventAction(event, nextContext, mediaTuple)
 
     if (!mediaTuple.hasClip && !mediaTuple.hasSnapshot) {
       logger.debug(

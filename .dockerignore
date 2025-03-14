@@ -4,6 +4,7 @@
 
 # Bundles
 /dist
+/**/*/dist
 
 # System-related
 /.DS_Store
@@ -29,8 +30,9 @@
 /*/**/temp
 
 # Environments and configuration
-.env.example
+apps/bot/.env.example
 config.ts
+bot.config.ts
 
 # Development configurations
 biome.json
@@ -38,6 +40,7 @@ biome.json
 
 # Testing
 coverage*
+**/*/coverage*
 
 # Docker
 docker-compose*
