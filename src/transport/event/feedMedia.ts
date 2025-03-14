@@ -28,7 +28,7 @@ export const resolveMedia = async (
     : undefined
 
   const snapshotResponse = event.has_snapshot
-    ? await context.frigate.get(frigateMedia.event.clip, {
+    ? await context.frigate.get(frigateMedia.event.snapshot, {
         id: event.id,
       })
     : undefined
