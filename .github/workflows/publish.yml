@@ -40,9 +40,11 @@ jobs:
       uses: oven-sh/setup-bun@v2
 
     - name: 'Bulk Release'
-      run: DEBUG=1 bunx zx-bulk-release --include-private true --npmFetch false
+      run: DEBUG=1 bunx zx-bulk-release --include-private true --npm-fetch false
 #      run: bun multi-semantic-release --dry-run --ignore-private=false --ignore-packages="packages/*"
       env:
+        GIT_COMMITER_NAME: semrel-extra-bot
+        GIT_COMMITER_EMAIL: semrel-extra-bot@hotmail.com
         GH_USER: test #${{github.actor}}
         GH_TOKEN: foobar #${{secrets.GITHUB_TOKEN}}
 
