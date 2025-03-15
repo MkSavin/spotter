@@ -1,12 +1,12 @@
 import {
+  type KafkaMessageController,
   bufferToJson,
   intervalHeartbeat,
-  type KafkaMessageController,
 } from '@spotter/transport'
+import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 import type { TransportContext } from '../../context'
 import { eventMediaAction } from '../actions/eventMediaAction'
 import { eventCode } from '../helpers/eventCode'
-import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 
 export const eventMediaController: KafkaMessageController<
   TransportContext

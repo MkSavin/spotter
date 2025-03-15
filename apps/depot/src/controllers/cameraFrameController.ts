@@ -3,12 +3,12 @@ import {
   bufferToJson,
   intervalHeartbeat,
 } from '@spotter/transport'
+import type { Message } from 'kafkajs'
 import {
   type CameraFramePayload,
   cameraFrameAction,
 } from '../actions/cameraFrameAction'
 import type { CoreContext } from '../context'
-import type { Message } from 'kafkajs'
 
 export const cameraFrameController: KafkaMessageController<
   CoreContext

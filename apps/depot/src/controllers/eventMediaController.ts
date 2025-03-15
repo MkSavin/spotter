@@ -3,12 +3,12 @@ import {
   bufferToJson,
   intervalHeartbeat,
 } from '@spotter/transport'
+import type { Message } from 'kafkajs'
 import {
   type EventMediaPayload,
   eventMediaAction,
 } from '../actions/eventMediaAction'
 import type { CoreContext } from '../context'
-import type { Message } from 'kafkajs'
 
 export const eventMediaController: KafkaMessageController<CoreContext> = async (
   payload,

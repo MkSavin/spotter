@@ -1,15 +1,15 @@
 import {
+  type KafkaMessageController,
   bufferToJson,
   intervalHeartbeat,
-  type KafkaMessageController,
 } from '@spotter/transport'
-import type { CoreContext } from '../../context'
-import {
-  eventTestAction,
-  type EventTestPayload,
-} from '../actions/eventTestAction'
-import { publishEventToKafka } from '../../helpers/publishEvent'
 import dayjs from 'dayjs'
+import type { CoreContext } from '../../context'
+import { publishEventToKafka } from '../../helpers/publishEvent'
+import {
+  type EventTestPayload,
+  eventTestAction,
+} from '../actions/eventTestAction'
 
 export const eventTestController: KafkaMessageController<CoreContext> = async (
   payload,

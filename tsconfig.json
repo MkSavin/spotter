@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": "./apps/bot/src",
     "outDir": "./lib",
     "target": "esnext",
     "module": "commonjs",
@@ -20,8 +19,6 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": [
-    "./apps/bot/src/*"
-  ],
+  "include": ["./apps/*", "./packages/*"],
   "exclude": ["node_modules"]
 }

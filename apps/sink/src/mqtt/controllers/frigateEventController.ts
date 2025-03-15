@@ -1,8 +1,8 @@
 import { bufferToJson } from '@spotter/transport'
-import type { MqttMessageController } from '../../regulators/MqttRegulator'
-import { parseFrigateEvent } from '../../parsing/parseFrigateEvent'
 import type { CoreContext } from '../../context'
 import { publishEventToKafka } from '../../helpers/publishEvent'
+import { parseFrigateEvent } from '../../parsing/parseFrigateEvent'
+import type { MqttMessageController } from '../../regulators/MqttRegulator'
 
 export const frigateEventController: MqttMessageController<
   CoreContext

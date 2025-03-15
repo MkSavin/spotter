@@ -1,5 +1,5 @@
 import process from 'node:process'
-import { kafkaLogging, KafkaRegulator } from '@spotter/transport'
+import { KafkaRegulator, kafkaLogging } from '@spotter/transport'
 import { Kafka, Partitioners } from 'kafkajs'
 import { Client as MinioClient } from 'minio'
 import information from '../package.json'

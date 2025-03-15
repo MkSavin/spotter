@@ -1,6 +1,6 @@
+import type { TransportContext } from '../../context'
 import { diffAffectedChats } from '../helpers/diffAffectedChats'
 import type { EventMessage } from '.prisma/client'
-import type { TransportContext } from '../../context'
 
 export const actualizeSentMessages = async (
   id: string,

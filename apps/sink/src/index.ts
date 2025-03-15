@@ -1,14 +1,14 @@
-import { kafkaLogging, KafkaRegulator } from '@spotter/transport'
 import process from 'node:process'
+import { KafkaRegulator, kafkaLogging } from '@spotter/transport'
 import { Kafka, Partitioners } from 'kafkajs'
+import { connectAsync as mqttConnectAsync } from 'mqtt'
 import information from '../package.json'
 import { resolveConfig } from './config'
-import { connectAsync as mqttConnectAsync } from 'mqtt'
-import { MqttRegulator } from './regulators/MqttRegulator'
 import type { CoreContext } from './context'
-import { frigateEventController } from './mqtt/controllers/frigateEventController'
 import { eventTestController } from './kafka/controllers/eventTestController'
 import { applicationLogger } from './log'
+import { frigateEventController } from './mqtt/controllers/frigateEventController'
+import { MqttRegulator } from './regulators/MqttRegulator'
 
 const run = async (): Promise<void> => {
   applicationLogger.info(

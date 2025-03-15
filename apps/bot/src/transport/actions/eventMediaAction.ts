@@ -1,6 +1,6 @@
+import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 import type { TransportContext } from '../../context'
 import { diffAffectedChats } from '../helpers/diffAffectedChats'
-import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 import { renderEvent } from '../view/renderEvent'
 
 type EventMediaPayload = {

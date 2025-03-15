@@ -5,13 +5,11 @@
 /coverage
 /**/*/coverage
 /.docker
-/.idea
 /.turbo
 /.vite
 /*/**/.turbo
 /*/**/.vite
 
-/*/**/.turbo
 /*/**/temp
 
 # Build cache

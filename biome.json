@@ -6,8 +6,9 @@
     "useIgnoreFile": false
   },
   "files": {
+    "include": ["apps/**/*.ts", "packages/**/*.ts"],
     "ignoreUnknown": false,
-    "ignore": []
+    "ignore": ["*dist/*", "*.turbo/*", "*.docker/*"]
   },
   "formatter": {
     "enabled": true,

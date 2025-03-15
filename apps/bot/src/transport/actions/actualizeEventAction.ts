@@ -1,8 +1,8 @@
 import type { SpotterEvent } from '@spotter/transport'
 import type { TransportContext } from '../../context'
-import { renderEvent } from '../view/renderEvent'
-import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
 import type { MediaTuple } from '../helpers/resolveFrigateMedia'
+import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
+import { renderEvent } from '../view/renderEvent'
 
 export const actualizeEventAction = async (
   event: SpotterEvent,

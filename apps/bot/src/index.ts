@@ -4,7 +4,9 @@ import { hydrate } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import { PrismaClient } from '@prisma/client'
+import { kafkaLogging } from '@spotter/transport'
 import { Bot, session } from 'grammy'
+import { Kafka, Partitioners } from 'kafkajs'
 import information from '../../../package.json'
 import {
   adminCommands,
@@ -16,14 +18,12 @@ import { resolveConfig } from './config'
 import type { BotContext, CoreContext } from './context'
 import { Frigate } from './framework/api/Frigate'
 import { timeout } from './helpers/timeout'
+import { applicationLogger } from './log'
 import { authorize } from './middlewares/bot/authorize'
 import { logging } from './middlewares/bot/logging'
 import { switchCommandList } from './middlewares/bot/switchCommandList'
 import type { Session } from './session'
 import { eventTransport } from './transport/eventTransport'
-import { Kafka, Partitioners } from 'kafkajs'
-import { kafkaLogging } from '@spotter/transport'
-import { applicationLogger } from './log'
 
 const prisma = new PrismaClient()
 

@@ -1,12 +1,12 @@
 import { Command } from '@grammyjs/commands'
 import { $Enums } from '@prisma/client'
 import dayjs from 'dayjs'
+import type { Message } from 'kafkajs'
 import type { BotContext } from '../../context'
 import { timeout } from '../../helpers/timeout'
 import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
-import type { Message } from 'kafkajs'
 
 export const testPublishCommand = new Command<BotContext>(
   'test_publish',

@@ -1,7 +1,7 @@
 import {
+  type KafkaMessageController,
   bufferToJson,
   intervalHeartbeat,
-  type KafkaMessageController,
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { cameraFrameAction } from '../actions/cameraFrameAction'

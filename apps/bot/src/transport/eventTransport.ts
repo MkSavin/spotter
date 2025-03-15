@@ -1,9 +1,9 @@
 import { KafkaRegulator } from '@spotter/transport'
 import type { Bot } from 'grammy'
 import type { BotContext, CoreContext, TransportContext } from '../context'
+import { cameraFrameController } from './controllers/cameraFrameController'
 import { eventController } from './controllers/eventController'
 import { eventMediaController } from './controllers/eventMediaController'
-import { cameraFrameController } from './controllers/cameraFrameController'
 
 export const eventTransport = async (
   bot: Bot<BotContext>,

@@ -1,5 +1,6 @@
 import { Command } from '@grammyjs/commands'
 import { $Enums } from '@prisma/client'
+import type { Message } from 'kafkajs'
 import type { BotContext } from '../../context'
 import { Frigate, frigateMedia } from '../../framework/api/Frigate'
 import { get } from '../../helpers/get'
@@ -7,7 +8,6 @@ import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
-import type { Message } from 'kafkajs'
 
 export const snapshotCommand = new Command<BotContext>(
   'snapshot',

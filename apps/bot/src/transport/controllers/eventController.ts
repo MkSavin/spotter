@@ -1,16 +1,16 @@
 import {
+  type KafkaMessageController,
   bufferToJson,
   intervalHeartbeat,
-  type KafkaMessageController,
 } from '@spotter/transport'
-import type { TransportContext } from '../../context'
-import { parseSpotterEvent } from '../parsing/parseSpotterEvent'
-import { actualizeEventAction } from '../actions/actualizeEventAction'
 import dayjs from 'dayjs'
-import { resolveFrigateMedia } from '../helpers/resolveFrigateMedia'
 import type { Message } from 'kafkajs'
+import type { TransportContext } from '../../context'
 import { Frigate } from '../../framework/api/Frigate'
+import { actualizeEventAction } from '../actions/actualizeEventAction'
 import { eventCode } from '../helpers/eventCode'
+import { resolveFrigateMedia } from '../helpers/resolveFrigateMedia'
+import { parseSpotterEvent } from '../parsing/parseSpotterEvent'
 
 export const eventController: KafkaMessageController<TransportContext> = async (
   payload,
