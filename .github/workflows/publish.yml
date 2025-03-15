@@ -39,6 +39,12 @@ jobs:
     - name: 'Install bun'
       uses: oven-sh/setup-bun@v2
 
+    - name: 'Check contents'
+      run: bun -e 'console.log(process.env)'
+      env:
+        GH_USER: ${{github.actor}}
+        GITHUB_TOKEN: 123
+
     - name: 'Bulk Release'
       run: bunx zx-bulk-release --include-private true
 #      run: bun multi-semantic-release --dry-run --ignore-private=false --ignore-packages="packages/*"
