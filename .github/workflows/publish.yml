@@ -41,6 +41,7 @@ jobs:
 #      run: bun multi-semantic-release --dry-run --ignore-private=false --ignore-packages="packages/*"
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        GITHUB_USERNAME: mksavin
 
     - name: 'Imperative image building'
       run: bunx zx .integration/imperative.mjs --file=.build-meta
