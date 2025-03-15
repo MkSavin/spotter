@@ -48,8 +48,8 @@ jobs:
         DEBUG: true
         GIT_COMMITTER_NAME: 'semrel-extra-bot'
         GIT_COMMITTER_EMAIL: 'semrel-extra-bot@hotmail.com'
-        GH_USER: test #${{github.actor}}
-        GH_TOKEN: foobar #${{secrets.GITHUB_TOKEN}}
+        GH_USER: ${{github.actor}}
+        GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
     - name: 'Imperative image building'
       run: bunx zx .integration/imperative.mjs --file=.build-meta
