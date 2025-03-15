@@ -39,11 +39,8 @@ jobs:
     - name: 'Install bun'
       uses: oven-sh/setup-bun@v2
 
-    - name: 'Check contents'
-      run: bun install zx-bulk-release
-
     - name: 'Bulk Release'
-      run: npm_config_yes=true zx-bulk-release --include-private true
+      run: npm_config_yes=true bunx zx-bulk-release --include-private true
 #      run: bun multi-semantic-release --dry-run --ignore-private=false --ignore-packages="packages/*"
       env:
         GH_USER: ${{github.actor}}
