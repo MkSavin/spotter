@@ -43,8 +43,9 @@ jobs:
       run: npm_config_yes=true bunx zx-bulk-release --include-private true
 #      run: bun multi-semantic-release --dry-run --ignore-private=false --ignore-packages="packages/*"
       env:
+        DEBUG: true
         GH_USER: ${{github.actor}}
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
     - name: 'Imperative image building'
       run: bunx zx .integration/imperative.mjs --file=.build-meta
