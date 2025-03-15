@@ -4,16 +4,20 @@
 
 # Bundles
 /dist
+/**/*/dist
 
 # System-related
 /.DS_Store
 
 # Deployment
+/.integration
 /.deployment
 /.docker
 /.github
+/.turbo
 
-# Caching
+# Build cache
+/*/**/.build-meta
 /.turbo
 /.vite
 /*/**/.turbo
@@ -24,20 +28,25 @@
 .gitignore
 .gitattributes
 
+# Temporary
+/*/**/temp
+
 # Environments and configuration
-.env.example
+apps/bot/.env.example
 config.ts
+bot.config.ts
 
 # Development configurations
 biome.json
-.releaserc
+.releaserc.json
 
 # Testing
 coverage*
+**/*/coverage*
 
 # Docker
 docker-compose*
-Dockerfile*
+apps/bot/Dockerfile
 .dockerignore
 
 # Other

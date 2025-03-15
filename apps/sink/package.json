@@ -1,0 +1,24 @@
+{
+  "name": "@spotter/sink",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "start:watch": "bun --watch src/index.ts",
+    "build": "bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "private": "true",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "dependencies": {
+    "@spotter/transport": "*",
+    "stenograph": "*",
+    "kafkajs": "^2.2.4",
+    "dotenv": "^16.4.7",
+    "mqtt": "^5.10.3"
+  }
+}

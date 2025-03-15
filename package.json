@@ -1,44 +1,29 @@
 {
-  "name": "elercam",
+  "name": "spotter",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "bun src/index.ts",
-    "start:watch": "bun --watch src/index.ts",
-    "build": "bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable",
-    "sign:token": "bun src/cli/sign.ts",
-    "prisma:generate": "bunx prisma generate",
+    "start": "turbo run start --parallel",
+    "start:watch": "turbo run start:watch --parallel",
+    "test": "turbo run test --parallel",
+    "build": "turbo run build --parallel",
+    "sign:token": "bun apps/bot/src/cli/sign.ts",
     "docker:dev": "ln -sf docker-compose.development.yml docker-compose.yml",
     "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml",
-    "docker:build": "docker build . --file Dockerfile",
-    "docker:run": "docker run -it --rm $(docker build . -q --file Dockerfile)"
+    "docker:build": "exit 0; docker build . --file apps/bot/Dockerfile",
+    "docker:run": "exit 0; docker run -it --rm $(docker build . -q --file Dockerfile)"
   },
   "private": "true",
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "packageManager": "bun@1.2.4",
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@types/bun": "^1.2.2",
-    "@types/tmp": "^0.2.6",
-    "@types/fluent-ffmpeg": "^2.1.27",
-    "@types/jsonwebtoken": "^9.0.9",
-    "prisma": "^6.4.1"
+    "prisma": "^6.4.1",
+    "turbo": "^2.4.4",
+    "zx-bulk-release": "^2.15.31"
   },
-  "dependencies": {
-    "@grammyjs/commands": "^1.0.5",
-    "@grammyjs/hydrate": "^1.4.1",
-    "@grammyjs/parse-mode": "^1.11.1",
-    "@grammyjs/runner": "^2.0.3",
-    "@prisma/client": "^6.4.1",
-    "dayjs": "^1.11.13",
-    "dotenv": "^16.4.7",
-    "fluent-ffmpeg": "^2.1.3",
-    "grammy": "^1.35.0",
-    "jsonwebtoken": "^9.0.2",
-    "mqtt": "^5.10.3",
-    "sharp": "^0.33.5",
-    "tmp": "^0.2.3"
-  }
+  "workspaces": ["apps/*", "packages/*"]
 }

@@ -1,0 +1,35 @@
+{
+  "name": "@spotter/bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "bun ./src/index.ts",
+    "start:watch": "bun --watch ./src/index.ts",
+    "build": "bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable",
+    "docker:build": "docker build . -t ghcr.io/mksavin/spotter-bot:latest",
+    "docker:publish": "docker push ghcr.io/mksavin/spotter-bot --all-tags",
+    "sign:token": "bun ./src/cli/sign.ts",
+    "prisma:generate": "bunx prisma generate"
+  },
+  "private": "true",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9"
+  },
+  "dependencies": {
+    "@spotter/transport": "*",
+    "stenograph": "*",
+    "@grammyjs/commands": "^1.0.5",
+    "@grammyjs/hydrate": "^1.4.1",
+    "@grammyjs/parse-mode": "^1.11.1",
+    "@grammyjs/runner": "^2.0.3",
+    "@prisma/client": "^6.4.1",
+    "dotenv": "^16.4.7",
+    "dayjs": "^1.11.13",
+    "grammy": "^1.35.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
