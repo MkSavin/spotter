@@ -1,0 +1,10 @@
+{
+  "META_VERSION": "1",
+  "hash": "11c9e93b0df1e1aa4336300cf66fc0de32156041",
+  "name": "@spotter/depot",
+  "version": "1.0.0",
+  "dependencies": {
+    "@spotter/transport": "*",
+    "stenograph": "*"
+  }
+}
