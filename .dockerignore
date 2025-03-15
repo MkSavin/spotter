@@ -10,12 +10,14 @@
 /.DS_Store
 
 # Deployment
+/.integration
 /.deployment
 /.docker
 /.github
 /.turbo
 
-# Caching
+# Build cache
+/*/**/.build-meta
 /.turbo
 /.vite
 /*/**/.turbo
@@ -36,7 +38,7 @@ bot.config.ts
 
 # Development configurations
 biome.json
-.releaserc
+.releaserc.json
 
 # Testing
 coverage*

@@ -1,0 +1,5 @@
+{
+  "cmd": "echo '${{ tag }}' > .build-meta",
+  "tagFormat": "lerna",
+  "npmFetch": false
+}

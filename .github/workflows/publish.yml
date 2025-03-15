@@ -36,15 +36,13 @@ jobs:
     - name: 'Install bun'
       uses: oven-sh/setup-bun@v2
 
-    - name: 'Install packages'
-      run: bun install semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/npm conventional-changelog-conventionalcommits
-
     - name: 'Semantic Release'
-      run: bunx semantic-release
+      run: bunx zx-bulk-release --include-private true
+#      run: bun multi-semantic-release --dry-run --ignore-private=false --ignore-packages="packages/*"
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
-    - name: 'Build Inventory Image'
-      run: |
-        docker build . --build-arg NPM_TOKEN=${{secrets.GITHUB_TOKEN}} --file Dockerfile --tag ghcr.io/mksavin/elercam:latest
-        docker push ghcr.io/mksavin/elercam:latest
+    - name: 'Imperative image building'
+      run: bunx zx .integration/imperative.mjs --file=.build-meta
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
