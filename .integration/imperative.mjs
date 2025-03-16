@@ -1,34 +1,32 @@
 #!/usr/bin/env zx
 
 import path from 'node:path'
+import { $ } from 'zx/core'
 
-const file = argv.file ?? '.build-meta'
-const filter = argv.filter ?? undefined
+const versions = JSON.parse(argv.versions || '[]')
+const dry = argv['dry-run'] === 'true' ?? false
 
-const searchOutput = (
-  await $`find ./apps -type f -name "${file}" -print0 | xargs -0 -I{} sh -c 'echo "{} = $(cat "{}")"'`
-).stdout
-
-const lineMatches = searchOutput.matchAll(
-  /^(.*) = ([\w\/@]*)@([\d.]+(?:-.+)?)$/gim,
-)
-
-const entries = [...lineMatches]
-  .map((match) => {
-    const parts = match.splice(1)
+const entries = await Promise.all(
+  versions.map(async (version) => {
+    // Warn: Running unsafe command due to bad arguments parsing
+    const q = $.quote
+    $.quote = (v) => v
+    const out =
+      await $`find ./apps -name 'package.json' -exec grep -l '"name":\\s*"\\(${version.name}\\)"' {} \\;`
+    $.quote = q
 
     return {
-      path: path.dirname(parts[0]),
-      name: parts[1],
-      code: parts[1]
+      path: path.dirname(out.stdout.trim()),
+      name: version.name,
+      code: version.name
         .replaceAll(/([a-z])([A-Z])/g, '$1-$2')
         .replaceAll(/[\s\/_]+/g, '-')
         .replaceAll(/[@$#]+/g, '')
         .toLowerCase(),
-      version: parts[2],
+      version: version.version,
     }
-  })
-  .filter((entry) => (!filter ? true : entry.code === filter))
+  }),
+)
 
 if (entries.length === 0) {
   process.exit(0)
@@ -80,7 +78,11 @@ await Promise.all(
     console.debug('    Using push command:', pushCommand)
     console.log()
 
-    // Warn: Running unsafe command
+    if (dry) {
+      return
+    }
+
+    // Warn: Running unsafe command due to bad arguments parsing
     const q = $.quote
     $.quote = (v) => v
     await $`${buildCommand}`
