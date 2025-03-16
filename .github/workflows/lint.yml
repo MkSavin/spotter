@@ -1,0 +1,40 @@
+name: Lint
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+      - '!master'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 'Setup Biome'
+      uses: biomejs/setup-biome@v2
+      with:
+        version: latest
+
+    - name: 'Run Biome'
+      run: biome ci .
+
+    - name: 'Run linter'
+      uses: wagoid/commitlint-github-action@v5
+      with:
+        configFile: commitlint.config.ts
+
+    - name: 'Install bun'
+      uses: oven-sh/setup-bun@v2
+
+    - name: 'Install dependencies'
+      run: bun install
+
+    - name: 'Run tests'
+      run: bun run test
