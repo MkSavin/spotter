@@ -15,7 +15,7 @@ export const eventsClearCommand = new Command<BotContext>(
     const list = await context.prisma.event.deleteMany()
 
     await context.replyWithHTML(
-      `\u{26a0}\u{fe0f} <b>Список событий очищен</b>
+      `\u{26a0}\u{fe0f} <b>Список событий очищен!</b>
 
 Затронуто событий: ${list.count}`,
     )
