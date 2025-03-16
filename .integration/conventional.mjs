@@ -45,6 +45,7 @@ const commitHashes = (
   .trim()
   .split('\n')
   .reverse()
+  .filter(Boolean)
 
 const commits = await Promise.all(
   commitHashes.map(async (hash) => ({
@@ -164,54 +165,57 @@ const changesets = await Promise.all(
   }),
 )
 
-if (changesets.length) {
-  const read =
-    'default' in readChangesets ? readChangesets.default : readChangesets
-
-  const availableChangesets = await read(cwd)
-
-  const newChangesets = changesets.filter(Boolean).filter(
-    (entry) =>
-      !availableChangesets.some((available) => {
-        const availableReleases = available.releases
-          .map((release) => `${release.name}-${release.type}`)
-          .join(';')
-        const newReleases = entry.releases
-          .map((release) => `${release.name}-${release.type}`)
-          .join(';')
-
-        const availableSummary = available.summary.trim().replaceAll('\n', '')
-        const newSummary = entry.summary.trim().replaceAll('\n', '')
-
-        return (
-          availableReleases === newReleases && availableSummary === newSummary
-        )
-      }),
-  )
-
-  // Loader bug fix
-  const write =
-    'default' in writeChangeset ? writeChangeset.default : writeChangeset
-
-  const wroteChangesets = await Promise.all(
-    newChangesets.map((changeset) =>
-      write(changeset, cwd).then((id) => ({
-        id,
-        ...changeset,
-      })),
-    ),
-  )
-
-  if (!wroteChangesets.length) {
-    console.log('No created changesets')
-  }
-
-  wroteChangesets.forEach((changeset) => {
-    console.log('Created changeset:', changeset.id)
-    console.log('  Summary:', changeset.summary)
-    console.log('  Releases:')
-    changeset.releases.forEach((entry) => {
-      console.log(`    ${entry.name}: ${entry.type}`)
-    })
-  })
+if (!changesets.length) {
+  console.log('No changesets to create')
+  process.exit(0)
 }
+
+const read =
+  'default' in readChangesets ? readChangesets.default : readChangesets
+
+const availableChangesets = await read(cwd)
+
+const newChangesets = changesets.filter(Boolean).filter(
+  (entry) =>
+    !availableChangesets.some((available) => {
+      const availableReleases = available.releases
+        .map((release) => `${release.name}-${release.type}`)
+        .join(';')
+      const newReleases = entry.releases
+        .map((release) => `${release.name}-${release.type}`)
+        .join(';')
+
+      const availableSummary = available.summary.trim().replaceAll('\n', '')
+      const newSummary = entry.summary.trim().replaceAll('\n', '')
+
+      return (
+        availableReleases === newReleases && availableSummary === newSummary
+      )
+    }),
+)
+
+// Loader bug fix
+const write =
+  'default' in writeChangeset ? writeChangeset.default : writeChangeset
+
+const wroteChangesets = await Promise.all(
+  newChangesets.map((changeset) =>
+    write(changeset, cwd).then((id) => ({
+      id,
+      ...changeset,
+    })),
+  ),
+)
+
+if (!wroteChangesets.length) {
+  console.log('No created changesets')
+}
+
+wroteChangesets.forEach((changeset) => {
+  console.log('Created changeset:', changeset.id)
+  console.log('  Summary:', changeset.summary)
+  console.log('  Releases:')
+  changeset.releases.forEach((entry) => {
+    console.log(`    ${entry.name}: ${entry.type}`)
+  })
+})

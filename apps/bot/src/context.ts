@@ -12,6 +12,11 @@ import type { Frigate } from './framework/api/Frigate'
 import type { Session } from './session'
 
 export type EnvironmentConfig = {
+  kafka: HeartbeatProps & {
+    clientId: string
+    brokers: string[]
+    groupId: string
+  }
   telegram: {
     token: string
   }
@@ -20,11 +25,6 @@ export type EnvironmentConfig = {
   }
   frigate: {
     remoteUrl: string
-  }
-  kafka: HeartbeatProps & {
-    clientId: string
-    brokers: string[]
-    groupId: string
   }
 }
 

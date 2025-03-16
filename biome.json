@@ -6,7 +6,7 @@
     "useIgnoreFile": false
   },
   "files": {
-    "include": ["apps/**/*.ts", "packages/**/*.ts", ".integration/**/*.mjs"],
+    "include": ["apps/**/*.ts", "packages/**/*.ts", ".integration/**/*.mjs", "**/*.config.ts"],
     "ignoreUnknown": false,
     "ignore": ["*dist/*", "*.turbo/*", "*.docker/*"]
   },

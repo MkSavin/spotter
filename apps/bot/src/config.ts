@@ -23,7 +23,6 @@ const tryReadContentConfig = async (
     }
   } catch (e) {
     logger.debug('Config file not found. Falling back to default settings')
-
     return defaultConfig
   }
 }
