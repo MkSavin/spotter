@@ -5,27 +5,35 @@ import path from 'node:path'
 const versions = JSON.parse(argv.versions || '[]')
 const dry = argv['dry-run'] === 'true' ?? false
 
-const entries = await Promise.all(
-  versions.map(async (version) => {
-    // Warn: Running unsafe command due to bad arguments parsing
-    const q = $.quote
-    $.quote = (v) => v
-    const out =
-      await $`find ./apps -name 'package.json' -exec grep -l '"name":\\s*"\\(${version.name}\\)"' {} \\;`
-    $.quote = q
+const entries = (
+  await Promise.all(
+    versions.map(async (version) => {
+      // Warn: Running unsafe command due to bad arguments parsing
+      const q = $.quote
+      $.quote = (v) => v
+      const out =
+        await $`find ./apps -name 'package.json' -exec grep -l '"name":\\s*"\\(${version.name}\\)"' {} \\;`
+      $.quote = q
 
-    return {
-      path: path.dirname(out.stdout.trim()),
-      name: version.name,
-      code: version.name
-        .replaceAll(/([a-z])([A-Z])/g, '$1-$2')
-        .replaceAll(/[\s\/_]+/g, '-')
-        .replaceAll(/[@$#]+/g, '')
-        .toLowerCase(),
-      version: version.version,
-    }
-  }),
-)
+      const packagePath = out.stdout.trim()
+
+      if (!packagePath) {
+        return
+      }
+
+      return {
+        path: path.dirname(packagePath),
+        name: version.name,
+        code: version.name
+          .replaceAll(/([a-z])([A-Z])/g, '$1-$2')
+          .replaceAll(/[\s\/_]+/g, '-')
+          .replaceAll(/[@$#]+/g, '')
+          .toLowerCase(),
+        version: version.version,
+      }
+    }),
+  )
+).filter(Boolean)
 
 if (entries.length === 0) {
   process.exit(0)
