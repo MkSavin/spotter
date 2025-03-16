@@ -38,7 +38,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GH_BYPASS_TOKEN }}
 
-    - name: 'Imperative image building'
+    - name: 'Imperative application images building'
       if: steps.changesets.outputs.published == 'true'
       run: bunx zx .integration/imperative.mjs --versions="${{steps.changesets.outputs.publishedPackages}}"
       env:
