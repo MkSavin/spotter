@@ -41,5 +41,7 @@ jobs:
     - name: 'Run changesets'
       id: changesets
       uses: changesets/action@v1
+      with:
+        version: bunx changeset tag && bunx changeset version
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
