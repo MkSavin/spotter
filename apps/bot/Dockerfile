@@ -19,7 +19,8 @@ FROM base AS schema
 
 COPY --from=install /app/node_modules ./node_modules
 COPY --from=install --parents /app/**/node_modules ./
-COPY ${APP_RELATIVE_PATH}/prisma ./${APP_RELATIVE_PATH}/prisma/
+COPY ${APP_RELATIVE_PATH}/prisma ${APP_RELATIVE_PATH}/prisma/
+RUN ls -lah ${APP_RELATIVE_PATH}/prisma
 RUN bunx prisma generate
 
 FROM base AS bundle
