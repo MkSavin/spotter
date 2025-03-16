@@ -9,7 +9,7 @@
     "test": "turbo run test --parallel",
     "build": "turbo run build --parallel",
     "sign:token": "bun apps/bot/src/cli/sign.ts",
-    "publish": "bunx changeset tag && git push --tags",
+    "publish": "bunx changeset tag",
     "docker:dev": "ln -sf docker-compose.development.yml docker-compose.yml",
     "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml"
   },
