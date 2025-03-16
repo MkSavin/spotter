@@ -1,5 +1,5 @@
 import { Command } from '@grammyjs/commands'
-import { $Enums } from '@prisma/client'
+import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
@@ -9,7 +9,7 @@ export const statsCommand = new Command<BotContext>(
   'stats',
   'Статистика базы данных',
 ).addToScope(commandScopes.private, [
-  guard($Enums.Role.ADMIN),
+  guard(Role.ADMIN),
   sender('present'),
   async (context, next) => {
     const eventCount = await context.prisma.event.count()

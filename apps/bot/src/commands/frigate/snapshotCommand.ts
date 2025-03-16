@@ -1,6 +1,6 @@
 import { Command } from '@grammyjs/commands'
-import { $Enums } from '@prisma/client'
 import type { Message } from 'kafkajs'
+import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
 import { Frigate, frigateMedia } from '../../framework/api/Frigate'
 import { get } from '../../helpers/get'
@@ -13,7 +13,7 @@ export const snapshotCommand = new Command<BotContext>(
   'snapshot',
   'Получить последний кадр с камеры',
 ).addToScope(commandScopes.private, [
-  guard($Enums.Role.ADMIN),
+  guard(Role.ADMIN),
   sender('present'),
   argument(argument.string, 'snapshot [камера]'),
   async (context, next) => {
@@ -36,7 +36,7 @@ export const snapshotCommand = new Command<BotContext>(
         camera: cameraName,
       })
 
-      if (response.status !== 200) {
+      if (!response.ok) {
         await message.editText(
           '\u{26a0}\u{fe0f} <b>Ошибка при получении снимка...</b>',
           {
@@ -55,7 +55,7 @@ export const snapshotCommand = new Command<BotContext>(
           chatId: context.chatId,
           messageId: message?.message_id,
           frameUrl: response.url,
-          endpointAuthorization: Frigate.generateJWT(),
+          endpointAuthorization: `Bearer ${Frigate.generateJWT()}`,
         }),
       }
 

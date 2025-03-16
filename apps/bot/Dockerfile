@@ -17,22 +17,20 @@ RUN bun install -D
 
 FROM base AS schema
 
-COPY --from=install /app/node_modules ./node_modules
-COPY --from=install --parents /app/**/node_modules ./
+COPY --from=install --parents **/node_modules ./
 COPY ${APP_RELATIVE_PATH}/prisma ${APP_RELATIVE_PATH}/prisma/
 RUN cd ${APP_RELATIVE_PATH} && bunx prisma generate
 
 FROM base AS bundle
 
-COPY --from=schema /app/node_modules ./node_modules
-COPY --from=schema --parents /app/**/node_modules ./
+COPY --from=schema --parents **/node_modules ./
 COPY . .
 RUN cd ${APP_RELATIVE_PATH} && bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable
 
 FROM base AS release
 
 # Copy binary tooling
-COPY --from=bundle /app/node_modules/.prisma/client ./node_modules/.prisma/client
+COPY --from=bundle .prisma-generated ./.prisma-generated
 
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/dist/index.js ./
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/package.json ./

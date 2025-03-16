@@ -1,3 +1,4 @@
+import { InputFile } from 'grammy'
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 import type { TransportContext } from '../../context'
 import { diffAffectedChats } from '../helpers/diffAffectedChats'
@@ -12,8 +13,36 @@ export const eventMediaAction = async (
   payload: EventMediaPayload,
   context: TransportContext,
 ): Promise<void> => {
-  const { bot, logger, prisma } = context
+  const { bot, logger, prisma, config } = context
   const { eventId, media } = payload
+
+  const correctedMedia = await Promise.all(
+    media.map(async (entry) => {
+      if (typeof entry.media !== 'string') {
+        return entry
+      }
+
+      if (
+        !entry.media.includes('://localhost') &&
+        config.media.strategy === 'link'
+      ) {
+        return entry
+      }
+
+      const response = await fetch(entry.media as string, {
+        method: 'GET',
+      })
+
+      if (!response.ok) {
+        return entry
+      }
+
+      return {
+        ...entry,
+        media: new InputFile(new Uint8Array(await response.arrayBuffer())),
+      }
+    }),
+  )
 
   const storedEvent = await prisma.event.findUnique({
     where: {
@@ -42,7 +71,7 @@ export const eventMediaAction = async (
 
   await Promise.all([
     ...added.map((chat) => {
-      const [firstMedia, secondMedia] = media
+      const [firstMedia, secondMedia] = correctedMedia
 
       return bot.api.sendMediaGroup(
         chat.id,
@@ -53,7 +82,7 @@ export const eventMediaAction = async (
       )
     }),
     ...intersected.map((message) =>
-      bot.api.sendMediaGroup(message.chatId, media, {
+      bot.api.sendMediaGroup(message.chatId, correctedMedia, {
         reply_to_message_id: message.id,
       }),
     ),

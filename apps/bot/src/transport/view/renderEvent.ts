@@ -1,5 +1,5 @@
-import type { Event } from '@prisma/client'
 import dayjs from 'dayjs'
+import type { Event } from '../../../../../.prisma-generated'
 import type { CoreContext } from '../../context'
 import { get } from '../../helpers/get'
 import type { MediaTuple } from '../helpers/resolveFrigateMedia'

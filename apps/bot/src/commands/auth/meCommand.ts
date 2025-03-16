@@ -22,7 +22,7 @@ export const meCommand = new Command<BotContext>(
 
 🧑 @${context.from.username} #${context.from.id}
 💼 <b>${user.role === 'ADMIN' ? 'администратор' : 'пользователь'}</b>
-📆 авторизация ${dayjs(user.authorized_at).format('DD.MM.YYYY HH:mm:ss')}`,
+📆 авторизация ${dayjs(user.authorizedAt).format('DD.MM.YYYY HH:mm:ss')}`,
     )
 
     return next()

@@ -1,7 +1,7 @@
 import type { SpotterEvent } from '@spotter/transport'
 
 export const parseSpotterEvent = (contents: any): SpotterEvent | null => {
-  const event = contents?.after
+  const event = contents
 
   if (!event || !event.id || !event.camera || !event.label) {
     return null

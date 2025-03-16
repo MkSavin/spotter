@@ -1,7 +1,7 @@
 import type { CommandGroup } from '@grammyjs/commands'
-import { $Enums } from '@prisma/client'
 import type { Middleware } from 'grammy'
 import type { Context as BaseContext } from 'grammy/out/context'
+import { Role } from '../../../../../.prisma-generated'
 import type { BotContext as GeneralContext } from '../../context'
 
 type CommandListPack<Context extends GeneralContext> = {
@@ -22,7 +22,7 @@ export const switchCommandList =
     const user = context.auth?.user
 
     const type: keyof typeof pack = user
-      ? user.role === $Enums.Role.ADMIN
+      ? user.role === Role.ADMIN
         ? 'admin'
         : 'user'
       : 'anonymous'
