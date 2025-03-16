@@ -28,7 +28,7 @@
 .env.production.local
 
 # Production-based configuration
-config.ts
+/config.ts
 bot.config.ts
 
 # Environment compose
