@@ -6,7 +6,6 @@ import readChangesets from '@changesets/read'
 import writeChangeset from '@changesets/write'
 import manypackages from '@manypkg/get-packages'
 import { CommitParser } from 'conventional-commits-parser'
-import { $ } from 'zx/core'
 import config from '../.changeset/config.json' with { type: 'json' }
 
 const cwd = process.cwd()

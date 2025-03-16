@@ -1,7 +1,6 @@
 #!/usr/bin/env zx
 
 import path from 'node:path'
-import { $ } from 'zx/core'
 
 const versions = JSON.parse(argv.versions || '[]')
 const dry = argv['dry-run'] === 'true' ?? false
