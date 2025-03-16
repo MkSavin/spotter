@@ -18,7 +18,6 @@
 
 # Build cache
 /*/**/.build-meta
-/.turbo
 /.vite
 /*/**/.turbo
 /*/**/.vite
