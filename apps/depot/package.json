@@ -6,9 +6,7 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:watch": "bun --watch src/index.ts",
-    "build": "bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable",
-    "docker:build": "docker build . -t ghcr.io/mksavin/spotter-depot:latest",
-    "docker:publish": "docker push ghcr.io/mksavin/spotter-depot --all-tags",
+    "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
     "test": "bun test",
     "test:coverage": "bun test --coverage"
   },

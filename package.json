@@ -10,9 +10,7 @@
     "build": "turbo run build --parallel",
     "sign:token": "bun apps/bot/src/cli/sign.ts",
     "docker:dev": "ln -sf docker-compose.development.yml docker-compose.yml",
-    "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml",
-    "docker:build": "exit 0; docker build . --file apps/bot/Dockerfile",
-    "docker:run": "exit 0; docker run -it --rm $(docker build . -q --file Dockerfile)"
+    "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml"
   },
   "private": "true",
   "keywords": [],
@@ -23,7 +21,10 @@
     "@biomejs/biome": "1.9.4",
     "prisma": "^6.4.1",
     "turbo": "^2.4.4",
-    "zx-bulk-release": "^2.15.31"
+    "changeset-conventional-commits": "^0.2.5"
   },
-  "workspaces": ["apps/*", "packages/*"]
+  "workspaces": ["apps/*", "packages/*"],
+  "dependencies": {
+    "@changesets/cli": "^2.28.1"
+  }
 }
