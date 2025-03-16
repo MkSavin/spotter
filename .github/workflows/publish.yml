@@ -20,7 +20,7 @@ jobs:
       with:
         ref: master
         fetch-depth: 0
-        persist-credentials: false
+        persist-credentials: true
 
     - name: 'Setup Biome'
       uses: biomejs/setup-biome@v2
