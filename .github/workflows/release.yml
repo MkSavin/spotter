@@ -40,6 +40,6 @@ jobs:
 
     - name: 'Imperative application images building'
       if: steps.changesets.outputs.published == 'true'
-      run: bunx zx .integration/imperative.mjs --versions="${{steps.changesets.outputs.publishedPackages}}"
+      run: bunx zx .integration/imperative.mjs --versions='${{steps.changesets.outputs.publishedPackages}}'
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
