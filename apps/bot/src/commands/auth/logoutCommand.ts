@@ -33,7 +33,7 @@ export const logoutCommand = new Command<BotContext>(
     const user = await context.prisma.user.delete({
       where: {
         id: userId,
-        chat_id: chatId,
+        chatId,
       },
     })
 

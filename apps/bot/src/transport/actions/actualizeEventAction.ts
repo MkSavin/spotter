@@ -19,6 +19,7 @@ export const actualizeEventAction = async (
   })
 
   if (storedEvent?.type === 'end') {
+    logger.debug('Event has already been ended. Skipping...')
     return
   }
 

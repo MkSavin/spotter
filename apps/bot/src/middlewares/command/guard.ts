@@ -1,9 +1,9 @@
-import { $Enums } from '@prisma/client'
+import { Role } from '../../../../../.prisma-generated'
 import type { BotContext as BaseContext } from '../../context'
 import type { CommandMiddleware } from '../types'
 
 export const guard = <Context extends BaseContext>(
-  instruction: $Enums.Role | 'anonymous' | 'authorized',
+  instruction: Role | 'anonymous' | 'authorized',
 ): CommandMiddleware<Context> => {
   return async (context, next) => {
     const auth = context.auth
@@ -22,7 +22,7 @@ export const guard = <Context extends BaseContext>(
       }
     } else if (instruction !== context.auth?.user?.role) {
       return context.reply(
-        `Эта команда доступна только ${instruction === $Enums.Role.ADMIN ? 'администраторам' : 'обычным пользователям'}`,
+        `Эта команда доступна только ${instruction === Role.ADMIN ? 'администраторам' : 'обычным пользователям'}`,
       )
     }
 

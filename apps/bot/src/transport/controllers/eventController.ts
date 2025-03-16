@@ -62,7 +62,7 @@ export const eventController: KafkaMessageController<TransportContext> = async (
         eventId: event.id,
         clipUrl: mediaTuple.clip?.url,
         snapshotUrl: mediaTuple.snapshot?.url,
-        endpointAuthorization: Frigate.generateJWT(),
+        endpointAuthorization: `Bearer ${Frigate.generateJWT()}`,
       }),
     }
 

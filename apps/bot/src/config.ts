@@ -45,6 +45,9 @@ export const resolveConfig = async (): Promise<Config> => {
     frigate: {
       remoteUrl: env.string('FRIGATE_REMOTE_URL', ''),
     },
+    media: {
+      strategy: env.string('MEDIA_STRATEGY', 'link'),
+    },
   }
 
   if (!environmentConfig.telegram.token) {

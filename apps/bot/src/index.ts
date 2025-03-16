@@ -3,10 +3,10 @@ import { commands } from '@grammyjs/commands'
 import { hydrate } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
-import { PrismaClient } from '@prisma/client'
 import { kafkaLogging } from '@spotter/transport'
 import { Bot, session } from 'grammy'
 import { Kafka, Partitioners } from 'kafkajs'
+import { PrismaClient } from '../../../.prisma-generated'
 import information from '../../../package.json'
 import {
   adminCommands,

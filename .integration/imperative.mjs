@@ -4,6 +4,7 @@ import path from 'node:path'
 
 const versions = JSON.parse(argv.versions || '[]')
 const dry = argv['dry-run'] === 'true' ?? false
+const noPublish = argv['no-publish'] === 'true' ?? false
 
 const entries = (
   await Promise.all(
@@ -51,7 +52,7 @@ await Promise.all(
 
     const buildEnvironment = {
       ...environment,
-      APP_RELATIVE_PATH: entry.path,
+      APP_RELATIVE_PATH: entry.path, // .replaceAll(/^.\//g)
     }
 
     const buildArgs = Object.entries(buildEnvironment)
@@ -93,7 +94,10 @@ await Promise.all(
     const q = $.quote
     $.quote = (v) => v
     await $`${buildCommand}`
-    await $`${pushCommand}`
+
+    if (!noPublish) {
+      await $`${pushCommand}`
+    }
     $.quote = q
   }),
 )

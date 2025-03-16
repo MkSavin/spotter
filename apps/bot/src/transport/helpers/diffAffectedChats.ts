@@ -1,4 +1,4 @@
-import type { Chat, EventMessage } from '@prisma/client'
+import type { Chat, EventMessage } from '../../../../../.prisma-generated'
 
 type AffectedDifference = {
   added: Pick<Chat, 'id'>[]

@@ -1,6 +1,6 @@
 import { Command } from '@grammyjs/commands'
-import type { $Enums, Prisma } from '@prisma/client'
 import jwt from 'jsonwebtoken'
+import type { Prisma, Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
 import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
@@ -25,7 +25,7 @@ export const loginCommand = new Command<BotContext>(
 
     const publicToken = context.match.trim()
 
-    let role: $Enums.Role
+    let role: Role
 
     try {
       const payload = jwt.verify(publicToken, process.env.AUTH_SECRET || '', {
@@ -65,7 +65,7 @@ export const loginCommand = new Command<BotContext>(
 
     logger.info(`Chat "${chat.id}" has successfully been attached`)
 
-    const userBase: Omit<Prisma.UserCreateInput, 'id' | 'chat_id'> = {
+    const userBase: Omit<Prisma.UserCreateInput, 'id' | 'chatId'> = {
       role,
       token: publicToken,
     }
@@ -73,14 +73,14 @@ export const loginCommand = new Command<BotContext>(
     const user = await context.prisma.user.upsert({
       where: {
         id: userId,
-        chat_id: chatId,
+        chatId,
       },
       update: {
         ...userBase,
       },
       create: {
         id: userId,
-        chat_id: chatId,
+        chatId,
         ...userBase,
       },
     })

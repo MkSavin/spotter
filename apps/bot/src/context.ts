@@ -2,12 +2,12 @@ import type { CommandsFlavor } from '@grammyjs/commands'
 import type { HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
-import type { Chat, PrismaClient, User } from '@prisma/client'
 import type { HeartbeatProps } from '@spotter/transport'
 import type { Bot, SessionFlavor } from 'grammy'
 import type { Context as GrammyContext } from 'grammy/out/context'
 import type { Consumer, Producer } from 'kafkajs'
 import type { Stenograph } from 'stenograph'
+import type { Chat, PrismaClient, User } from '../../../.prisma-generated'
 import type { Frigate } from './framework/api/Frigate'
 import type { Session } from './session'
 
@@ -25,6 +25,9 @@ export type EnvironmentConfig = {
   }
   frigate: {
     remoteUrl: string
+  }
+  media: {
+    strategy: string
   }
 }
 

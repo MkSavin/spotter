@@ -1,6 +1,6 @@
 import { Command } from '@grammyjs/commands'
-import { $Enums } from '@prisma/client'
 import jwt from 'jsonwebtoken'
+import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
 import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
@@ -10,7 +10,7 @@ export const signCommand = new Command<BotContext>(
   'sign',
   'Создать код доступа',
 ).addToScope(commandScopes.private, [
-  guard($Enums.Role.ADMIN),
+  guard(Role.ADMIN),
   argument(argument.stringOptional, 'sign [роль]'),
   async (context, next) => {
     const logger = context.logger.sub('auth')
