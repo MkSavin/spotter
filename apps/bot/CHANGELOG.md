@@ -1,5 +1,14 @@
 # @spotter/bot
 
+## 1.0.3
+
+### Patch Changes
+
+- d18442e: fix: stenograph log levels prefixes changed. Prisma schema file moved to root directory
+- Updated dependencies [d18442e]
+  - stenograph@1.0.1
+  - @spotter/transport@1.0.1
+
 ## 1.0.2
 
 ### Patch Changes
