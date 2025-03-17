@@ -7,8 +7,7 @@
     "start": "bun src/index.ts",
     "start:watch": "bun --watch src/index.ts",
     "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
-    "sign:token": "bun src/cli/sign.ts",
-    "prisma:generate": "bunx prisma generate"
+    "sign:token": "bun src/cli/sign.ts"
   },
   "private": "true",
   "keywords": [],

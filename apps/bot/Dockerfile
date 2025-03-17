@@ -13,25 +13,25 @@ FROM base AS install
 COPY package.json .npmrc ./
 COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
-RUN bun install -D
+RUN bun install
 
 FROM base AS schema
 
 COPY --from=install --parents **/node_modules ./
-COPY ${APP_RELATIVE_PATH}/prisma ${APP_RELATIVE_PATH}/prisma/
-COPY ${APP_RELATIVE_PATH}/package.json ${APP_RELATIVE_PATH}
-RUN cd ${APP_RELATIVE_PATH} && bunx prisma generate
+COPY package.json .npmrc prisma/ ./
+
+RUN bunx prisma generate
 
 FROM base AS bundle
 
-COPY --from=schema --parents **/node_modules ./
+COPY --from=install --parents **/node_modules ./
 COPY . .
-RUN cd ${APP_RELATIVE_PATH} && bun build --entrypoints ./src/index.ts --outdir ./dist --target bun --env disable
+RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable
 
 FROM base AS release
 
 # Copy binary tooling
-COPY --from=bundle .prisma-generated ./.prisma-generated
+COPY --from=schema .prisma-generated ./.prisma-generated
 
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/dist/index.js ./
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/package.json ./

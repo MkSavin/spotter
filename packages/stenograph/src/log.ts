@@ -11,29 +11,29 @@ import type { StenographLevelRepository } from './types'
 export const defaultLogLevels: StenographLevelRepository = [
   {
     name: 'error',
-    icon: '❌',
+    icon: '\x1b[31mERROR\x1b[0m',
     console: consoleRenderer.error,
   },
   {
     name: 'warn',
     // /!\ - biome replaces with incorrect char
-    icon: '\u{26a0}\u{fe0f}',
+    icon: '\x1b[33mWARN \x1b[0m',
     console: consoleRenderer.warn,
   },
   {
     name: 'info',
     // [i] - biome replaces with incorrect char
-    icon: '\u{2139}\u{fe0f}',
+    icon: '\x1b[34mINFO \x1b[0m',
     console: consoleRenderer.info,
   },
   {
     name: 'verbose',
-    icon: '📙',
+    icon: '\x1b[35mVERBS\x1b[0m',
     console: consoleRenderer.info,
   },
   {
     name: 'debug',
-    icon: '🐞',
+    icon: '\x1b[36mDEBUG\x1b[0m',
     console: consoleRenderer.debug,
   },
 ]
@@ -49,7 +49,7 @@ export const defaultLogger = new Stenograph({
     pathJoinFormat(' » '),
     prefixFormat(
       (message, oldPrefix) =>
-        `${oldPrefix ? `${oldPrefix} ` : ''}[${message.path}] ${message.level.icon ?? message.level.name}`,
+        `${message.level.icon ?? message.level.name} ${oldPrefix ? `${oldPrefix} ` : ''}[${message.path || '~'}]`,
     ),
   ]),
 })

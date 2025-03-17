@@ -2,17 +2,15 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^prisma:generate","^build"],
+      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
     "start": {
-      "dependsOn": ["^prisma:generate"],
       "cache": false,
       "persistent": true
     },
     "start:watch": {
-      "dependsOn": ["^prisma:generate"],
       "cache": false,
       "persistent": true
     },
@@ -23,9 +21,6 @@
       "cache": false
     },
     "test:coverage": {
-      "cache": false
-    },
-    "prisma:generate": {
       "cache": false
     }
   }

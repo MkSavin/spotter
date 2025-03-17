@@ -26,5 +26,5 @@ export const kafkaLogging =
 
     logger
       .sub(namespaceCode ?? 'unknown', log.timestamp)
-      .some(translateLevel(level), log.message)
+      .log(translateLevel(level), log.message)
   }

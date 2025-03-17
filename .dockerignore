@@ -4,7 +4,8 @@
 
 # Bundles
 /dist
-/**/*/dist
+/apps/*/dist
+/packages/*/dist
 
 # System-related
 /.DS_Store

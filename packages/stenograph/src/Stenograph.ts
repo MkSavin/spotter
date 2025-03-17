@@ -117,7 +117,7 @@ export class Stenograph {
    *
    * @param message
    */
-  log(message: StenographSimplifiedMessage): this {
+  message(message: StenographSimplifiedMessage): this {
     const definition = this.findDefinition(message.level)
 
     if (!this.format || this.transport.length === 0 || !definition) {
@@ -150,13 +150,13 @@ export class Stenograph {
    * @private
    */
   private logShorthand(level: StenographLevel, content: any[] = []): this {
-    return this.log({
+    return this.message({
       level,
       content,
     })
   }
 
-  some = (level: StenographLevel, ...content: any[]): this =>
+  log = (level: StenographLevel, ...content: any[]): this =>
     this.logShorthand(level, content)
   error = (...content: any[]): this => this.logShorthand('error', content)
   warn = (...content: any[]): this => this.logShorthand('warn', content)
