@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import type { TransportContext } from '../../context'
 import { get } from '../../helpers/get'
+import { correctMediaSource } from '../helpers/correctMediaSource'
 
 export type CameraFramePayload = {
   cameraCode: string
@@ -22,7 +23,7 @@ export const cameraFrameAction = async (
 
   const media = {
     type: 'photo' as const,
-    media: frameUrl,
+    media: (await correctMediaSource(frameUrl, context)) ?? frameUrl,
     caption: `<b>Снимок с камеры</b> | 📆 ${dayjs().format('DD.MM HH:mm')} | ${cameraLabel}`,
     parse_mode: 'HTML' as const,
   }

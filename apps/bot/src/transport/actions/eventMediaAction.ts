@@ -1,6 +1,6 @@
-import { InputFile } from 'grammy'
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 import type { TransportContext } from '../../context'
+import { correctMediaSource } from '../helpers/correctMediaSource'
 import { diffAffectedChats } from '../helpers/diffAffectedChats'
 import { renderEvent } from '../view/renderEvent'
 
@@ -9,40 +9,24 @@ type EventMediaPayload = {
   media: (InputMediaPhoto | InputMediaVideo)[]
 }
 
-const localhostRegex =
-  /^((?:http|https):\/\/)?(localhost|minio|127\.0\.0\.1|192\.168\.[0-9]{1,3}\.[0-9]{1,3}):?(\d+)?/gi
-
 export const eventMediaAction = async (
   payload: EventMediaPayload,
   context: TransportContext,
 ): Promise<void> => {
-  const { bot, logger, prisma, config } = context
+  const { bot, logger, prisma } = context
   const { eventId, media } = payload
 
   const correctedMedia = await Promise.all(
     media.map(async (entry) => {
-      if (typeof entry.media !== 'string') {
-        return entry
-      }
+      const corrected = await correctMediaSource(entry.media, context)
 
-      if (
-        !entry.media.match(localhostRegex) &&
-        config.media.strategy === 'link'
-      ) {
-        return entry
-      }
-
-      const response = await fetch(entry.media as string, {
-        method: 'GET',
-      })
-
-      if (!response.ok) {
+      if (!corrected) {
         return entry
       }
 
       return {
         ...entry,
-        media: new InputFile(new Uint8Array(await response.arrayBuffer())),
+        media: corrected,
       }
     }),
   )
@@ -58,6 +42,7 @@ export const eventMediaAction = async (
   }
 
   logger.debug('Feeding event media')
+  logger.verbose('Event media:', correctedMedia)
 
   const actualChats = await prisma.chat.findMany({
     select: {
@@ -89,9 +74,14 @@ export const eventMediaAction = async (
         reply_to_message_id: message.id,
       }),
     ),
-  ]).catch((error: any) => {
-    logger.error('Error when processing messages', error)
-  })
-
-  logger.debug('Feeding event media successfully finished')
+  ])
+    .then(() => {
+      logger.debug('Feeding event media successfully finished')
+    })
+    .catch((error: any) => {
+      logger.error(
+        'Error when processing messages while feeding event media',
+        error,
+      )
+    })
 }
