@@ -143,6 +143,15 @@ export class Stenograph {
   }
 
   /**
+   * Hide sensitive information
+   *
+   * @param value
+   */
+  sensitive(value: string): string {
+    return `${value.at(0)} ${'#'.repeat(value.length - 2)} ${value.at(-1)}`
+  }
+
+  /**
    * Leveled log shorthand
    *
    * @param level

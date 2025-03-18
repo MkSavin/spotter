@@ -27,13 +27,28 @@ export const cameraFrameAction = async (
     parse_mode: 'HTML' as const,
   }
 
-  if (messageId) {
-    await bot.api.editMessageMedia(chatId, messageId, media)
-  } else {
-    await bot.api.sendPhoto(chatId, media.media, {
-      caption: media.caption,
-      parse_mode: media.parse_mode,
-    })
+  try {
+    if (messageId) {
+      await bot.api.editMessageMedia(chatId, messageId, media)
+    } else {
+      await bot.api.sendPhoto(chatId, media.media, {
+        caption: media.caption,
+        parse_mode: media.parse_mode,
+      })
+    }
+  } catch (error) {
+    logger.error(error)
+
+    if (messageId) {
+      await bot.api.editMessageText(
+        chatId,
+        messageId,
+        'При обработке снимка что-то пошло не так...',
+        {
+          parse_mode: 'HTML' as const,
+        },
+      )
+    }
   }
 
   logger.debug('Camera frame successfully sent')

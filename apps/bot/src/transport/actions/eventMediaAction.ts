@@ -9,6 +9,9 @@ type EventMediaPayload = {
   media: (InputMediaPhoto | InputMediaVideo)[]
 }
 
+const localhostRegex =
+  /^((?:http|https):\/\/)?(localhost|minio|127\.0\.0\.1|192\.168\.[0-9]{1,3}\.[0-9]{1,3}):?(\d+)?/gi
+
 export const eventMediaAction = async (
   payload: EventMediaPayload,
   context: TransportContext,
@@ -23,7 +26,7 @@ export const eventMediaAction = async (
       }
 
       if (
-        !entry.media.includes('://localhost') &&
+        !entry.media.match(localhostRegex) &&
         config.media.strategy === 'link'
       ) {
         return entry
@@ -86,7 +89,9 @@ export const eventMediaAction = async (
         reply_to_message_id: message.id,
       }),
     ),
-  ])
+  ]).catch((error: any) => {
+    logger.error('Error when processing messages', error)
+  })
 
   logger.debug('Feeding event media successfully finished')
 }

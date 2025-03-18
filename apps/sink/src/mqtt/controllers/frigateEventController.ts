@@ -1,4 +1,4 @@
-import { bufferToJson } from '@spotter/transport'
+import { type SpotterEvent, bufferToJson } from '@spotter/transport'
 import type { CoreContext } from '../../context'
 import { publishEventToKafka } from '../../helpers/publishEvent'
 import { parseFrigateEvent } from '../../parsing/parseFrigateEvent'
@@ -11,10 +11,17 @@ export const frigateEventController: MqttMessageController<
   const { producer, logger: baseLogger } = context
 
   const value = bufferToJson(contents)
-  const event = value ? parseFrigateEvent(value) : undefined
 
-  if (!event) {
-    baseLogger.debug('Got not parsable event. Skipping...')
+  if (!value) {
+    return
+  }
+
+  let event: SpotterEvent
+
+  try {
+    event = parseFrigateEvent(value)
+  } catch (error) {
+    baseLogger.warn(error)
     baseLogger.verbose('Event data:', value)
     return
   }

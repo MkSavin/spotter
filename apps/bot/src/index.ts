@@ -25,7 +25,9 @@ import { switchCommandList } from './middlewares/bot/switchCommandList'
 import type { Session } from './session'
 import { eventTransport } from './transport/eventTransport'
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  log: ['info', 'warn', 'error'],
+})
 
 const initialize = (coreContext: CoreContext): Bot<BotContext> => {
   const bot = new Bot<BotContext>(coreContext.config.telegram.token)

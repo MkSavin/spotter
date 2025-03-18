@@ -12,6 +12,8 @@ export const actualizeEventAction = async (
   const { logger, prisma } = context
   const { id, ...eventData } = event
 
+  // try to get event data from redis
+
   let storedEvent = await prisma.event.findUnique({
     where: {
       id,
@@ -38,6 +40,8 @@ export const actualizeEventAction = async (
       ...eventData,
     },
   })
+
+  // if event.type === 'end' store event data to redis
 
   const contents = renderEvent(storedEvent, context, mediaTuple)
 
