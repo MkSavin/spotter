@@ -1,5 +1,11 @@
 # @spotter/bot
 
+## 1.0.5
+
+### Patch Changes
+
+- f2a3877: media source correction logic fixed
+
 ## 1.0.4
 
 ### Patch Changes
