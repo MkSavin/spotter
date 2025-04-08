@@ -87,7 +87,7 @@ export const loginCommand = new Command<BotContext>(
 
     logger.info(`User "${user.id}" has successfully been authorized`)
 
-    context.session.needUpdateCommands = true
+    context.session.user.needUpdateCommands = true
 
     await context.replyWithHTML(
       `🎉 <b>Добро пожаловать, ${role === 'ADMIN' ? 'администратор' : 'пользователь'}!</b>
@@ -97,10 +97,7 @@ export const loginCommand = new Command<BotContext>(
 
     await context.deleteMessage()
 
-    context.auth = {
-      chat,
-      user,
-    }
+    context.session.user.authorizedRole = user.role
 
     return next()
   },

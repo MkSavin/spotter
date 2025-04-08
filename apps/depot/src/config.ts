@@ -11,12 +11,11 @@ export type CoreConfig = {
     groupId: string
   }
 
-  minio: {
+  s3: {
     host: string
-    port: number
-    ssl: boolean
     accessKey: string
     secretKey: string
+    bucket: string
   }
 
   directory: {
@@ -33,12 +32,11 @@ export const resolveConfig = (): CoreConfig => {
       heartbeat: env.number('KAFKA_ACTION_HEARTBEAT', 3000),
       timeout: env.number('KAFKA_ACTION_TIMEOUT', 30000),
     },
-    minio: {
-      host: env.string('MINIO_HOST', ''),
-      port: env.number('MINIO_PORT', 9000),
-      ssl: env.boolean('MINIO_SSL', false),
-      accessKey: env.string('MINIO_ACCESS', ''),
-      secretKey: env.string('MINIO_SECRET', ''),
+    s3: {
+      host: env.string('S3_HOST', ''),
+      accessKey: env.string('S3_ACCESS', ''),
+      secretKey: env.string('S3_SECRET', ''),
+      bucket: env.string('S3_BUCKET', 'spotter'),
     },
     directory: {
       cleanupStrategy: env.enum(
@@ -53,8 +51,8 @@ export const resolveConfig = (): CoreConfig => {
     throw new Error('Bad configuration. No kafka brokers found.')
   }
 
-  if (!result.minio.host) {
-    throw new Error('Bad configuration. No minio host found.')
+  if (!result.s3.host) {
+    throw new Error('Bad configuration. No s3 host found.')
   }
 
   applicationLogger.verbose('Using core configuration:', result)

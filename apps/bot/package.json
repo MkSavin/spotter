@@ -6,10 +6,13 @@
   "scripts": {
     "start": "bun src/index.ts",
     "start:watch": "bun --watch src/index.ts",
-    "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
+    "build:bot": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
+    "build:cli": "bun build --entrypoints src/cli.ts --outfile ./dist/spotter --target bun --env disable",
+    "build": "bun run build:bot && bun run build:cli",
     "sign:token": "bun src/cli/sign.ts"
   },
   "private": "true",
+  "sideEffects": "false",
   "keywords": [],
   "author": "me@mksav.in",
   "license": "MIT",
@@ -24,9 +27,9 @@
     "@grammyjs/parse-mode": "^1.11.1",
     "@grammyjs/runner": "^2.0.3",
     "@prisma/client": "^6.4.1",
-    "dotenv": "^16.4.7",
-    "dayjs": "^1.11.13",
+    "kafkajs": "^2.2.4",
     "grammy": "^1.35.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "commander": "^13.1.0"
   }
 }

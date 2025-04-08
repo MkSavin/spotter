@@ -1,5 +1,6 @@
-import * as process from 'node:process'
-import { Endpoint } from './Endpoint'
+import jwt from 'jsonwebtoken'
+import type { Config, FrigateConfig } from '../config'
+import { NvrEndpoint } from './NvrEndpoint'
 import { type ResourceParams, ResourceType } from './Resource'
 
 export const frigateMedia: Record<ResourceType, string> = {
@@ -8,12 +9,50 @@ export const frigateMedia: Record<ResourceType, string> = {
   [ResourceType.latestFrame]: '{host}/api/{camera}/latest.jpg',
 }
 
-export class FrigateEndpoint extends Endpoint {
-  get hostUrl(): string {
-    return process.env.FRIGATE_LOCAL_URL || ''
+export class FrigateEndpoint extends NvrEndpoint {
+  frigateConfig: FrigateConfig
+
+  constructor(config: Config) {
+    super(config)
+    this.frigateConfig = this.config.nvr.frigate
   }
 
-  resolveResource(type: ResourceType, parameters: ResourceParams): string {
-    return this.resolveUrl(frigateMedia[type], parameters)
+  private generateFrigateJWT(): string {
+    console.log(
+      {
+        sub: this.frigateConfig.authUser,
+        exp: Date.now() / 1000 + 60 * 60,
+      },
+      this.frigateConfig.authSecret || '',
+      { algorithm: 'HS256' },
+    )
+
+    return jwt.sign(
+      {
+        sub: this.frigateConfig.authUser,
+        exp: Date.now() / 1000 + 60 * 60,
+      },
+      this.frigateConfig.authSecret || '',
+      { algorithm: 'HS256' },
+    )
+  }
+
+  get hostUrl(): string {
+    return this.frigateConfig.remoteUrl || ''
+  }
+
+  resolveResourceUrl(type: ResourceType, parameters: ResourceParams): string {
+    return this.settleUrl(frigateMedia[type], parameters)
+  }
+
+  composeHeaders(): HeadersInit | undefined {
+    console.log(this.generateFrigateJWT())
+    return {
+      Authorization: `Bearer ${this.generateFrigateJWT()}`,
+    }
+  }
+
+  resolveEventCode(id: string): string {
+    return id.split('-').at(1) ?? id
   }
 }

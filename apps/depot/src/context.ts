@@ -1,5 +1,5 @@
+import type { S3Client } from 'bun'
 import type { Consumer, Producer } from 'kafkajs'
-import type { Client as MinioClient } from 'minio'
 import type { Stenograph } from 'stenograph'
 import type { CoreConfig } from './config'
 import type { TempDirectoryController } from './fs/temp'
@@ -10,7 +10,7 @@ export type CoreContext = {
   }
   config: CoreConfig
   logger: Stenograph
-  minio: MinioClient
+  s3: S3Client
   consumer: Consumer
   producer: Producer
 }

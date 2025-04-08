@@ -2,7 +2,7 @@ import { Command } from '@grammyjs/commands'
 import type { Message } from 'kafkajs'
 import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
-import { Frigate, frigateMedia } from '../../framework/api/Frigate'
+import { ResourceType } from '../../endpoint/Resource'
 import { get } from '../../helpers/get'
 import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
@@ -32,11 +32,18 @@ export const snapshotCommand = new Command<BotContext>(
     await context.replyWithChatAction('upload_photo')
 
     try {
-      const response = await context.frigate.get(frigateMedia.camera.latest, {
-        camera: cameraName,
-      })
+      const request = context.nvr.composeResourceRequest(
+        ResourceType.latestFrame,
+        {
+          camera: cameraName,
+        },
+      )
+
+      const response = await context.nvr.fetchRequest(request)
 
       if (!response.ok) {
+        context.logger.warn('Snapshot response is not ok, skipping...')
+
         await message.editText(
           '\u{26a0}\u{fe0f} <b>Ошибка при получении снимка...</b>',
           {
@@ -55,7 +62,7 @@ export const snapshotCommand = new Command<BotContext>(
           chatId: context.chatId,
           messageId: message?.message_id,
           frameUrl: response.url,
-          endpointAuthorization: `Bearer ${Frigate.generateJWT()}`,
+          endpointAuthorization: request.headers.get('Authorization'),
         }),
       }
 
@@ -64,16 +71,21 @@ export const snapshotCommand = new Command<BotContext>(
         messages: [eventMessage],
       })
 
-      await message.editText('🖼 <b>Обрабатываем полученный снимок...</b>', {
-        parse_mode: 'HTML',
-      })
-    } catch {
+      await message.editText(
+        `🖼 <b>Обрабатываем снимок с камеры ${cameraLabel}...</b>`,
+        {
+          parse_mode: 'HTML',
+        },
+      )
+    } catch (error) {
       await message.editText(
         '\u{26a0}\u{fe0f} <b>Ошибка при обработке снимка...</b>',
         {
           parse_mode: 'HTML',
         },
       )
+
+      context.logger.error(error)
     }
 
     return next()

@@ -62,7 +62,7 @@ const run = async (): Promise<void> => {
     .run(context)
 
   await new KafkaRegulator<CoreContext>()
-    .on('spotter.event.test_seed', eventTestController)
+    .message('spotter.event.test_seed', eventTestController)
     .run(context)
 
   applicationLogger.info('Application successfully started up')

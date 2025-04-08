@@ -16,20 +16,21 @@ import {
 } from './commands/commandList'
 import { resolveConfig } from './config'
 import type { BotContext, CoreContext } from './context'
-import { Frigate } from './framework/api/Frigate'
+import { constructEndpoint } from './endpoint/constructEndpoint'
 import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
-import { authorize } from './middlewares/bot/authorize'
 import { logging } from './middlewares/bot/logging'
 import { switchCommandList } from './middlewares/bot/switchCommandList'
-import type { Session } from './session'
+import type { GlobalSession, UserSession } from './session'
 import { eventTransport } from './transport/eventTransport'
 
 const prisma = new PrismaClient({
   log: ['info', 'warn', 'error'],
 })
 
-const initialize = (coreContext: CoreContext): Bot<BotContext> => {
+const initialize = async (
+  coreContext: CoreContext,
+): Promise<Bot<BotContext>> => {
   const bot = new Bot<BotContext>(coreContext.config.telegram.token)
 
   bot.catch(applicationLogger.error)
@@ -48,25 +49,58 @@ const initialize = (coreContext: CoreContext): Bot<BotContext> => {
     }),
   )
 
-  bot.use(authorize)
-
   bot.use(hydrateReply, hydrate())
 
   bot.use(commands())
 
-  const initial = (): Session => ({
-    needUpdateCommands: true,
+  const listedUsers = await coreContext.prisma.user.findMany({
+    select: {
+      id: true,
+      chatId: true,
+      role: true,
+    },
   })
 
   bot.use(
     session({
-      initial,
-      getSessionKey: (ctx) =>
-        ctx.from === undefined || ctx.chat === undefined
-          ? undefined
-          : `${ctx.from.id}/${ctx.chat.id}`,
-      prefix: 'user-',
+      type: 'multi',
+
+      user: {
+        initial: (): UserSession => ({
+          authorizedRole: undefined,
+          needUpdateCommands: true,
+        }),
+        getSessionKey: (context) =>
+          context.from === undefined || context.chat === undefined
+            ? undefined
+            : `${context.chat.id}@${context.from.id}`,
+        prefix: 'user/',
+      },
+
+      global: {
+        initial: (): GlobalSession => ({
+          events: {},
+        }),
+        getSessionKey: () => 'global',
+      },
     }),
+    (context, next) => {
+      const userId = context.from?.id ? `${context.from.id}` : undefined
+      const chatId = context.chatId ? `${context.chatId}` : undefined
+
+      if (
+        userId &&
+        chatId &&
+        context.session.user.authorizedRole === undefined
+      ) {
+        const user = listedUsers.find(
+          (user) => user.id === userId && user.chatId === chatId,
+        )
+        context.session.user.authorizedRole = user?.role
+      }
+
+      next()
+    },
   )
 
   return bot
@@ -79,7 +113,7 @@ const polling = async (): Promise<void> => {
 
   const config = await resolveConfig()
 
-  const frigate = new Frigate()
+  const nvr = constructEndpoint(config.nvr.type, config)
 
   const kafka = new Kafka({
     clientId: config.kafka.clientId,
@@ -100,7 +134,7 @@ const polling = async (): Promise<void> => {
     config,
     logger: applicationLogger,
     prisma,
-    frigate,
+    nvr,
     producer,
     consumer,
     runner: undefined,
@@ -118,7 +152,7 @@ const polling = async (): Promise<void> => {
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
 
-  const bot = initialize(coreContext)
+  const bot = await initialize(coreContext)
 
   bot.use(
     allCommands,

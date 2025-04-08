@@ -1,5 +1,4 @@
 import { Command } from '@grammyjs/commands'
-import dayjs from 'dayjs'
 import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
@@ -11,18 +10,32 @@ export const meCommand = new Command<BotContext>(
   guard('authorized'),
   sender('present'),
   async (context, next) => {
-    if (!context.auth?.user || !context.from) {
+    if (!context.chatId || !context.from) {
       return
     }
 
-    const user = context.auth.user
+    const user = await context.prisma.user.findUnique({
+      where: {
+        id: context.from.id.toString(),
+        chatId: context.chatId.toString(),
+      },
+    })
+
+    if (!user) {
+      return
+    }
+
+    const formattedDate = new Intl.DateTimeFormat('ru-RU', {
+      dateStyle: 'short',
+      timeStyle: 'medium',
+    }).format(user.authorizedAt)
 
     await context.replyWithHTML(
       `🤷 <b>Информация об авторизованном пользователе</b>
 
 🧑 @${context.from.username} #${context.from.id}
 💼 <b>${user.role === 'ADMIN' ? 'администратор' : 'пользователь'}</b>
-📆 авторизация ${dayjs(user.authorizedAt).format('DD.MM.YYYY HH:mm:ss')}`,
+📆 авторизация ${formattedDate}`,
     )
 
     return next()

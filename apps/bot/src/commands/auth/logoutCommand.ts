@@ -39,15 +39,14 @@ export const logoutCommand = new Command<BotContext>(
 
     logger.info(`User "${user.id}" has successfully been unauthorized`)
 
-    context.session.needUpdateCommands = true
+    context.session.user.needUpdateCommands = true
+    context.session.user.authorizedRole = null
 
     await context.replyWithHTML(
       `👋 <b>Еще увидимся!</b>
 
 Чат и пользователь были успешно деавторизованы!`,
     )
-
-    context.auth = null
 
     return next()
   },

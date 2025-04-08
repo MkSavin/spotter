@@ -11,6 +11,7 @@
     "test:coverage": "bun test --coverage"
   },
   "private": "true",
+  "sideEffects": "false",
   "keywords": [],
   "author": "me@mksav.in",
   "license": "MIT",
@@ -18,7 +19,6 @@
     "@spotter/transport": "*",
     "stenograph": "*",
     "kafkajs": "^2.2.4",
-    "dotenv": "^16.4.7",
     "mqtt": "^5.10.3"
   }
 }

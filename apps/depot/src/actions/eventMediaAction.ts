@@ -29,7 +29,7 @@ export const eventMediaAction = async (
     const processingContext: ProcessFileContext = {
       ...context,
       ...payload,
-      bucket: 'event-media',
+      s3Path: 'event-media',
       filePrefix: `event-${eventCode}`,
     }
 

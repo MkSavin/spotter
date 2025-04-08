@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { KafkaRegulator, kafkaLogging } from '@spotter/transport'
+import { S3Client } from 'bun'
 import { Kafka, Partitioners } from 'kafkajs'
-import { Client as MinioClient } from 'minio'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
@@ -17,12 +17,11 @@ const run = async (): Promise<void> => {
 
   const config = resolveConfig()
 
-  const minio = new MinioClient({
-    endPoint: config.minio.host,
-    port: config.minio.port,
-    useSSL: config.minio.ssl,
-    accessKey: config.minio.accessKey,
-    secretKey: config.minio.secretKey,
+  const s3 = new S3Client({
+    endpoint: config.s3.host,
+    accessKeyId: config.s3.accessKey,
+    secretAccessKey: config.s3.secretKey,
+    bucket: config.s3.bucket,
   })
 
   const kafka = new Kafka({
@@ -56,15 +55,15 @@ const run = async (): Promise<void> => {
     await producer.connect()
 
     await new KafkaRegulator<CoreContext>()
-      .on('spotter.event.media_requested', eventMediaController)
-      .on('spotter.camera.frame_requested', cameraFrameController)
+      .message('spotter.event.media_requested', eventMediaController)
+      .message('spotter.camera.frame_requested', cameraFrameController)
       .run({
         directory: {
           temp: tempDir,
         },
         logger: applicationLogger,
         config,
-        minio,
+        s3,
         consumer,
         producer,
       })

@@ -1,4 +1,4 @@
-import { Endpoint } from './Endpoint'
+import { NvrEndpoint } from './NvrEndpoint'
 import { type ResourceParams, ResourceType } from './Resource'
 
 export const testMedia: Record<ResourceType, string> = {
@@ -7,12 +7,12 @@ export const testMedia: Record<ResourceType, string> = {
   [ResourceType.latestFrame]: '{host}/images/detection.jpg',
 }
 
-export class TestEndpoint extends Endpoint {
+export class TestEndpoint extends NvrEndpoint {
   get hostUrl(): string {
-    return 'https://frigate.video/'
+    return 'https://test.test/'
   }
 
-  resolveResource(type: ResourceType, parameters: ResourceParams): string {
-    return this.resolveUrl(testMedia[type], parameters)
+  resolveResourceUrl(type: ResourceType, parameters: ResourceParams): string {
+    return this.settleUrl(testMedia[type], parameters)
   }
 }

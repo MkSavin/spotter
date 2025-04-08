@@ -15,21 +15,21 @@ export const switchCommandList =
     pack: CommandListPack<Context>,
   ): Middleware<Context> =>
   async (context, next) => {
-    if (!context.session.needUpdateCommands) {
+    if (!context.session.user.needUpdateCommands) {
       return next()
     }
 
-    const user = context.auth?.user
+    const role = context.session.user.authorizedRole
 
-    const type: keyof typeof pack = user
-      ? user.role === Role.ADMIN
+    const type: keyof typeof pack = role
+      ? role === Role.ADMIN
         ? 'admin'
         : 'user'
       : 'anonymous'
 
     const list = pack[type]
 
-    context.session.needUpdateCommands = false
+    context.session.user.needUpdateCommands = false
 
     context.logger.debug(`Command list updated using ${type} pack`)
 

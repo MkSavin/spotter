@@ -1,3 +1,4 @@
+import path from 'node:path'
 import Bun, { type BunFile } from 'bun'
 import { type Stenograph, defaultLogger } from 'stenograph'
 import type { CoreContext } from '../context'
@@ -11,8 +12,8 @@ type NamedBunFile = Omit<BunFile, 'name'> & {
 }
 
 export type ProcessFileContext = CoreContext & {
+  s3Path?: string
   filePrefix: string
-  bucket: string
   endpointAuthorization?: string
 }
 
@@ -39,10 +40,10 @@ export const processFile = async (
   }
 
   const {
-    minio,
+    s3,
     logger: baseLogger = defaultLogger,
+    s3Path,
     filePrefix,
-    bucket,
     directory,
     endpointAuthorization,
   } = context
@@ -77,7 +78,10 @@ export const processFile = async (
     `${directory.temp.directory}/${filePrefix}-${hash}-processed.${extension}`,
   )
 
-  const objectFile = `${filePrefix}-${hash}.${extension}`
+  const objectFile = path.join(
+    s3Path ?? '',
+    `${filePrefix}-${hash}.${extension}`,
+  )
 
   logger.debug(`Processing ${mimeType}...`)
   logger.verbose('Directory structure:', {
@@ -113,23 +117,20 @@ export const processFile = async (
     processed: processed.name,
   })
 
-  if (!(await minio.bucketExists(bucket))) {
-    await minio.makeBucket(bucket)
-    logger.debug('Bucket successfully created')
-  }
+  const file = s3.file(objectFile)
 
-  const uploadInfo = await minio.fPutObject(
-    bucket,
-    objectFile,
-    processed.name,
-    { 'Content-Type': mimeType },
-  )
+  await file.write(processed, {
+    type: mimeType,
+  })
 
-  logger.debug('File successfully uploaded to minio', uploadInfo)
+  logger.debug('File successfully uploaded to s3')
 
   if (context.config.directory.cleanupStrategy === 'file-processed') {
     await Promise.all([raw.delete(), processed.delete()])
   }
 
-  return minio.presignedGetObject(bucket, objectFile)
+  return file.presign({
+    acl: 'public-read',
+    expiresIn: 60 * 60 * 24, // 1 day
+  })
 }

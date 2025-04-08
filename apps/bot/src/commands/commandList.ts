@@ -6,9 +6,9 @@ import { loginCommand } from './auth/loginCommand'
 import { logoutCommand } from './auth/logoutCommand'
 import { meCommand } from './auth/meCommand'
 import { signCommand } from './auth/signCommand'
-import { snapshotCommand } from './frigate/snapshotCommand'
 import { startCommand } from './general/startCommand'
 import { versionCommand } from './general/versionCommand'
+import { snapshotCommand } from './nvr/snapshotCommand'
 import { testPublishCommand } from './testing/testPublishCommand'
 
 export const anonymousCommands = new CommandGroup<BotContext>().add([

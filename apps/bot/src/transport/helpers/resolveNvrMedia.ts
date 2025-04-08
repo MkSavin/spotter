@@ -1,6 +1,6 @@
 import type { SpotterEvent } from '@spotter/transport'
 import type { CoreContext } from '../../context'
-import { frigateMedia } from '../../framework/api/Frigate'
+import { ResourceType } from '../../endpoint/Resource'
 
 export type MediaTuple = {
   clip: Response | undefined
@@ -8,26 +8,34 @@ export type MediaTuple = {
 
   hasClip: boolean
   hasSnapshot: boolean
+
+  endpointAuthorization: string | undefined
 }
 
-export const resolveFrigateMedia = async (
+export const resolveNvrMedia = async (
   event: SpotterEvent,
   context: CoreContext,
 ): Promise<MediaTuple> => {
+  const clipRequest = context.nvr.composeResourceRequest(ResourceType.clip, {
+    id: event.id,
+  })
+  const snapshotRequest = context.nvr.composeResourceRequest(
+    ResourceType.snapshot,
+    {
+      id: event.id,
+    },
+  )
+
   const clipResponse = event.hasClip
-    ? await context.frigate.get(frigateMedia.event.clip, {
-        id: event.id,
-      })
+    ? await context.nvr.fetchRequest(clipRequest)
     : undefined
 
   const snapshotResponse = event.hasSnapshot
-    ? await context.frigate.get(frigateMedia.event.snapshot, {
-        id: event.id,
-      })
+    ? await context.nvr.fetchRequest(snapshotRequest)
     : undefined
 
-  const hasClip = clipResponse?.status === 200
-  const hasSnapshot = snapshotResponse?.status === 200
+  const hasClip = !!clipResponse?.ok
+  const hasSnapshot = !!snapshotResponse?.ok
 
   context.logger.debug(
     `Clip ${hasClip ? '' : 'NOT '}found. Snapshot ${hasSnapshot ? '' : 'NOT '}found`,
@@ -39,5 +47,8 @@ export const resolveFrigateMedia = async (
 
     hasClip,
     hasSnapshot,
+
+    endpointAuthorization:
+      clipRequest.headers.get('Authorization') ?? undefined,
   }
 }

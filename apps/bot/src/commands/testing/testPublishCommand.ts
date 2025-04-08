@@ -1,5 +1,4 @@
 import { Command } from '@grammyjs/commands'
-import dayjs from 'dayjs'
 import type { Message } from 'kafkajs'
 import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
@@ -18,8 +17,7 @@ export const testPublishCommand = new Command<BotContext>(
     const { producer } = context
 
     const id =
-      context.match ||
-      `${dayjs().unix()}-${Math.random().toString(36).slice(2)}`
+      context.match || `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
     const eventMessage = (type: 'start' | 'update' | 'end'): Message => ({
       key: `event-test-${id}`,

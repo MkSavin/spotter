@@ -14,9 +14,9 @@ export const eventTransport = async (
   await context.producer.connect()
 
   await new KafkaRegulator<TransportContext>()
-    .on('spotter.event', eventController)
-    .on('spotter.event.media_processed', eventMediaController)
-    .on('spotter.camera.frame_processed', cameraFrameController)
+    .message('spotter.event', eventController)
+    .message('spotter.event.media_processed', eventMediaController)
+    .message('spotter.camera.frame_processed', cameraFrameController)
     .run({
       ...context,
       logger,

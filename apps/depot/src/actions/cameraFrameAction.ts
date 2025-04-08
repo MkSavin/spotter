@@ -29,7 +29,7 @@ export const cameraFrameAction = async (
     const processingContext: ProcessFileContext = {
       ...context,
       ...payload,
-      bucket: 'camera-media',
+      s3Path: 'camera-media',
       filePrefix: `camera-${cameraCode}`,
     }
 

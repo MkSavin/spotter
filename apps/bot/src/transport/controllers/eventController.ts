@@ -3,13 +3,11 @@ import {
   bufferToJson,
   intervalHeartbeat,
 } from '@spotter/transport'
-import dayjs from 'dayjs'
 import type { Message } from 'kafkajs'
 import type { TransportContext } from '../../context'
-import { Frigate } from '../../framework/api/Frigate'
 import { actualizeEventAction } from '../actions/actualizeEventAction'
 import { eventCode } from '../helpers/eventCode'
-import { resolveFrigateMedia } from '../helpers/resolveFrigateMedia'
+import { resolveNvrMedia } from '../helpers/resolveNvrMedia'
 import { parseSpotterEvent } from '../parsing/parseSpotterEvent'
 
 export const eventController: KafkaMessageController<TransportContext> = async (
@@ -31,9 +29,14 @@ export const eventController: KafkaMessageController<TransportContext> = async (
     return
   }
 
+  const formattedDate = new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(new Date(event.startTime * 1000))
+
   const logger = baseLogger.sub(
     topic,
-    `${eventCode(event.id)} ${dayjs.unix(event.startTime).format('YY-MM-DD HH:mm')} [${event.type}]`,
+    `${eventCode(event.id)} ${formattedDate} [${event.type}]`,
   )
 
   const nextContext = { ...context, logger }
@@ -44,7 +47,7 @@ export const eventController: KafkaMessageController<TransportContext> = async (
       return
     }
 
-    const mediaTuple = await resolveFrigateMedia(event, context)
+    const mediaTuple = await resolveNvrMedia(event, context)
 
     await actualizeEventAction(event, nextContext, mediaTuple)
 
@@ -62,7 +65,7 @@ export const eventController: KafkaMessageController<TransportContext> = async (
         eventId: event.id,
         clipUrl: mediaTuple.clip?.url,
         snapshotUrl: mediaTuple.snapshot?.url,
-        endpointAuthorization: `Bearer ${Frigate.generateJWT()}`,
+        endpointAuthorization: mediaTuple.endpointAuthorization,
       }),
     }
 

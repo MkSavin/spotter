@@ -1,4 +1,3 @@
-import dayjs from 'dayjs'
 import type { Middleware } from 'grammy'
 import { defaultLogger } from 'stenograph'
 import type { BotContext } from '../../context'
@@ -24,7 +23,10 @@ const subLogger = (context: BotContext): string[] => {
 
   const what = commandName ?? 'message'
 
-  const when = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const when = new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(new Date())
 
   return [who, what, when]
 }

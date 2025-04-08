@@ -3,7 +3,6 @@ import {
   bufferToJson,
   intervalHeartbeat,
 } from '@spotter/transport'
-import dayjs from 'dayjs'
 import type { CoreContext } from '../../context'
 import { publishEventToKafka } from '../../helpers/publishEvent'
 import {
@@ -24,7 +23,7 @@ export const eventTestController: KafkaMessageController<CoreContext> = async (
     return
   }
 
-  const unix = dayjs().unix()
+  const unix = Date.now()
 
   const eventId =
     value.eventId ?? `${unix}-${Math.random().toString(36).slice(2)}`

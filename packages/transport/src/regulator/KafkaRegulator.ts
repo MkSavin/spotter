@@ -1,7 +1,17 @@
-import type { Consumer, EachMessagePayload, Producer } from 'kafkajs'
+import type {
+  Consumer,
+  EachBatchPayload,
+  EachMessagePayload,
+  Producer,
+} from 'kafkajs'
 
 export type KafkaMessageController<Context> = (
   payload: EachMessagePayload,
+  context: Context,
+) => Promise<void>
+
+export type KafkaBatchController<Context> = (
+  payload: EachBatchPayload,
   context: Context,
 ) => Promise<void>
 
@@ -11,15 +21,20 @@ type BaseContext = {
 }
 
 export class KafkaRegulator<Context extends BaseContext> {
-  subscribed: Record<string, KafkaMessageController<Context>> = {}
+  messageSubscribers: Record<string, KafkaMessageController<Context>> = {}
+  batchSubscribers: Record<string, KafkaBatchController<Context>> = {}
 
-  on(topic: string, callback: KafkaMessageController<Context>): this {
-    this.subscribed[topic] = callback
+  message(topic: string, callback: KafkaMessageController<Context>): this {
+    this.messageSubscribers[topic] = callback
+    return this
+  }
+  batch(topic: string, callback: KafkaBatchController<Context>): this {
+    this.batchSubscribers[topic] = callback
     return this
   }
 
   get topics(): string[] {
-    return Object.keys(this.subscribed)
+    return Object.keys(this.messageSubscribers)
   }
 
   async consumeMessages(
@@ -27,8 +42,19 @@ export class KafkaRegulator<Context extends BaseContext> {
     context: Context,
   ): Promise<void> {
     await Promise.all(
-      Object.entries(this.subscribed)
+      Object.entries(this.messageSubscribers)
         .filter(([topic]) => topic === payload.topic)
+        .map(([_, handler]) => handler(payload, context)),
+    )
+  }
+
+  async consumeBatches(
+    payload: EachBatchPayload,
+    context: Context,
+  ): Promise<void> {
+    await Promise.all(
+      Object.entries(this.batchSubscribers)
+        .filter(([topic]) => topic === payload.batch.topic)
         .map(([_, handler]) => handler(payload, context)),
     )
   }
@@ -41,7 +67,8 @@ export class KafkaRegulator<Context extends BaseContext> {
     })
 
     await context.consumer.run({
-      eachMessage: (message) => this.consumeMessages(message, context),
+      eachMessage: (payload) => this.consumeMessages(payload, context),
+      eachBatch: (payload) => this.consumeBatches(payload, context),
     })
   }
 }

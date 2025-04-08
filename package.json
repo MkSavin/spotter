@@ -25,7 +25,8 @@
     "@changesets/cli": "^2.28.1",
     "conventional-commits-parser": "^6.1.0",
     "prisma": "^6.4.1",
-    "turbo": "^2.4.4"
+    "turbo": "^2.4.4",
+    "typescript": "^5.8.2"
   },
   "workspaces": ["apps/*", "packages/*"]
 }

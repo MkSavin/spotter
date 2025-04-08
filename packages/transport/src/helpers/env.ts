@@ -1,7 +1,3 @@
-import dotenv from 'dotenv'
-
-dotenv.config()
-
 export const env = {
   string: (variable: string, defaultValue: string): string =>
     process.env[variable] ?? defaultValue,

@@ -1,10 +1,45 @@
 import path from 'node:path'
 import process from 'node:process'
-import { env } from '@spotter/transport'
+import { type HeartbeatProps, env } from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
 import information from '../../../package.json'
-import type { Config, ContentConfig, EnvironmentConfig } from './context'
+import type { EndpointCode } from './endpoint/constructEndpoint'
 import { applicationLogger } from './log'
+
+export type FrigateConfig = {
+  remoteUrl: string
+  authSecret: string
+  authUser: string
+}
+
+export type EnvironmentConfig = {
+  kafka: HeartbeatProps & {
+    clientId: string
+    brokers: string[]
+    groupId: string
+  }
+  telegram: {
+    token: string
+  }
+  database: {
+    url: string
+  }
+  nvr: {
+    type: EndpointCode
+
+    frigate: FrigateConfig
+  }
+  media: {
+    strategy: string
+  }
+}
+
+export type ContentConfig = {
+  objectLabels: Record<string, string>
+  cameraLabels: Record<string, string>
+}
+
+export type Config = EnvironmentConfig & ContentConfig
 
 const logger = defaultLogger.sub('config')
 
@@ -42,8 +77,14 @@ export const resolveConfig = async (): Promise<Config> => {
     database: {
       url: env.string('DATABASE_URL', ''),
     },
-    frigate: {
-      remoteUrl: env.string('FRIGATE_REMOTE_URL', ''),
+    nvr: {
+      type: env.string('NVR_TYPE', 'frigate') as EndpointCode,
+
+      frigate: {
+        remoteUrl: env.string('FRIGATE_REMOTE_URL', ''),
+        authSecret: env.string('FRIGATE_AUTH_SECRET', ''),
+        authUser: env.string('FRIGATE_AUTH_USER', ''),
+      },
     },
     media: {
       strategy: env.string('MEDIA_STRATEGY', 'link'),
@@ -56,11 +97,16 @@ export const resolveConfig = async (): Promise<Config> => {
   if (!environmentConfig.kafka.brokers.length) {
     throw new Error('Bad configuration. No kafka brokers found.')
   }
-  if (!environmentConfig.frigate.remoteUrl) {
-    throw new Error('Bad configuration. No frigate remote url found.')
-  }
   if (!environmentConfig.database.url) {
     throw new Error('Bad configuration. No database url found.')
+  }
+
+  const nvrType = environmentConfig.nvr.type
+  const nvrConfig =
+    nvrType && nvrType !== 'test' ? environmentConfig.nvr[nvrType] : undefined
+
+  if (nvrConfig && !nvrConfig.remoteUrl) {
+    throw new Error(`Bad configuration. No ${nvrType} remote url found.`)
   }
 
   const contentConfig: ContentConfig = await tryReadContentConfig(

@@ -1,6 +1,6 @@
 import type { SpotterEvent } from '@spotter/transport'
 import type { TransportContext } from '../../context'
-import type { MediaTuple } from '../helpers/resolveFrigateMedia'
+import type { MediaTuple } from '../helpers/resolveNvrMedia'
 import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
 import { renderEvent } from '../view/renderEvent'
 
