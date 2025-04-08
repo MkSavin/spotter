@@ -1,5 +1,13 @@
 # @spotter/sink
 
+## 1.0.3
+
+### Patch Changes
+
+- d7e607b: fix: User authorization caching. DayJS removed
+- Updated dependencies [d7e607b]
+  - @spotter/transport@1.0.2
+
 ## 1.0.2
 
 ### Patch Changes
