@@ -1,5 +1,11 @@
 # @spotter/bot
 
+## 1.0.7
+
+### Patch Changes
+
+- ea8c7fb: fix(bot): Multiple visual fixes. Added retrying logic to event media action
+
 ## 1.0.6
 
 ### Patch Changes
