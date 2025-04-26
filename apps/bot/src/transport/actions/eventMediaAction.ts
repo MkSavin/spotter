@@ -1,8 +1,9 @@
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
 import type { TransportContext } from '../../context'
-import { correctMediaSource } from '../helpers/correctMediaSource'
-import { diffAffectedChats } from '../helpers/diffAffectedChats'
+import { InnoxiousMedia } from '../../media/InnoxiousMedia'
+import { supplySubscribers } from '../helpers/supplySubscribers'
 import { renderEvent } from '../view/renderEvent'
+import type { EventMessage } from '.prisma/client'
 
 type EventMediaPayload = {
   eventId: string
@@ -16,21 +17,6 @@ export const eventMediaAction = async (
   const { bot, logger, prisma } = context
   const { eventId, media } = payload
 
-  const correctedMedia = await Promise.all(
-    media.map(async (entry) => {
-      const corrected = await correctMediaSource(entry.media, context)
-
-      if (!corrected) {
-        return entry
-      }
-
-      return {
-        ...entry,
-        media: corrected,
-      }
-    }),
-  )
-
   const storedEvent = await prisma.event.findUnique({
     where: {
       id: eventId,
@@ -41,47 +27,60 @@ export const eventMediaAction = async (
     return
   }
 
+  const innoxeus = new InnoxiousMedia(media)
+
   logger.debug('Feeding event media')
-  logger.verbose('Event media:', correctedMedia)
-
-  const actualChats = await prisma.chat.findMany({
-    select: {
-      id: true,
-    },
-  })
-
-  const { added, intersected } = diffAffectedChats(
-    actualChats,
-    storedEvent.messages,
-  )
+  logger.verbose('Event media:', innoxeus)
 
   const contents = renderEvent(storedEvent, context)
 
-  await Promise.all([
-    ...added.map((chat) => {
-      const [firstMedia, secondMedia] = correctedMedia
+  let tryIndex = 0
 
-      return bot.api.sendMediaGroup(
-        chat.id,
-        [
-          { ...firstMedia, parse_mode: 'HTML' as const, caption: contents },
-          secondMedia,
-        ].filter(Boolean),
-      )
-    }),
-    ...intersected.map((message) =>
-      bot.api.sendMediaGroup(message.chatId, correctedMedia, {
-        reply_to_message_id: message.id,
-      }),
-    ),
-  ])
-    .then(() => {
-      logger.debug('Feeding event media successfully finished')
-    })
-    .catch((error: any) => {
-      logger.error(
-        'Error when processing messages while feeding event media',
-        error,
-      )
-    })
+  const options = { parse_mode: 'HTML' as const }
+
+  const sendMedia = async (message: EventMessage): Promise<void> => {
+    const { chatId, id } = message
+
+    if (tryIndex < 3) {
+      try {
+        await bot.api.sendMediaGroup(chatId, await innoxeus.naive(), {
+          reply_to_message_id: id,
+          disable_notification: true,
+        })
+        logger.verbose(`Media sent to ${chatId} replying to ${id}`)
+        tryIndex = 0
+      } catch (error) {
+        logger.error('Error while publishing media by public strategy', error)
+        tryIndex++
+      }
+    }
+
+    if (tryIndex !== 0) {
+      logger.debug('Retrying with buffered strategy')
+
+      try {
+        await bot.api.sendMediaGroup(chatId, await innoxeus.accurate(), {
+          reply_to_message_id: id,
+          disable_notification: true,
+        })
+        logger.verbose(`Media sent to ${chatId} replying to ${id}`)
+      } catch (error) {
+        logger.error('Error while publishing media by buffered strategy', error)
+      }
+    }
+  }
+
+  await supplySubscribers(storedEvent.messages, context, {
+    create: async (chatId) => {
+      const message = await bot.api.sendMessage(chatId, contents, options)
+
+      await sendMedia({
+        id: message.message_id,
+        chatId,
+      })
+    },
+    update: async (message) => {
+      await sendMedia(message)
+    },
+  })
 }

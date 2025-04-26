@@ -18,19 +18,10 @@ export class FrigateEndpoint extends NvrEndpoint {
   }
 
   private generateFrigateJWT(): string {
-    console.log(
-      {
-        sub: this.frigateConfig.authUser,
-        exp: Date.now() / 1000 + 60 * 60,
-      },
-      this.frigateConfig.authSecret || '',
-      { algorithm: 'HS256' },
-    )
-
     return jwt.sign(
       {
         sub: this.frigateConfig.authUser,
-        exp: Date.now() / 1000 + 60 * 60,
+        exp: Date.now() / 1000 + 60 * 60 * 3,
       },
       this.frigateConfig.authSecret || '',
       { algorithm: 'HS256' },
@@ -46,7 +37,6 @@ export class FrigateEndpoint extends NvrEndpoint {
   }
 
   composeHeaders(): HeadersInit | undefined {
-    console.log(this.generateFrigateJWT())
     return {
       Authorization: `Bearer ${this.generateFrigateJWT()}`,
     }

@@ -1,5 +1,5 @@
 import type { TransportContext } from '../../context'
-import { diffAffectedChats } from '../helpers/diffAffectedChats'
+import { supplySubscribers } from '../helpers/supplySubscribers'
 import type { EventMessage } from '.prisma/client'
 
 export const actualizeSentMessages = async (
@@ -10,32 +10,23 @@ export const actualizeSentMessages = async (
 ) => {
   const { bot, prisma, logger } = context
 
-  const actualChats = await prisma.chat.findMany({
-    select: {
-      id: true,
-    },
-  })
-
-  const { added, intersected } = diffAffectedChats(actualChats, messages)
-
   const options = { parse_mode: 'HTML' as const }
 
   try {
-    const affected = await Promise.all([
-      ...added.map(
-        (chat): Promise<EventMessage> =>
-          bot.api.sendMessage(chat.id, contents, options).then((message) => ({
-            chatId: chat.id,
-            id: message.message_id,
-          })),
-      ),
-      ...intersected.map(
-        (message): Promise<EventMessage> =>
-          bot.api
-            .editMessageText(message.chatId, message.id, contents, options)
-            .then(() => message),
-      ),
-    ])
+    const supplied = await supplySubscribers(messages, context, {
+      create: (chatId) =>
+        bot.api
+          .sendMessage(chatId, contents, options)
+          .then((message) => ({ id: message.message_id, chatId })),
+      update: async (message) =>
+        bot.api
+          .editMessageText(message.chatId, message.id, contents, options)
+          .then(() => message),
+    })
+
+    const affected = supplied
+      .map((entry) => entry.data)
+      .filter((entry): entry is EventMessage => Boolean(entry))
 
     await prisma.event.update({
       where: {

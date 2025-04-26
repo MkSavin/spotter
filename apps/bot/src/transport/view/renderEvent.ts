@@ -19,8 +19,14 @@ export const renderEvent = (
 
   const score = Math.round(event.score * 1000) / 10
 
-  const clip = mediaTuple?.hasClip ? '📼' : ''
-  const snapshot = mediaTuple?.hasSnapshot ? '📸' : ''
+  const clip =
+    mediaTuple?.hasClip && mediaTuple.clip
+      ? `<a href="${mediaTuple.clip.url}">📼</a>`
+      : ''
+  const snapshot =
+    mediaTuple?.hasSnapshot && mediaTuple.snapshot
+      ? `<a href="${mediaTuple.snapshot.url}">📸</a>`
+      : ''
 
   const title = event.type === 'start' ? 'Движение!' : 'Произошло событие!'
 

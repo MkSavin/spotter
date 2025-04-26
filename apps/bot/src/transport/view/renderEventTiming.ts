@@ -44,7 +44,7 @@ export const renderEventTiming = (event: SpotterEvent): string => {
     return formatDate(startDate, 'date-time')
   }
 
-  const diff = event.endTime - event.startTime
+  const diff = Math.round(event.endTime - event.startTime)
 
   if (diff > 60 * 60 * 24) {
     return `${formatDate(startDate, 'date-time')} - ${formatDate(endDate, 'date-time')} | ${formatDuration(diff)}`
