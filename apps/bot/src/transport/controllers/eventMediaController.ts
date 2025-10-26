@@ -3,7 +3,7 @@ import {
   bufferToJson,
   intervalHeartbeat,
 } from '@spotter/transport'
-import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
+import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
 import type { TransportContext } from '../../context'
 import { eventMediaAction } from '../actions/eventMediaAction'
 import { eventCode } from '../helpers/eventCode'

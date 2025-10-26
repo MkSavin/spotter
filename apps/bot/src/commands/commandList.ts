@@ -11,8 +11,11 @@ import { versionCommand } from './general/versionCommand'
 import { snapshotCommand } from './nvr/snapshotCommand'
 import { testPublishCommand } from './testing/testPublishCommand'
 
-export const anonymousCommands = new CommandGroup<BotContext>().add([
+export const generalCommands = new CommandGroup<BotContext>().add([
   startCommand,
+])
+
+export const anonymousCommands = new CommandGroup<BotContext>().add([
   loginCommand,
 ])
 
@@ -34,7 +37,7 @@ export const adminCommands = new CommandGroup<BotContext>().add([
 
 /*
   Base:
-  [anonymous] /start
+  /start
 
   Auth:
   [anonymous] /login
@@ -50,7 +53,7 @@ export const adminCommands = new CommandGroup<BotContext>().add([
   Users:
   /user_sign [user] - only for users role
   /user_revoke [user]
-  /user_promote [user] [role]
+  /user_promote [user] [role]Ï
   /user_demote [user] - set role to viewer
 
   Cameras:
@@ -64,6 +67,7 @@ export const adminCommands = new CommandGroup<BotContext>().add([
 
 export const allCommands = new CommandGroup<BotContext>().add(
   [
+    ...generalCommands.commands,
     ...anonymousCommands.commands,
     ...userCommands.commands,
     ...adminCommands.commands,

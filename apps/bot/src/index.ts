@@ -1,6 +1,6 @@
 import process from 'node:process'
 import { commands } from '@grammyjs/commands'
-import { hydrate } from '@grammyjs/hydrate'
+import { hydrateApi, hydrateContext } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import { kafkaLogging } from '@spotter/transport'
@@ -15,10 +15,11 @@ import {
   userCommands,
 } from './commands/commandList'
 import { resolveConfig } from './config'
-import type { BotContext, CoreContext } from './context'
+import type { BotApi, BotContext, CoreContext } from './context'
 import { constructEndpoint } from './endpoint/constructEndpoint'
 import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
+import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { logging } from './middlewares/bot/logging'
 import { switchCommandList } from './middlewares/bot/switchCommandList'
 import type { GlobalSession, UserSession } from './session'
@@ -30,8 +31,15 @@ const prisma = new PrismaClient({
 
 const initialize = async (
   coreContext: CoreContext,
-): Promise<Bot<BotContext>> => {
-  const bot = new Bot<BotContext>(coreContext.config.telegram.token)
+): Promise<Bot<BotContext, BotApi>> => {
+  const bot = new Bot<BotContext, BotApi>(coreContext.config.telegram.token)
+
+  // Attach innoxious API helpers so code can call
+  // bot.api.innoxious.sendMediaGroup(...)
+  attachInnoxious(bot.api)
+
+  // TODO: add testing with
+  // client: { apiRoot: "http://localhost:8081" }, environment: 'test'
 
   bot.catch(applicationLogger.error)
 
@@ -49,7 +57,13 @@ const initialize = async (
     }),
   )
 
-  bot.use(hydrateReply, hydrate())
+  bot.use(hydrateReply, hydrateContext())
+
+  bot.api.config.use(hydrateApi())
+  bot.api.config.use(async (prev, method, payload, signal) => {
+    console.log('test', method, payload, signal)
+    return prev(method, payload, signal)
+  })
 
   bot.use(commands())
 

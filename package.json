@@ -7,6 +7,7 @@
     "start": "turbo run start --parallel",
     "start:watch": "turbo run start:watch --parallel",
     "test": "turbo run test --parallel",
+    "test:coverage": "turbo run test:coverage --parallel",
     "build": "turbo run build --parallel",
     "sign:token": "bun apps/bot/src/cli/sign.ts",
     "publish": "bunx changeset tag",
@@ -20,7 +21,7 @@
   "license": "ISC",
   "packageManager": "bun@1.2.4",
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "^1.9.4",
     "lodash": "^4.17.21",
     "@changesets/cli": "^2.28.1",
     "conventional-commits-parser": "^6.1.0",

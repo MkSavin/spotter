@@ -32,7 +32,7 @@ export const renderEvent = (
 
   const code = context.nvr.resolveEventCode(event.id)
 
-  const timing = renderEventTiming(event)
+  const timing = renderEventTiming(event, context.config.timezone)
 
   return `<b>${title}</b> <code>${code}</code>
 <b>${label}</b> ${score} | <b>${camera}</b>${clip || snapshot ? ` | ${clip}${snapshot}` : ''}

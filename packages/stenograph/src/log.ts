@@ -53,3 +53,8 @@ export const defaultLogger = new Stenograph({
     ),
   ]),
 })
+
+// Disable logging during tests to avoid noisy output
+if (process.env.NODE_ENV === 'test') {
+  defaultLogger.disable()
+}

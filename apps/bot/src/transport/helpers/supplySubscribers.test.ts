@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Chat, EventMessage } from '../../../../../.prisma-generated'
+import { timeout } from '../../helpers/timeout'
 import { supplySubscribedChats } from './supplySubscribers'
 
 const chats: Pick<Chat, 'id'>[] = [
@@ -29,17 +30,14 @@ const messages: EventMessage[] = [
   },
 ]
 
-const timeout = (delay = 100) =>
-  new Promise((resolve) => setTimeout(resolve, delay))
-
 const supply = (
   subscribedChats: Pick<Chat, 'id'>[],
   suppliedMessages: EventMessage[],
 ) => {
   return supplySubscribedChats(subscribedChats, suppliedMessages, {
-    create: (chatId) => timeout().then(() => ({ chatId, id: -1 })),
-    update: (message) => timeout().then(() => message),
-    remove: (message) => timeout().then(() => message),
+    create: (chatId) => timeout(100).then(() => ({ chatId, id: -1 })),
+    update: (message) => timeout(100).then(() => message),
+    remove: (message) => timeout(100).then(() => message),
   })
 }
 

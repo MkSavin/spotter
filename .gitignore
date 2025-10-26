@@ -22,11 +22,8 @@
 
 # Environment
 .env
-/*/**/.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+**/.env.*
+!**/.env.*.example
 
 # Production-based configuration
 /config.ts
@@ -37,3 +34,7 @@ docker-compose.yml
 
 # NPM-driven files
 package-lock.json
+
+# MacOS specific files
+.DS_Store
+Thumbs.db

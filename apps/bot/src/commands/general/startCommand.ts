@@ -1,13 +1,11 @@
 import { Command } from '@grammyjs/commands'
 import type { BotContext } from '../../context'
-import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
 
 export const startCommand = new Command<BotContext>(
   'start',
   'Начать работу с ботом',
 ).addToScope(commandScopes.private, [
-  guard('anonymous'),
   async (context, next) => {
     await context.replyWithHTML(
       `📹 <b>Бот-помощник для работы с NVR</b>

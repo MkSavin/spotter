@@ -1,11 +1,16 @@
 import type { SpotterEvent } from '@spotter/transport'
 
-const formatDate = (date: Date, format: 'date-time' | 'time'): string => {
+const formatDate = (
+  date: Date,
+  format: 'date-time' | 'time',
+  timezone: string,
+): string => {
   switch (format) {
     case 'time':
       return new Intl.DateTimeFormat('ru-RU', {
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: timezone,
       }).format(date)
     default:
       return new Intl.DateTimeFormat('ru-RU', {
@@ -13,6 +18,7 @@ const formatDate = (date: Date, format: 'date-time' | 'time'): string => {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: timezone,
       }).format(date)
   }
 }
@@ -36,23 +42,26 @@ const formatDuration = (duration: number) => {
     .join(' ')
 }
 
-export const renderEventTiming = (event: SpotterEvent): string => {
+export const renderEventTiming = (
+  event: SpotterEvent,
+  timezone: string,
+): string => {
   const startDate = new Date(event.startTime * 1000)
   const endDate = event.endTime ? new Date(event.endTime * 1000) : undefined
 
   if (!event.endTime || !endDate) {
-    return formatDate(startDate, 'date-time')
+    return formatDate(startDate, 'date-time', timezone)
   }
 
   const diff = Math.round(event.endTime - event.startTime)
 
   if (diff > 60 * 60 * 24) {
-    return `${formatDate(startDate, 'date-time')} - ${formatDate(endDate, 'date-time')} | ${formatDuration(diff)}`
+    return `${formatDate(startDate, 'date-time', timezone)} - ${formatDate(endDate, 'date-time', timezone)} | ${formatDuration(diff)}`
   }
 
   if (diff > 60) {
-    return `${formatDate(startDate, 'date-time')} - ${formatDate(endDate, 'time')} | ${formatDuration(diff)}`
+    return `${formatDate(startDate, 'date-time', timezone)} - ${formatDate(endDate, 'time', timezone)} | ${formatDuration(diff)}`
   }
 
-  return `${formatDate(startDate, 'date-time')} | ${formatDuration(diff)}`
+  return `${formatDate(startDate, 'date-time', timezone)} | ${formatDuration(diff)}`
 }

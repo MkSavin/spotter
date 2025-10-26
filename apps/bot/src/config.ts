@@ -13,6 +13,7 @@ export type FrigateConfig = {
 }
 
 export type EnvironmentConfig = {
+  timezone: string
   kafka: HeartbeatProps & {
     clientId: string
     brokers: string[]
@@ -64,6 +65,7 @@ const tryReadContentConfig = async (
 
 export const resolveConfig = async (): Promise<Config> => {
   const environmentConfig: EnvironmentConfig = {
+    timezone: env.string('TZ', 'Europe/Moscow'),
     kafka: {
       clientId: env.string('KAFKA_CLIENT_ID', information.name),
       brokers: env.stringArray('KAFKA_BROKERS', []),

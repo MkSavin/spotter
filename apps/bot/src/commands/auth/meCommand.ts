@@ -33,7 +33,7 @@ export const meCommand = new Command<BotContext>(
     await context.replyWithHTML(
       `🤷 <b>Информация об авторизованном пользователе</b>
 
-🧑 @${context.from.username} #${context.from.id}
+🧑 @${context.from.username ?? 'никнейм не задан'} | #${context.from.id}
 💼 <b>${user.role === 'ADMIN' ? 'администратор' : 'пользователь'}</b>
 📆 авторизация ${formattedDate}`,
     )

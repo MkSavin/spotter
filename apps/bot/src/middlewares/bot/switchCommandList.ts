@@ -5,6 +5,7 @@ import { Role } from '../../../../../.prisma-generated'
 import type { BotContext as GeneralContext } from '../../context'
 
 type CommandListPack<Context extends GeneralContext> = {
+  general: CommandGroup<Context>
   anonymous: CommandGroup<Context>
   user: CommandGroup<Context>
   admin: CommandGroup<Context>
@@ -27,13 +28,13 @@ export const switchCommandList =
         : 'user'
       : 'anonymous'
 
-    const list = pack[type]
+    const list = [pack.general, pack[type]]
 
     context.session.user.needUpdateCommands = false
 
     context.logger.debug(`Command list updated using ${type} pack`)
 
-    await context.setMyCommands(list as CommandGroup<BaseContext>)
+    await context.setMyCommands(list as CommandGroup<BaseContext>[])
 
     return next()
   }

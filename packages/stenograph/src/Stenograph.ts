@@ -16,6 +16,8 @@ export class Stenograph {
   transport: StenographTransport[] = []
   format: StenographFormatter | undefined = undefined
 
+  enabled = true
+
   gluedMessage: Partial<StenographSimplifiedMessage> = {}
 
   constructor(options: StenographOptions) {
@@ -27,6 +29,26 @@ export class Stenograph {
     this.levels = options.levels ?? []
     this.transport = options.transport ?? []
     this.format = options.format
+  }
+
+  /**
+   * Disable logging
+   *
+   * @returns this
+   */
+  disable(): this {
+    this.enabled = false
+    return this
+  }
+
+  /**
+   * Enable logging
+   *
+   * @returns this
+   */
+  enable(): this {
+    this.enabled = true
+    return this
   }
 
   /**
@@ -120,7 +142,12 @@ export class Stenograph {
   message(message: StenographSimplifiedMessage): this {
     const definition = this.findDefinition(message.level)
 
-    if (!this.format || this.transport.length === 0 || !definition) {
+    if (
+      !this.enabled ||
+      !this.format ||
+      this.transport.length === 0 ||
+      !definition
+    ) {
       return this
     }
 

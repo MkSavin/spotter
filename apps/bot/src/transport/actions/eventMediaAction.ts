@@ -1,6 +1,6 @@
-import type { InputMediaPhoto, InputMediaVideo } from 'grammy/out/types.node'
+import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
 import type { TransportContext } from '../../context'
-import { InnoxiousMedia } from '../../media/InnoxiousMedia'
+import { InnoxiousMediaGroup } from '../../extension/innoxious/InnoxiousMedia'
 import { supplySubscribers } from '../helpers/supplySubscribers'
 import { renderEvent } from '../view/renderEvent'
 import type { EventMessage } from '.prisma/client'
@@ -27,47 +27,24 @@ export const eventMediaAction = async (
     return
   }
 
-  const innoxeus = new InnoxiousMedia(media)
+  const innoxeus = new InnoxiousMediaGroup(media)
 
   logger.debug('Feeding event media')
   logger.verbose('Event media:', innoxeus)
 
   const contents = renderEvent(storedEvent, context)
 
-  let tryIndex = 0
-
   const options = { parse_mode: 'HTML' as const }
 
   const sendMedia = async (message: EventMessage): Promise<void> => {
     const { chatId, id } = message
 
-    if (tryIndex < 3) {
-      try {
-        await bot.api.sendMediaGroup(chatId, await innoxeus.naive(), {
-          reply_to_message_id: id,
-          disable_notification: true,
-        })
-        logger.verbose(`Media sent to ${chatId} replying to ${id}`)
-        tryIndex = 0
-      } catch (error) {
-        logger.error('Error while publishing media by public strategy', error)
-        tryIndex++
-      }
-    }
+    // TODO: test bot.api.copyMessage
 
-    if (tryIndex !== 0) {
-      logger.debug('Retrying with buffered strategy')
-
-      try {
-        await bot.api.sendMediaGroup(chatId, await innoxeus.accurate(), {
-          reply_to_message_id: id,
-          disable_notification: true,
-        })
-        logger.verbose(`Media sent to ${chatId} replying to ${id}`)
-      } catch (error) {
-        logger.error('Error while publishing media by buffered strategy', error)
-      }
-    }
+    await bot.api.innoxious.sendMediaGroup(chatId, innoxeus, {
+      reply_to_message_id: id,
+      disable_notification: true,
+    })
   }
 
   await supplySubscribers(storedEvent.messages, context, {
