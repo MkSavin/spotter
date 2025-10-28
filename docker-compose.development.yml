@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongo:
     build:
@@ -36,34 +34,27 @@ services:
       ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
       ME_CONFIG_BASICAUTH: false
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    restart: unless-stopped
-    networks:
-      - kafka
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - '2181:2181'
-
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.0
     restart: unless-stopped
     networks:
       - kafka
-    depends_on:
-      - zookeeper
     ports:
       - '9092:9092'
       - '9997:9997'
       - '29092:29092'
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      CLUSTER_ID: "q8RkVBbMQYel-fULGNEbNQ"
+      KAFKA_KRAFT_BROKER_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: 1
+      KAFKA_LOG4J_LOGGERS: "org.apache.kafka.image.loader.MetadataLoader=WARN"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
@@ -80,7 +71,6 @@ services:
     ports:
       - '8082:8080'
     depends_on:
-      - zookeeper
       - kafka
     environment:
       KAFKA_CLUSTERS_0_NAME: local
@@ -88,7 +78,7 @@ services:
       KAFKA_CLUSTERS_0_METRICS_PORT: 9997
 
   kafka-init:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.0
     networks:
       - kafka
     depends_on:
@@ -111,41 +101,41 @@ services:
       kafka-topics --bootstrap-server kafka:29092 --list
       "
 
-#  garage:
-#    image: dxflrs/garage:v1.1.0
-#    restart: unless-stopped
-#    environment:
-#      - GARAGE_RPC_SECRET=b60a083b0e334f939312a67d508ed425770c6497c6ae86371b369bf7365f5c95
-#      - GARAGE_ADMIN_TOKEN=test_admin_token
-#      - GARAGE_METRICS_TOKEN=test_admin_token
-#    ports:
-#      - '3900:3900'
-#      - '3901:3901'
-#      - '3902:3902'
-#      - '3903:3903'
-#    volumes:
-#      - .deployment/garage/garage.toml:/etc/garage.toml
-#      - .docker/garage/meta:/var/lib/garage/meta
-#      - .docker/garage/data:/var/lib/garage/data
+  #  garage:
+  #    image: dxflrs/garage:v1.1.0
+  #    restart: unless-stopped
+  #    environment:
+  #      - GARAGE_RPC_SECRET=b60a083b0e334f939312a67d508ed425770c6497c6ae86371b369bf7365f5c95
+  #      - GARAGE_ADMIN_TOKEN=test_admin_token
+  #      - GARAGE_METRICS_TOKEN=test_admin_token
+  #    ports:
+  #      - '3900:3900'
+  #      - '3901:3901'
+  #      - '3902:3902'
+  #      - '3903:3903'
+  #    volumes:
+  #      - .deployment/garage/garage.toml:/etc/garage.toml
+  #      - .docker/garage/meta:/var/lib/garage/meta
+  #      - .docker/garage/data:/var/lib/garage/data
 
-#  minio:
-#    volumes:
-#      - .docker/minio:/data
-#    image: quay.io/minio/minio:latest
-#    command: server --console-address ":9001" /data/minio
-#    expose:
-#      - '9000'
-#      - '9001'
-#    networks:
-#      - minio
-#    environment:
-#      MINIO_ROOT_USER: admin
-#      MINIO_ROOT_PASSWORD: some-minio-access
-#    healthcheck:
-#      test: ['CMD', 'mc', 'ready', 'local']
-#      interval: 5s
-#      timeout: 5s
-#      retries: 5
+  #  minio:
+  #    volumes:
+  #      - .docker/minio:/data
+  #    image: quay.io/minio/minio:latest
+  #    command: server --console-address ":9001" /data/minio
+  #    expose:
+  #      - '9000'
+  #      - '9001'
+  #    networks:
+  #      - minio
+  #    environment:
+  #      MINIO_ROOT_USER: admin
+  #      MINIO_ROOT_PASSWORD: some-minio-access
+  #    healthcheck:
+  #      test: ['CMD', 'mc', 'ready', 'local']
+  #      interval: 5s
+  #      timeout: 5s
+  #      retries: 5
 
   mosquitto:
     image: eclipse-mosquitto:2

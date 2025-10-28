@@ -5,8 +5,8 @@ import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
 
-export const eventsClearCommand = new Command<BotContext>(
-  'events_clear',
+export const eventClearCommand = new Command<BotContext>(
+  'event_clear',
   'Очистить список событий',
 ).addToScope(commandScopes.private, [
   guard(Role.ADMIN),

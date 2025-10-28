@@ -5,8 +5,8 @@ import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
 
-export const statsCommand = new Command<BotContext>(
-  'stats',
+export const systemStatsCommand = new Command<BotContext>(
+  'system_stats',
   'Статистика базы данных',
 ).addToScope(commandScopes.private, [
   guard(Role.ADMIN),

@@ -1,15 +1,16 @@
 import { CommandGroup } from '@grammyjs/commands'
 import type { BotContext } from '../context'
-import { eventsClearCommand } from './admin/eventsClearCommand'
-import { statsCommand } from './admin/statsCommand'
+import { eventClearCommand } from './admin/eventClearCommand'
+import { systemStatsCommand } from './admin/systemStatsCommand'
 import { loginCommand } from './auth/loginCommand'
 import { logoutCommand } from './auth/logoutCommand'
 import { meCommand } from './auth/meCommand'
-import { signCommand } from './auth/signCommand'
+import { userSignCommand } from './user/userSignCommand'
 import { startCommand } from './general/startCommand'
-import { versionCommand } from './general/versionCommand'
-import { snapshotCommand } from './nvr/snapshotCommand'
-import { testPublishCommand } from './testing/testPublishCommand'
+import { systemVersionCommand } from './admin/systemVersionCommand'
+import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
+import { testPublishCommand } from './test/testPublishCommand'
+import { cameraListCommand } from './nvr/cameraListCommand'
 
 export const generalCommands = new CommandGroup<BotContext>().add([
   startCommand,
@@ -27,12 +28,18 @@ export const userCommands = new CommandGroup<BotContext>().add([
 export const adminCommands = new CommandGroup<BotContext>().add([
   logoutCommand,
   meCommand,
-  snapshotCommand,
-  versionCommand,
-  signCommand,
+
+  cameraListCommand,
+  cameraSnapshotCommand,
+
+  systemVersionCommand,
+  systemStatsCommand,
+
   testPublishCommand,
-  eventsClearCommand,
-  statsCommand,
+
+  userSignCommand,
+
+  eventClearCommand,
 ])
 
 /*
@@ -53,7 +60,7 @@ export const adminCommands = new CommandGroup<BotContext>().add([
   Users:
   /user_sign [user] - only for users role
   /user_revoke [user]
-  /user_promote [user] [role]Ï
+  /user_promote [user] [role]
   /user_demote [user] - set role to viewer
 
   Cameras:

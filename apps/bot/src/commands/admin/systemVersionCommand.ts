@@ -6,8 +6,8 @@ import type { BotContext } from '../../context'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
 
-export const versionCommand = new Command<BotContext>(
-  'version',
+export const systemVersionCommand = new Command<BotContext>(
+  'system_version',
   'Узнать информацию о версии бота и платформы',
 ).addToScope(commandScopes.private, [
   guard(Role.ADMIN),

@@ -9,13 +9,13 @@ import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
 
-export const snapshotCommand = new Command<BotContext>(
-  'snapshot',
+export const cameraSnapshotCommand = new Command<BotContext>(
+  'camera_snapshot',
   'Получить последний кадр с камеры',
 ).addToScope(commandScopes.private, [
   guard(Role.ADMIN),
   sender('present'),
-  argument(argument.string, 'snapshot [камера]'),
+  argument(argument.string, 'camera_snapshot [камера]'),
   async (context, next) => {
     if (typeof context.match !== 'string') {
       return next()

@@ -9,6 +9,7 @@ import { Kafka, Partitioners } from 'kafkajs'
 import { PrismaClient } from '../../../.prisma-generated'
 import information from '../../../package.json'
 import {
+  generalCommands,
   adminCommands,
   allCommands,
   anonymousCommands,
@@ -60,10 +61,6 @@ const initialize = async (
   bot.use(hydrateReply, hydrateContext())
 
   bot.api.config.use(hydrateApi())
-  bot.api.config.use(async (prev, method, payload, signal) => {
-    console.log('test', method, payload, signal)
-    return prev(method, payload, signal)
-  })
 
   bot.use(commands())
 
@@ -171,6 +168,7 @@ const polling = async (): Promise<void> => {
   bot.use(
     allCommands,
     switchCommandList({
+      general: generalCommands,
       anonymous: anonymousCommands,
       user: userCommands,
       admin: adminCommands,

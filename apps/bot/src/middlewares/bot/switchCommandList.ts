@@ -1,6 +1,5 @@
 import type { CommandGroup } from '@grammyjs/commands'
-import type { Middleware } from 'grammy'
-import type { Context as BaseContext } from 'grammy/out/context'
+import type { Middleware, Context as BaseContext } from 'grammy'
 import { Role } from '../../../../../.prisma-generated'
 import type { BotContext as GeneralContext } from '../../context'
 

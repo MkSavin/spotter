@@ -6,12 +6,12 @@ import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
 
-export const signCommand = new Command<BotContext>(
-  'sign',
+export const userSignCommand = new Command<BotContext>(
+  'user_sign',
   'Создать код доступа',
 ).addToScope(commandScopes.private, [
   guard(Role.ADMIN),
-  argument(argument.stringOptional, 'sign [роль]'),
+  argument(argument.stringOptional, 'user_sign [роль]'),
   async (context, next) => {
     const logger = context.logger.sub('auth')
 
