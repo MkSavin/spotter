@@ -11,7 +11,7 @@ Spotter подхватывает событие, отправляет уведо
 ## Архитектура
 
 ```
- Frigate NVR ──MQTT──▶  sink  ──Kafka──▶  bot  ──▶ Telegram
+ Frigate NVR ──MQTT──▶  sink  ──Redis──▶  bot  ──▶ Telegram
                                   │  ▲
                                   ▼  │
                                  depot ──▶ S3 / MinIO
@@ -19,10 +19,10 @@ Spotter подхватывает событие, отправляет уведо
 
 | Сервис             | Назначение                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
-| **`apps/sink`**    | Мост MQTT → Kafka. Слушает `frigate/events`, парсит события Frigate, публикует в `spotter.event`. |
+| **`apps/sink`**    | Мост NVR → Redis Streams. Подключаемый `Source` (Frigate/MQTT) ингестит события, нормализует в `SpotterEvent`, публикует в `spotter.event`. |
 | **`apps/bot`**     | Telegram-бот (grammY). Реагирует на события, шлёт уведомления, обрабатывает команды операторов.   |
 | **`apps/depot`**   | Медиа-процессор. Скачивает клипы/снимки с NVR, обрабатывает (ffmpeg/sharp), кладёт в S3.          |
-| **`packages/transport`** | Общие абстракции Kafka: `KafkaRegulator`, `env`, `intervalHeartbeat`, `bufferToJson`.      |
+| **`packages/transport`** | Общие абстракции транспорта: `RedisRegulator`, `StreamProducer`, `env`, `resolveRedisConfig`, `bufferToJson`, контракт `SpotterEvent`. |
 | **`packages/stenograph`** | Структурированный логгер с контекстными саб-логгерами.                                     |
 
 Подробности по каждому сервису — в его `AGENTS.md` (например, [apps/bot/AGENTS.md](apps/bot/AGENTS.md)).
@@ -32,7 +32,7 @@ Spotter подхватывает событие, отправляет уведо
 
 - **Рантайм:** [Bun](https://bun.sh) 1.2.4 — запуск, тесты, сборка, S3-клиент
 - **Монорепо:** Turborepo + workspaces (`apps/*`, `packages/*`)
-- **Транспорт:** Kafka (KRaft mode, KafkaJS) + MQTT (Mosquitto)
+- **Транспорт:** Redis Streams (встроенный `Bun.RedisClient`, consumer groups) + MQTT (Mosquitto)
 - **БД:** SQLite (`bun:sqlite`) + Drizzle ORM (схема в [apps/bot/src/db/schema.ts](apps/bot/src/db/schema.ts))
 - **Хранилище:** S3 / MinIO
 - **Telegram:** grammY (+ `@grammyjs/commands`, `hydrate`, `parse-mode`, `runner`)
@@ -56,14 +56,14 @@ cp .env.sink.example     .env.sink
 cp .env.depot-1.example  .env.depot-1
 ```
 
-Минимум для бота: `TELEGRAM_TOKEN`, `KAFKA_BROKERS`, `FRIGATE_REMOTE_URL` (БД — локальный
+Минимум для бота: `TELEGRAM_TOKEN`, `REDIS_URL`, `FRIGATE_REMOTE_URL` (БД — локальный
 SQLite-файл по пути `DATABASE_PATH`, по умолчанию `./data/bot.sqlite`).
 
 ### 3. Инфраструктура (Docker)
 
 ```bash
 bun run docker:dev          # симлинк docker-compose.yml → development
-docker compose up -d        # kafka, kafka-ui, mosquitto
+docker compose up -d        # redis, mosquitto
 ```
 
 > БД отдельным сервисом не нужна — это локальный SQLite-файл. Миграции Drizzle
@@ -109,11 +109,16 @@ bun apps/bot/src/cli.ts sign admin -t <AUTH_SECRET>
 
 Полученный токен оператор отправляет боту командой `/login <token>`.
 
-## Kafka-топики
+## Redis Streams
 
-| Топик                            | Кто пишет | Кто читает | Назначение                          |
+Каждый стрим читается своей consumer-группой (`spotter-bot` / `spotter-depot` / `spotter-sink`).
+Доставка — at-least-once: `XACK` после успешной обработки, зависшие записи перезабираются
+`XAUTOCLAIM` (reaper). Группы создаются с позиции `$` — на рестарте старое не пересылается.
+
+| Стрим                            | Кто пишет | Кто читает | Назначение                          |
 | -------------------------------- | --------- | ---------- | ----------------------------------- |
 | `spotter.event`                  | sink      | bot        | Событие камеры (start/update/end)   |
+| `spotter.event.test_seed`        | bot       | sink       | Посев тестовых событий (`/test_publish`) |
 | `spotter.event.media_requested`  | bot       | depot      | Запрос на обработку клипа/снимка     |
 | `spotter.event.media_processed`  | depot     | bot        | URL обработанного медиа              |
 | `spotter.camera.frame_requested` | bot       | depot      | Запрос актуального кадра камеры       |
@@ -126,9 +131,9 @@ bun apps/bot/src/cli.ts sign admin -t <AUTH_SECRET>
 apps/
   bot/      Telegram-бот (grammY)
   depot/    Медиа-процессор (ffmpeg/sharp → S3)
-  sink/     MQTT → Kafka мост
+  sink/     MQTT → Redis Streams мост
 packages/
-  transport/   Абстракции Kafka + общие helpers
+  transport/   Абстракции транспорта (RedisRegulator) + контракт SpotterEvent + helpers
   stenograph/  Логгер
 apps/bot/src/db/   SQLite-схема и репозиторий (Drizzle): chats, users, events
 apps/bot/drizzle/  Сгенерированные миграции Drizzle
@@ -139,5 +144,5 @@ apps/bot/drizzle/  Сгенерированные миграции Drizzle
 ## Дорожная карта
 
 - [x] ~~MongoDB + Prisma~~ → SQLite (`bun:sqlite`) + Drizzle
-- [ ] Заменить Kafka на Redis Streams (облегчить инфраструктуру)
+- [x] ~~Kafka~~ → Redis Streams (встроенный `Bun.RedisClient`, consumer groups)
 - [ ] Интеграция LGTM-стека (Loki / Grafana / Tempo / Mimir)

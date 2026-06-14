@@ -1,14 +1,14 @@
 import process from 'node:process'
-import { KafkaRegulator, kafkaLogging } from '@spotter/transport'
-import { Kafka, Partitioners } from 'kafkajs'
-import { connectAsync as mqttConnectAsync } from 'mqtt'
+import { RedisRegulator, StreamProducer } from '@spotter/transport'
+import { RedisClient } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
-import { eventTestController } from './kafka/controllers/eventTestController'
+import { publishEvent } from './helpers/publishEvent'
 import { applicationLogger } from './log'
-import { frigateEventController } from './mqtt/controllers/frigateEventController'
-import { MqttRegulator } from './regulators/MqttRegulator'
+import type { SourceHandle } from './source/Source'
+import { constructSource } from './source/constructSource'
+import { eventTestController } from './stream/controllers/eventTestController'
 
 const run = async (): Promise<void> => {
   applicationLogger.info(
@@ -17,32 +17,32 @@ const run = async (): Promise<void> => {
 
   const config = resolveConfig()
 
-  const kafka = new Kafka({
-    clientId: config.kafka.clientId,
-    brokers: config.kafka.brokers,
-    logCreator: kafkaLogging(applicationLogger),
-    connectionTimeout: 15 * 1000,
-  })
-
-  const producer = kafka.producer({
-    createPartitioner: Partitioners.DefaultPartitioner,
-  })
+  // Dedicated blocking connection for XREADGROUP; the producer connection stays
+  // free for XADD (ingested events + test seeds) and the regulator's acks.
+  const subscriber = new RedisClient(config.redis.url)
+  const producer = new StreamProducer(
+    new RedisClient(config.redis.url),
+    config.redis.maxLen,
+  )
 
   await producer.connect()
-  const consumer = kafka.consumer({
-    groupId: config.kafka.groupId,
-    heartbeatInterval: config.kafka.heartbeat,
-    sessionTimeout: config.kafka.timeout * 2,
-  })
+  await subscriber.connect()
 
-  const mqttClient = await mqttConnectAsync(config.mqtt.broker, {
-    connectTimeout: 15 * 1000,
-  })
+  // Pluggable NVR ingestion: one source per sink instance. The source emits
+  // canonical SpotterEvents; we publish them onto the stream.
+  const source = constructSource(config.source.type, config, applicationLogger)
+
+  let sourceHandle: SourceHandle | null = null
+  let transport: Awaited<
+    ReturnType<RedisRegulator<CoreContext>['run']>
+  > | null = null
 
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
-    await producer.disconnect()
-    await mqttClient.endAsync()
+    await transport?.stop()
+    await sourceHandle?.stop()
+    subscriber.close()
+    producer.disconnect()
     process.exit(1)
   }
 
@@ -50,20 +50,26 @@ const run = async (): Promise<void> => {
   process.on('SIGTERM', shutdown)
 
   const context: CoreContext = {
-    mqtt: mqttClient,
     producer,
-    consumer,
+    subscriber,
     config,
     logger: applicationLogger,
   }
 
-  await new MqttRegulator<CoreContext>()
-    .on('frigate/events', frigateEventController)
-    .run(context)
+  sourceHandle = await source.run(async (event) => {
+    await publishEvent(event, producer)
+  })
 
-  await new KafkaRegulator<CoreContext>()
+  transport = await new RedisRegulator<CoreContext>()
     .message('spotter.event.test_seed', eventTestController)
-    .run(context)
+    .run(context, {
+      group: config.redis.group,
+      consumer: config.redis.consumer,
+      blockMs: config.redis.blockMs,
+      count: config.redis.count,
+      reclaimMinIdleMs: config.redis.reclaimMinIdleMs,
+      reaperIntervalMs: config.redis.reaperIntervalMs,
+    })
 
   applicationLogger.info('Application successfully started up')
 }

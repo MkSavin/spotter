@@ -1,70 +1,21 @@
 services:
-  kafka:
-    image: confluentinc/cp-kafka:7.4.0
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
     networks:
-      - kafka
+      - spotter
     ports:
-      - '9092:9092'
-      - '9997:9997'
-      - '29092:29092'
-    environment:
-      CLUSTER_ID: "q8RkVBbMQYel-fULGNEbNQ"
-      KAFKA_KRAFT_BROKER_ID: 1
-      KAFKA_PROCESS_ROLES: "broker,controller"
-      KAFKA_NODE_ID: 1
-      KAFKA_LOG4J_LOGGERS: "org.apache.kafka.image.loader.MetadataLoader=WARN"
-      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9092"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
-      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_JMX_PORT: 9997
-      KAFKA_JMX_HOSTNAME: kafka
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    networks:
-      - kafka
-    ports:
-      - '8082:8080'
-    depends_on:
-      - kafka
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
-
-  kafka-init:
-    image: confluentinc/cp-kafka:7.4.0
-    networks:
-      - kafka
-    depends_on:
-      - kafka
-    entrypoint: [ '/bin/sh', '-c' ]
-    command: |
-      "
-      # blocks until kafka is reachable
-      kafka-topics --bootstrap-server kafka:29092 --list
-
-      echo -e 'Creating kafka topics'
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter.event --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter.event.test_seed --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter.event.media_requested --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter.event.media_processed --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter.camera.frame_requested --replication-factor 1 --partitions 1
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic spotter.camera.frame_processed --replication-factor 1 --partitions 1
-
-      echo -e 'Successfully created the following topics:'
-      kafka-topics --bootstrap-server kafka:29092 --list
-      "
+      - '6379:6379'
+    # appendonly keeps the streams durable across restarts (a crashed depot's
+    # pending entries survive and get reclaimed by the reaper).
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - .docker/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   #  garage:
   #    image: dxflrs/garage:v1.1.0
@@ -105,6 +56,8 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
+    networks:
+      - spotter
     ports:
       - '1883:1883'
       - '8883:8883'
@@ -114,5 +67,5 @@ services:
       - .docker/mosquitto/data:/mosquitto/data
 
 networks:
-  kafka:
+  spotter:
     driver: bridge

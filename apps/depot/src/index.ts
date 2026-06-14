@@ -1,7 +1,6 @@
 import process from 'node:process'
-import { KafkaRegulator, kafkaLogging } from '@spotter/transport'
-import { S3Client } from 'bun'
-import { Kafka, Partitioners } from 'kafkajs'
+import { RedisRegulator, StreamProducer } from '@spotter/transport'
+import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
@@ -24,54 +23,60 @@ const run = async (): Promise<void> => {
     bucket: config.s3.bucket,
   })
 
-  const kafka = new Kafka({
-    clientId: config.kafka.clientId,
-    brokers: config.kafka.brokers,
-    logCreator: kafkaLogging(applicationLogger),
-  })
-
-  const producer = kafka.producer({
-    createPartitioner: Partitioners.DefaultPartitioner,
-  })
-  const consumer = kafka.consumer({
-    groupId: config.kafka.groupId,
-    heartbeatInterval: config.kafka.heartbeat,
-    sessionTimeout: config.kafka.timeout * 2,
-  })
+  // Dedicated blocking connection for XREADGROUP; the producer connection stays
+  // free for the regulator's acks/reclaims and back-message publishing.
+  const subscriber = new RedisClient(config.redis.url)
+  const producer = new StreamProducer(
+    new RedisClient(config.redis.url),
+    config.redis.maxLen,
+  )
 
   const tempDir = await temp('spotter-depot-media-')
 
+  let transport: Awaited<
+    ReturnType<RedisRegulator<CoreContext>['run']>
+  > | null = null
+
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
-    await producer.disconnect()
-    await consumer.disconnect()
+    await transport?.stop()
+    subscriber.close()
+    producer.disconnect()
+    await tempDir.remove()
     process.exit(1)
   }
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
 
-  try {
-    await producer.connect()
+  await producer.connect()
+  await subscriber.connect()
 
-    await new KafkaRegulator<CoreContext>()
-      .message('spotter.event.media_requested', eventMediaController)
-      .message('spotter.camera.frame_requested', cameraFrameController)
-      .run({
+  transport = await new RedisRegulator<CoreContext>()
+    .message('spotter.event.media_requested', eventMediaController)
+    .message('spotter.camera.frame_requested', cameraFrameController)
+    .run(
+      {
         directory: {
           temp: tempDir,
         },
         logger: applicationLogger,
         config,
         s3,
-        consumer,
+        subscriber,
         producer,
-      })
+      },
+      {
+        group: config.redis.group,
+        consumer: config.redis.consumer,
+        blockMs: config.redis.blockMs,
+        count: config.redis.count,
+        reclaimMinIdleMs: config.redis.reclaimMinIdleMs,
+        reaperIntervalMs: config.redis.reaperIntervalMs,
+      },
+    )
 
-    applicationLogger.info('Application successfully started up')
-  } finally {
-    await tempDir.remove()
-  }
+  applicationLogger.info('Application successfully started up')
 }
 
 run().catch((error) => {

@@ -1,15 +1,11 @@
-import { type HeartbeatProps, env } from '@spotter/transport'
+import { type RedisConfig, env, resolveRedisConfig } from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
 
 const cleanupStrategies = ['file-processed', 'process-exited'] as const
 
 export type CoreConfig = {
-  kafka: HeartbeatProps & {
-    clientId: string
-    brokers: string[]
-    groupId: string
-  }
+  redis: RedisConfig
 
   s3: {
     host: string
@@ -25,13 +21,10 @@ export type CoreConfig = {
 
 export const resolveConfig = (): CoreConfig => {
   const result: CoreConfig = {
-    kafka: {
-      clientId: env.string('KAFKA_CLIENT_ID', information.name),
-      brokers: env.stringArray('KAFKA_BROKERS', []),
-      groupId: env.string('KAFKA_GROUP_ID', 'spotter-depot'),
-      heartbeat: env.number('KAFKA_ACTION_HEARTBEAT', 3000),
-      timeout: env.number('KAFKA_ACTION_TIMEOUT', 30000),
-    },
+    redis: resolveRedisConfig({
+      group: 'spotter-depot',
+      clientId: information.name,
+    }),
     s3: {
       host: env.string('S3_HOST', ''),
       accessKey: env.string('S3_ACCESS', ''),
@@ -47,8 +40,8 @@ export const resolveConfig = (): CoreConfig => {
     },
   }
 
-  if (!result.kafka.brokers.length) {
-    throw new Error('Bad configuration. No kafka brokers found.')
+  if (!result.redis.url) {
+    throw new Error('Bad configuration. No redis url found.')
   }
 
   if (!result.s3.host) {

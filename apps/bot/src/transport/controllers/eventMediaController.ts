@@ -1,18 +1,14 @@
-import {
-  type KafkaMessageController,
-  bufferToJson,
-  intervalHeartbeat,
-} from '@spotter/transport'
+import { type StreamMessageController, bufferToJson } from '@spotter/transport'
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
 import type { TransportContext } from '../../context'
 import { eventMediaAction } from '../actions/eventMediaAction'
 import { eventCode } from '../helpers/eventCode'
 
-export const eventMediaController: KafkaMessageController<
+export const eventMediaController: StreamMessageController<
   TransportContext
 > = async (payload, context): Promise<void> => {
-  const { topic, message, heartbeat } = payload
-  const { config, logger: baseLogger } = context
+  const { topic, message } = payload
+  const { logger: baseLogger } = context
 
   const value = bufferToJson(message.value)
 
@@ -48,7 +44,5 @@ export const eventMediaController: KafkaMessageController<
 
   const nextContext = { ...context, logger }
 
-  await intervalHeartbeat(heartbeat, config.kafka, async () => {
-    await eventMediaAction(actionPayload, nextContext)
-  })
+  await eventMediaAction(actionPayload, nextContext)
 }

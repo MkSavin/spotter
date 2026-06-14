@@ -1,20 +1,15 @@
-import {
-  type KafkaMessageController,
-  bufferToJson,
-  intervalHeartbeat,
-} from '@spotter/transport'
-import type { Message } from 'kafkajs'
+import { type StreamMessageController, bufferToJson } from '@spotter/transport'
 import {
   type CameraFramePayload,
   cameraFrameAction,
 } from '../actions/cameraFrameAction'
 import type { CoreContext } from '../context'
 
-export const cameraFrameController: KafkaMessageController<
+export const cameraFrameController: StreamMessageController<
   CoreContext
 > = async (payload, context) => {
-  const { topic, message, heartbeat } = payload
-  const { producer, config, logger: baseLogger } = context
+  const { topic, message } = payload
+  const { producer, logger: baseLogger } = context
 
   const value = bufferToJson(message.value)
 
@@ -32,29 +27,18 @@ export const cameraFrameController: KafkaMessageController<
 
   const logger = baseLogger.sub('action', topic, actionPayload.cameraCode)
 
-  await intervalHeartbeat(heartbeat, config.kafka, async () => {
-    const result = await cameraFrameAction(actionPayload, {
-      ...context,
-      logger,
-    })
-
-    if (!result) {
-      return
-    }
-
-    logger.verbose('Back-message contents: ', result)
-
-    const message: Message = {
-      value: JSON.stringify(result),
-    }
-
-    const sent = await producer.send({
-      topic: 'spotter.camera.frame_processed',
-      messages: [message],
-    })
-
-    logger.info(
-      `Back-message send to topic "${sent.at(0)?.topicName ?? 'unknown'}"`,
-    )
+  const result = await cameraFrameAction(actionPayload, {
+    ...context,
+    logger,
   })
+
+  if (!result) {
+    return
+  }
+
+  logger.verbose('Back-message contents: ', result)
+
+  await producer.publish('spotter.camera.frame_processed', result)
+
+  logger.info('Back-message sent to stream "spotter.camera.frame_processed"')
 }

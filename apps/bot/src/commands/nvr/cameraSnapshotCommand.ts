@@ -1,5 +1,4 @@
 import { Command } from '@grammyjs/commands'
-import type { Message } from 'kafkajs'
 import type { BotContext } from '../../context'
 import { Role } from '../../db/schema'
 import { ResourceType } from '../../endpoint/Resource'
@@ -56,19 +55,12 @@ export const cameraSnapshotCommand = new Command<BotContext>(
 
       const { producer } = context
 
-      const eventMessage: Message = {
-        value: JSON.stringify({
-          cameraCode: cameraName,
-          chatId: context.chatId,
-          messageId: message?.message_id,
-          frameUrl: response.url,
-          endpointAuthorization: request.headers.get('Authorization'),
-        }),
-      }
-
-      await producer.send({
-        topic: 'spotter.camera.frame_requested',
-        messages: [eventMessage],
+      await producer.publish('spotter.camera.frame_requested', {
+        cameraCode: cameraName,
+        chatId: context.chatId,
+        messageId: message?.message_id,
+        frameUrl: response.url,
+        endpointAuthorization: request.headers.get('Authorization'),
       })
 
       await message.editText(

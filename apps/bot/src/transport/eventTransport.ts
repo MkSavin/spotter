@@ -1,4 +1,4 @@
-import { KafkaRegulator } from '@spotter/transport'
+import { RedisRegulator, type RegulatorHandle } from '@spotter/transport'
 import type { Bot } from 'grammy'
 import type {
   BotApi,
@@ -13,18 +13,26 @@ import { eventMediaController } from './controllers/eventMediaController'
 export const eventTransport = async (
   bot: Bot<BotContext, BotApi>,
   context: CoreContext,
-): Promise<void> => {
+): Promise<RegulatorHandle> => {
   const logger = context.logger.sub('transport')
 
-  await context.producer.connect()
-
-  await new KafkaRegulator<TransportContext>()
+  return new RedisRegulator<TransportContext>()
     .message('spotter.event', eventController)
     .message('spotter.event.media_processed', eventMediaController)
     .message('spotter.camera.frame_processed', cameraFrameController)
-    .run({
-      ...context,
-      logger,
-      bot,
-    })
+    .run(
+      {
+        ...context,
+        logger,
+        bot,
+      },
+      {
+        group: context.config.redis.group,
+        consumer: context.config.redis.consumer,
+        blockMs: context.config.redis.blockMs,
+        count: context.config.redis.count,
+        reclaimMinIdleMs: context.config.redis.reclaimMinIdleMs,
+        reaperIntervalMs: context.config.redis.reaperIntervalMs,
+      },
+    )
 }

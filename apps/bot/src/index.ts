@@ -3,9 +3,9 @@ import { commands } from '@grammyjs/commands'
 import { hydrateApi, hydrateContext } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
-import { kafkaLogging } from '@spotter/transport'
+import { type RegulatorHandle, StreamProducer } from '@spotter/transport'
+import { RedisClient } from 'bun'
 import { Bot, session } from 'grammy'
-import { Kafka, Partitioners } from 'kafkajs'
 import information from '../../../package.json'
 import {
   adminCommands,
@@ -122,20 +122,18 @@ const polling = async (): Promise<void> => {
 
   const nvr = constructEndpoint(config.nvr.type, config)
 
-  const kafka = new Kafka({
-    clientId: config.kafka.clientId,
-    brokers: config.kafka.brokers,
-    logCreator: kafkaLogging(applicationLogger),
-  })
+  // Dedicated blocking connection for XREADGROUP; the producer connection stays
+  // free for XADD and the regulator's acks/reclaims.
+  const subscriber = new RedisClient(config.redis.url)
+  const producer = new StreamProducer(
+    new RedisClient(config.redis.url),
+    config.redis.maxLen,
+  )
 
-  const producer = kafka.producer({
-    createPartitioner: Partitioners.DefaultPartitioner,
-  })
-  const consumer = kafka.consumer({
-    groupId: config.kafka.groupId,
-    heartbeatInterval: config.kafka.heartbeat,
-    sessionTimeout: config.kafka.timeout * 2,
-  })
+  await producer.connect()
+  await subscriber.connect()
+
+  let transport: RegulatorHandle | null = null
 
   const coreContext: CoreContext = {
     config,
@@ -143,7 +141,7 @@ const polling = async (): Promise<void> => {
     db: database,
     nvr,
     producer,
-    consumer,
+    subscriber,
     runner: undefined,
   }
 
@@ -152,6 +150,9 @@ const polling = async (): Promise<void> => {
       applicationLogger.info(`Shutting down due to ${signal}...`)
       await coreContext.runner?.stop()
     }
+    await transport?.stop()
+    subscriber.close()
+    producer.disconnect()
     database.$client.close()
     process.exit(1)
   }
@@ -180,7 +181,7 @@ const polling = async (): Promise<void> => {
   // Wait bot+runner to fully startup before initializing transport
   await timeout(500)
 
-  await eventTransport(bot, coreContext)
+  transport = await eventTransport(bot, coreContext)
 
   applicationLogger.debug('Bot is successfully connected to message transport!')
 }

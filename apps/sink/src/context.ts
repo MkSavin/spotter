@@ -1,12 +1,11 @@
-import type { Consumer, Producer } from 'kafkajs'
-import type { MqttClient } from 'mqtt'
+import type { StreamProducer } from '@spotter/transport'
+import type { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { CoreConfig } from './config'
 
 export type CoreContext = {
   config: CoreConfig
   logger: Stenograph
-  mqtt: MqttClient
-  producer: Producer
-  consumer: Consumer
+  producer: StreamProducer
+  subscriber: RedisClient
 }

@@ -2,7 +2,9 @@ import type { CommandsFlavor } from '@grammyjs/commands'
 import type { HydrateApiFlavor, HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
+import type { StreamProducer } from '@spotter/transport'
 import type { AbortSignal } from 'abort-controller'
+import type { RedisClient } from 'bun'
 import type {
   Api,
   Bot,
@@ -11,7 +13,6 @@ import type {
   SessionFlavor,
 } from 'grammy'
 import type { Message } from 'grammy/types'
-import type { Consumer, Producer } from 'kafkajs'
 import type { Stenograph } from 'stenograph'
 import type { Config } from './config'
 import type { BotDatabase } from './db/client'
@@ -44,8 +45,8 @@ export type CoreContext = {
 
   db: BotDatabase
   nvr: NvrEndpoint
-  consumer: Consumer
-  producer: Producer
+  subscriber: RedisClient
+  producer: StreamProducer
 
   runner: RunnerHandle | undefined
 }

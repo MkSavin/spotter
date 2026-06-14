@@ -31,8 +31,6 @@
     "commander": "^13.1.0",
     "drizzle-orm": "^0.45.2",
     "grammy": "^1.35.0",
-    "jsonwebtoken": "^9.0.2",
-    "kafkajs": "^2.2.4",
-    "stenograph": "*"
+    "jsonwebtoken": "^9.0.2",    "stenograph": "*"
   }
 }

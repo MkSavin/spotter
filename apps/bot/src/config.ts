@@ -1,6 +1,6 @@
 import path from 'node:path'
 import process from 'node:process'
-import { type HeartbeatProps, env } from '@spotter/transport'
+import { type RedisConfig, env, resolveRedisConfig } from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
 import information from '../../../package.json'
 import type { EndpointCode } from './endpoint/constructEndpoint'
@@ -14,11 +14,7 @@ export type FrigateConfig = {
 
 export type EnvironmentConfig = {
   timezone: string
-  kafka: HeartbeatProps & {
-    clientId: string
-    brokers: string[]
-    groupId: string
-  }
+  redis: RedisConfig
   telegram: {
     token: string
   }
@@ -66,13 +62,10 @@ const tryReadContentConfig = async (
 export const resolveConfig = async (): Promise<Config> => {
   const environmentConfig: EnvironmentConfig = {
     timezone: env.string('TZ', 'Europe/Moscow'),
-    kafka: {
-      clientId: env.string('KAFKA_CLIENT_ID', information.name),
-      brokers: env.stringArray('KAFKA_BROKERS', []),
-      groupId: env.string('KAFKA_GROUP_ID', 'spotter-sink'),
-      heartbeat: env.number('KAFKA_ACTION_HEARTBEAT', 3000),
-      timeout: env.number('KAFKA_ACTION_TIMEOUT', 30000),
-    },
+    redis: resolveRedisConfig({
+      group: 'spotter-bot',
+      clientId: information.name,
+    }),
     telegram: {
       token: env.string('TELEGRAM_TOKEN', ''),
     },
@@ -96,8 +89,8 @@ export const resolveConfig = async (): Promise<Config> => {
   if (!environmentConfig.telegram.token) {
     throw new Error('Bad configuration. No telegram token found.')
   }
-  if (!environmentConfig.kafka.brokers.length) {
-    throw new Error('Bad configuration. No kafka brokers found.')
+  if (!environmentConfig.redis.url) {
+    throw new Error('Bad configuration. No redis url found.')
   }
   const nvrType = environmentConfig.nvr.type
   const nvrConfig =

@@ -1,19 +1,8 @@
-import type { SpotterEvent } from '@spotter/transport'
-import type { Message, Producer, RecordMetadata } from 'kafkajs'
+import type { SpotterEvent, StreamProducer } from '@spotter/transport'
 
-export const publishEventToKafka = async (
+// Publishes a canonical event onto the `spotter.event` stream. The stream is a
+// single ordered log, so per-event ordering is preserved without a partition key.
+export const publishEvent = async (
   event: SpotterEvent,
-  producer: Producer,
-): Promise<RecordMetadata | undefined> => {
-  const message: Message = {
-    key: `event-${event.id}`,
-    value: JSON.stringify(event),
-  }
-
-  const sent = await producer.send({
-    topic: 'spotter.event',
-    messages: [message],
-  })
-
-  return sent.at(0)
-}
+  producer: StreamProducer,
+): Promise<string> => producer.publish('spotter.event', event)

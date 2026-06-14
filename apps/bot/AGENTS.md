@@ -1,6 +1,6 @@
 # AGENTS.md — `@spotter/bot`
 
-Telegram-фронтенд (grammY). Реагирует на Kafka-события камер, шлёт уведомления и
+Telegram-фронтенд (grammY). Реагирует на события камер из Redis Streams, шлёт уведомления и
 обрабатывает команды операторов. Общие конвенции — в корневом [AGENTS.md](../../AGENTS.md).
 
 ## Запуск
@@ -10,7 +10,7 @@ cd apps/bot
 bun start            # или bun start:watch
 bun test
 ```
-Нужен `.env.bot` в корне (см. `.env.bot.example`): `TELEGRAM_TOKEN`, `KAFKA_BROKERS`,
+Нужен `.env.bot` в корне (см. `.env.bot.example`): `TELEGRAM_TOKEN`, `REDIS_URL`,
 `FRIGATE_REMOTE_URL`, `MEDIA_STRATEGY`. БД — SQLite-файл `DATABASE_PATH` (по умолчанию
 `./data/bot.sqlite`), миграции применяются автоматически при старте.
 
@@ -18,7 +18,7 @@ bun test
 
 [src/index.ts](src/index.ts): `initialize()` собирает `Bot`, навешивает middleware
 (logging → core-context → sequentialize → hydrate → commands → session), затем
-`polling()` поднимает Kafka и вызывает `eventTransport()`.
+`polling()` поднимает Redis-подключения (`subscriber` + `producer`) и вызывает `eventTransport()`.
 
 Порядок важен: транспорт стартует **после** того как раннер бота поднялся
 (`await timeout(500)`), иначе сообщения могут потеряться.
@@ -57,13 +57,17 @@ export const cameraListCommand = new Command<BotContext>('camera_list', 'Опи�
 Токены — JWT, подписанные `AUTH_SECRET`. Выдать: `bun run sign:token <role>` (CLI в [src/cli.ts](src/cli.ts)).
 Оператор активирует токен командой `/login`.
 
-## Транспорт (Kafka)
+## Транспорт (Redis Streams)
 
-[src/transport/eventTransport.ts](src/transport/eventTransport.ts) подписывается на:
-- `spotter.event` → `eventController` — создаёт/обновляет событие, шлёт/актуализирует уведомление.
+[src/transport/eventTransport.ts](src/transport/eventTransport.ts) через `RedisRegulator`
+(группа `spotter-bot`) подписывается на:
+- `spotter.event` → `eventController` — создаёт/обновляет событие, шлёт/актуализирует уведомление,
+  на `end` публикует `spotter.event.media_requested` через `producer.publish`.
 - `spotter.event.media_processed` → `eventMediaController` — досылает медиа к уведомлению.
 - `spotter.camera.frame_processed` → `cameraFrameController` — отдаёт кадр по запросу `/camera_snapshot`.
 
+`run()` возвращает `{ stop() }` (хранится в `index.ts` для graceful shutdown). Ack — после
+успешной обработки; долгая работа безопасна (см. модель доставки в корневом AGENTS.md).
 Контроллеры → `actions/` (бизнес-логика), `view/` (рендер сообщений), `parsing/`, `helpers/`, `mixins/`.
 
 ## NVR-эндпоинты

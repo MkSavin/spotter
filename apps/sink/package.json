@@ -17,8 +17,6 @@
   "license": "MIT",
   "dependencies": {
     "@spotter/transport": "*",
-    "stenograph": "*",
-    "kafkajs": "^2.2.4",
-    "mqtt": "^5.10.3"
+    "stenograph": "*",    "mqtt": "^5.10.3"
   }
 }

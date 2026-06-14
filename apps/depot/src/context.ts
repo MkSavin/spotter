@@ -1,5 +1,5 @@
-import type { S3Client } from 'bun'
-import type { Consumer, Producer } from 'kafkajs'
+import type { StreamProducer } from '@spotter/transport'
+import type { RedisClient, S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { CoreConfig } from './config'
 import type { TempDirectoryController } from './fs/temp'
@@ -11,6 +11,6 @@ export type CoreContext = {
   config: CoreConfig
   logger: Stenograph
   s3: S3Client
-  consumer: Consumer
-  producer: Producer
+  subscriber: RedisClient
+  producer: StreamProducer
 }

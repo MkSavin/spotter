@@ -1,21 +1,17 @@
-import {
-  type KafkaMessageController,
-  bufferToJson,
-  intervalHeartbeat,
-} from '@spotter/transport'
+import { type StreamMessageController, bufferToJson } from '@spotter/transport'
 import type { CoreContext } from '../../context'
-import { publishEventToKafka } from '../../helpers/publishEvent'
+import { publishEvent } from '../../helpers/publishEvent'
 import {
   type EventTestPayload,
   eventTestAction,
 } from '../actions/eventTestAction'
 
-export const eventTestController: KafkaMessageController<CoreContext> = async (
+export const eventTestController: StreamMessageController<CoreContext> = async (
   payload,
   context,
 ) => {
-  const { topic, message, heartbeat } = payload
-  const { producer, config, logger: baseLogger } = context
+  const { topic, message } = payload
+  const { producer, logger: baseLogger } = context
 
   const value = bufferToJson(message.value)
 
@@ -43,19 +39,15 @@ export const eventTestController: KafkaMessageController<CoreContext> = async (
 
   const logger = baseLogger.sub('action', topic, actionPayload.eventId)
 
-  await intervalHeartbeat(heartbeat, config.kafka, async () => {
-    const event = await eventTestAction(actionPayload)
+  const event = await eventTestAction(actionPayload)
 
-    if (!event) {
-      return
-    }
+  if (!event) {
+    return
+  }
 
-    logger.verbose('Back-message contents: ', event)
+  logger.verbose('Back-message contents: ', event)
 
-    const sent = await publishEventToKafka(event, producer)
+  await publishEvent(event, producer)
 
-    if (sent) {
-      logger.debug(`Event sent to topic "${sent.topicName}"`)
-    }
-  })
+  logger.debug('Event sent to stream "spotter.event"')
 }

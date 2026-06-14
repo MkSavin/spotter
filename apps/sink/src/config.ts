@@ -1,39 +1,39 @@
-import { type HeartbeatProps, env } from '@spotter/transport'
+import { type RedisConfig, env, resolveRedisConfig } from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
+import type { SourceCode } from './source/constructSource'
 
 export type CoreConfig = {
-  kafka: HeartbeatProps & {
-    clientId: string
-    brokers: string[]
-    groupId: string
-  }
+  redis: RedisConfig
 
-  mqtt: {
-    broker: string
+  source: {
+    type: SourceCode
+    frigate: {
+      broker: string
+    }
   }
 }
 
 export const resolveConfig = (): CoreConfig => {
   const result: CoreConfig = {
-    kafka: {
-      clientId: env.string('KAFKA_CLIENT_ID', information.name),
-      brokers: env.stringArray('KAFKA_BROKERS', []),
-      groupId: env.string('KAFKA_GROUP_ID', 'spotter-sink'),
-      heartbeat: env.number('KAFKA_ACTION_HEARTBEAT', 3000),
-      timeout: env.number('KAFKA_ACTION_TIMEOUT', 30000),
-    },
-    mqtt: {
-      broker: env.string('MQTT_BROKER', ''),
+    redis: resolveRedisConfig({
+      group: 'spotter-sink',
+      clientId: information.name,
+    }),
+    source: {
+      type: env.string('SOURCE_TYPE', 'frigate') as SourceCode,
+      frigate: {
+        broker: env.string('MQTT_BROKER', ''),
+      },
     },
   }
 
-  if (!result.kafka.brokers.length) {
-    throw new Error('No kafka brokers found.')
+  if (!result.redis.url) {
+    throw new Error('No redis url found.')
   }
 
-  if (!result.mqtt.broker.length) {
-    throw new Error('No mqtt broker found.')
+  if (result.source.type === 'frigate' && !result.source.frigate.broker) {
+    throw new Error('No mqtt broker found for the frigate source.')
   }
 
   applicationLogger.verbose('Using core configuration:', result)

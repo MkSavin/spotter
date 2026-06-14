@@ -7,24 +7,24 @@
 
 - **Рантайм — только Bun.** Никаких `npm`/`node`/`ts-node`. Запуск: `bun start`, тесты: `bun test`.
 - **Монорепо** Turborepo: 3 сервиса (`apps/*`) + 2 пакета (`packages/*`).
-- **Связь между сервисами — через Kafka** (и MQTT на входе). Прямых вызовов между сервисами нет.
+- **Связь между сервисами — через Redis Streams** (и MQTT на входе). Прямых вызовов между сервисами нет.
 - **Стиль:** Biome — одинарные кавычки, без `;`, отступ 2 пробела. Запускай `bunx biome check --write` перед завершением.
 
 ## Архитектура потока данных
 
 ```
-Frigate ──MQTT(frigate/events)──▶ sink ──Kafka(spotter.event)──▶ bot ──▶ Telegram
+Frigate ──MQTT(frigate/events)──▶ sink ──Redis(spotter.event)──▶ bot ──▶ Telegram
                                                                   │ ▲
                                             spotter.*.requested   ▼ │  spotter.*.processed
                                                                  depot ──▶ S3/MinIO
 ```
 
-1. Frigate шлёт MQTT-событие → **sink** парсит (`parseFrigateEvent`) → публикует в `spotter.event`.
+1. Frigate шлёт MQTT-событие → **sink** парсит (`parseFrigateEvent`) → публикует в стрим `spotter.event`.
 2. **bot** слушает `spotter.event`, обновляет БД (SQLite), шлёт уведомление. На `end`-событиях запрашивает медиа.
 3. **depot** ловит `*.media_requested` / `*.frame_requested`, качает с NVR, обрабатывает, кладёт в S3, отвечает `*_processed`.
 4. **bot** ловит `*_processed` и отправляет медиа в Telegram-чат.
 
-Топики целиком — в [README.md](README.md#kafka-топики).
+Стримы (= имена топиков) целиком — в [README.md](README.md#redis-streams).
 
 ## Команды
 
@@ -46,40 +46,48 @@ Frigate ──MQTT(frigate/events)──▶ sink ──Kafka(spotter.event)─�
 читая переменные через хелперы из `@spotter/transport`:
 
 ```ts
-import { env } from '@spotter/transport'
+import { env, resolveRedisConfig } from '@spotter/transport'
 
-env.string('KAFKA_CLIENT_ID', 'default')
-env.number('KAFKA_ACTION_HEARTBEAT', 3000)
-env.stringArray('KAFKA_BROKERS', [])         // split по ','
+env.string('REDIS_URL', 'redis://localhost:6379')
+env.number('REDIS_BLOCK_MS', 5000)
 env.enum('DIRECTORY_CLEANUP', strategies, 'file-processed')
 env.boolean('FLAG', false)
+
+// Общий REDIS_*-блок собирается одним хелпером из transport:
+const redis = resolveRedisConfig({ group: 'spotter-bot', clientId: 'spotter-bot' })
 ```
-`resolveConfig` сам бросает ошибку при отсутствии обязательных значений (брокеры, токен, БД).
+`resolveConfig` сам бросает ошибку при отсутствии обязательных значений (`REDIS_URL`, токен, БД).
 **Не** читай `process.env` напрямую в бизнес-логике — только в `config.ts`.
 
 ### Паттерн Regulator
 Подписка на сообщения декларативна, через builder:
 
 ```ts
-await new KafkaRegulator<Context>()
+const handle = await new RedisRegulator<Context>()
   .message('spotter.event.media_requested', eventMediaController)
-  .run(context)            // context должен содержать { consumer, producer }
+  .run(context, { group: config.redis.group, consumer: config.redis.consumer })
+// context должен содержать { subscriber, producer, logger }; run() НЕ блокирует —
+// возвращает { stop() }. Подключения держат процесс живым.
 ```
 Аналогично `MqttRegulator` в sink (`.on('frigate/events', controller)`).
 
+**Модель доставки:** `RedisRegulator` читает группой через `XREADGROUP` и делает `XACK`
+**после** успешной обработки. Упавшее/зависшее сообщение остаётся в PEL и перезабирается
+`XAUTOCLAIM` (стартовый reclaim + периодический reaper по `reclaimMinIdleMs`). Группы создаются
+с позиции `$` — на рестарте старые события заново не пересылаются. Heartbeat'ов нет (в отличие
+от Kafka): держи `REDIS_RECLAIM_MIN_IDLE_MS` выше самой долгой операции (транскодинг).
+
 ### Паттерн Controller → Action
 - **Controller** (`*Controller.ts`): парсит сырьё (`bufferToJson(message.value)`), ранний `return` на мусоре,
-  строит типизированный payload, оборачивает работу в `intervalHeartbeat`, публикует ответ. **Без** бизнес-логики.
+  строит типизированный payload, делает работу, публикует ответ через `producer.publish`. **Без** бизнес-логики.
 - **Action** (`*Action.ts`): чистая бизнес-логика на типизированном payload, возвращает результат для ответа.
 
 ```ts
-await intervalHeartbeat(heartbeat, config.kafka, async () => {
-  const result = await someAction(payload, { ...context, logger })
-  if (!result) return
-  await producer.send({ topic: '...processed', messages: [{ value: JSON.stringify(result) }] })
-})
+const result = await someAction(payload, { ...context, logger })
+if (!result) return
+await producer.publish('...processed', result) // XADD в стрим; ack делает регулятор
 ```
-`intervalHeartbeat` обязателен для долгих операций (видео, скачивание) — иначе Kafka выкинет consumer из группы.
+Долгая работа безопасна: запись остаётся pending до `XACK`, никто не вытесняет consumer.
 
 ### Логирование (stenograph)
 ```ts
@@ -125,4 +133,4 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 
 - [apps/bot/AGENTS.md](apps/bot/AGENTS.md) — Telegram-бот, команды, сессии, Innoxious-медиа.
 - [apps/depot/AGENTS.md](apps/depot/AGENTS.md) — обработка медиа, S3, ffmpeg/sharp.
-- [apps/sink/AGENTS.md](apps/sink/AGENTS.md) — MQTT→Kafka мост, парсинг Frigate.
+- [apps/sink/AGENTS.md](apps/sink/AGENTS.md) — NVR→Redis Streams мост, подключаемый `Source` (Frigate/MQTT).

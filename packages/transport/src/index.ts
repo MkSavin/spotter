@@ -1,10 +1,9 @@
-export * from './regulator/KafkaRegulator'
+export * from './regulator/RedisRegulator'
+export * from './regulator/parseStreamReply'
 
 export * from './helpers/bufferToJson'
 export * from './helpers/env'
-export * from './helpers/intervalHeartbeat'
 
-export * from './logging/kafkaLogging'
+export * from './config/redis'
 
-export * from './context'
 export * from './schema/spotterEvent'

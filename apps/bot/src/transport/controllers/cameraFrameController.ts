@@ -1,16 +1,12 @@
-import {
-  type KafkaMessageController,
-  bufferToJson,
-  intervalHeartbeat,
-} from '@spotter/transport'
+import { type StreamMessageController, bufferToJson } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { cameraFrameAction } from '../actions/cameraFrameAction'
 
-export const cameraFrameController: KafkaMessageController<
+export const cameraFrameController: StreamMessageController<
   TransportContext
 > = async (payload, context): Promise<void> => {
-  const { topic, message, heartbeat } = payload
-  const { config, logger: baseLogger } = context
+  const { topic, message } = payload
+  const { logger: baseLogger } = context
 
   const value = bufferToJson(message.value)
 
@@ -37,7 +33,5 @@ export const cameraFrameController: KafkaMessageController<
 
   const nextContext = { ...context, logger }
 
-  await intervalHeartbeat(heartbeat, config.kafka, async () => {
-    await cameraFrameAction(actionPayload, nextContext)
-  })
+  await cameraFrameAction(actionPayload, nextContext)
 }
