@@ -31,8 +31,12 @@ const readValueField = (fields: unknown): string => {
   return ''
 }
 
-// `[[id, [field, value, ...]], ...]` for a single stream.
-const parseEntries = (topic: string, entries: unknown): StreamRecord[] => {
+// `[[id, [field, value, ...]], ...]` for a single stream. Shared by XREADGROUP,
+// XCLAIM and XRANGE replies, which all use this entry shape.
+export const parseEntries = (
+  topic: string,
+  entries: unknown,
+): StreamRecord[] => {
   if (!Array.isArray(entries)) {
     return []
   }
@@ -90,20 +94,30 @@ export const parseReadGroupReply = (reply: unknown): StreamRecord[] => {
   return []
 }
 
-// XAUTOCLAIM reply: `[cursor, entries, deletedIds]`. `topic` is known by the
-// caller (XAUTOCLAIM targets a single stream).
-export const parseAutoclaimReply = (
-  topic: string,
-  reply: unknown,
-): { cursor: string; messages: StreamRecord[] } => {
+export type PendingEntry = {
+  id: string
+  // How many times this entry has been delivered (incremented by XREADGROUP and
+  // XCLAIM). Used to detect poison messages that keep failing.
+  deliveries: number
+}
+
+// Extended XPENDING reply: `[[id, consumer, idleMs, deliveryCount], ...]`.
+export const parsePendingReply = (reply: unknown): PendingEntry[] => {
   if (!Array.isArray(reply)) {
-    return { cursor: '0-0', messages: [] }
+    return []
   }
 
-  const [cursor, entries] = reply
+  const entries: PendingEntry[] = []
 
-  return {
-    cursor: cursor != null ? String(cursor) : '0-0',
-    messages: parseEntries(topic, entries),
+  for (const item of reply) {
+    if (!Array.isArray(item) || item[0] == null) {
+      continue
+    }
+    entries.push({
+      id: String(item[0]),
+      deliveries: Number(item[3] ?? 0),
+    })
   }
+
+  return entries
 }

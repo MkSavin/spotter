@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7-labs
 
-FROM oven/bun:1.2.4-alpine AS base
+FROM oven/bun:1.3.14-alpine AS base
 
 ARG APP_RELATIVE_PATH
 
@@ -19,7 +19,7 @@ FROM base AS bundle
 
 COPY --from=install --parents **/node_modules ./
 COPY . .
-RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable
+RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable --minify
 
 FROM base AS release
 

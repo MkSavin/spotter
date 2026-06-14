@@ -33,6 +33,7 @@ export const eventTransport = async (
         count: context.config.redis.count,
         reclaimMinIdleMs: context.config.redis.reclaimMinIdleMs,
         reaperIntervalMs: context.config.redis.reaperIntervalMs,
+        maxDeliveries: context.config.redis.maxDeliveries,
       },
     )
 }

@@ -11,6 +11,7 @@ export type RedisConfig = {
   count: number
   reclaimMinIdleMs: number
   reaperIntervalMs: number
+  maxDeliveries: number
   maxLen: number
 }
 
@@ -31,6 +32,7 @@ export const resolveRedisConfig = (defaults: {
     count: env.number('REDIS_COUNT', 10),
     reclaimMinIdleMs: env.number('REDIS_RECLAIM_MIN_IDLE_MS', 300000),
     reaperIntervalMs: env.number('REDIS_REAPER_INTERVAL_MS', 60000),
+    maxDeliveries: env.number('REDIS_MAX_DELIVERIES', 5),
     maxLen: env.number('REDIS_MAXLEN', 10000),
   }
 }

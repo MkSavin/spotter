@@ -69,6 +69,7 @@ const run = async (): Promise<void> => {
       count: config.redis.count,
       reclaimMinIdleMs: config.redis.reclaimMinIdleMs,
       reaperIntervalMs: config.redis.reaperIntervalMs,
+      maxDeliveries: config.redis.maxDeliveries,
     })
 
   applicationLogger.info('Application successfully started up')

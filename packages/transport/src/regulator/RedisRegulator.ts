@@ -3,7 +3,8 @@ import type { Stenograph } from 'stenograph'
 import {
   type StreamMessage,
   type StreamRecord,
-  parseAutoclaimReply,
+  parseEntries,
+  parsePendingReply,
   parseReadGroupReply,
 } from './parseStreamReply'
 
@@ -26,6 +27,9 @@ export type RegulatorOptions = {
   count?: number
   reclaimMinIdleMs?: number
   reaperIntervalMs?: number
+  // After this many failed deliveries an entry is treated as poison: moved to
+  // `<stream>.dead` and acked instead of being retried forever.
+  maxDeliveries?: number
 }
 
 export type RegulatorHandle = {
@@ -110,6 +114,7 @@ export class RedisRegulator<Context extends BaseContext> {
     const count = options.count ?? 10
     const minIdleMs = options.reclaimMinIdleMs ?? 300000
     const reaperIntervalMs = options.reaperIntervalMs ?? 60000
+    const maxDeliveries = options.maxDeliveries ?? 5
     const streams = this.streams
 
     await producer.connect()
@@ -150,26 +155,72 @@ export class RedisRegulator<Context extends BaseContext> {
       }
     }
 
+    // Poison message: it has failed too many times. Move the body to a dead-
+    // letter stream for inspection and ack the original so it stops cycling.
+    const deadLetter = async (
+      stream: string,
+      id: string,
+      deliveries: number,
+    ): Promise<void> => {
+      const range = await producer.send('XRANGE', [stream, id, id])
+      const value = parseEntries(stream, range).at(0)?.message.value ?? ''
+
+      await producer.send('XADD', [
+        `${stream}.dead`,
+        '*',
+        'value',
+        value,
+        'reason',
+        'max-deliveries-exceeded',
+        'deliveries',
+        String(deliveries),
+        'stream',
+        stream,
+        'originalId',
+        id,
+      ])
+      await producer.send('XACK', [stream, group, id])
+
+      log.warn(
+        `Poison message ${stream}/${id} (deliveries=${deliveries}) moved to ${stream}.dead`,
+      )
+    }
+
     // Reclaim entries idle longer than minIdleMs (crashed/stuck consumers).
+    // XPENDING carries the delivery count, so poison messages are diverted to
+    // the DLQ before they are re-dispatched; everything else is XCLAIM'd to this
+    // consumer and retried.
     const reclaim = async (): Promise<void> => {
       for (const stream of streams) {
-        let cursor = '0-0'
-        do {
-          const reply = await producer.send('XAUTOCLAIM', [
+        const pending = parsePendingReply(
+          await producer.send('XPENDING', [
+            stream,
+            group,
+            'IDLE',
+            String(minIdleMs),
+            '-',
+            '+',
+            String(count),
+          ]),
+        )
+
+        for (const { id, deliveries } of pending) {
+          if (deliveries > maxDeliveries) {
+            await deadLetter(stream, id, deliveries)
+            continue
+          }
+
+          const claimed = await producer.send('XCLAIM', [
             stream,
             group,
             consumer,
             String(minIdleMs),
-            cursor,
-            'COUNT',
-            String(count),
+            id,
           ])
-          const parsed = parseAutoclaimReply(stream, reply)
-          for (const record of parsed.messages) {
+          for (const record of parseEntries(stream, claimed)) {
             await dispatch(record)
           }
-          cursor = parsed.cursor
-        } while (cursor !== '0-0')
+        }
       }
     }
 

@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { parseAutoclaimReply, parseReadGroupReply } from './parseStreamReply'
+import {
+  parseEntries,
+  parsePendingReply,
+  parseReadGroupReply,
+} from './parseStreamReply'
 
 const payload = JSON.stringify({ id: 'evt-1', type: 'start' })
 
@@ -85,34 +89,43 @@ describe('parseReadGroupReply', () => {
   })
 })
 
-describe('parseAutoclaimReply', () => {
-  test('parses cursor and reclaimed entries', () => {
+describe('parseEntries', () => {
+  test('parses XCLAIM / XRANGE entry shape for a known stream', () => {
+    const reply = [['1700000000000-0', ['value', payload]]]
+    expect(parseEntries('spotter.event', reply)).toEqual([
+      {
+        topic: 'spotter.event',
+        message: { id: '1700000000000-0', value: payload },
+      },
+    ])
+  })
+
+  test('returns empty for malformed entries', () => {
+    expect(parseEntries('s', null)).toEqual([])
+    expect(parseEntries('s', [])).toEqual([])
+  })
+})
+
+describe('parsePendingReply', () => {
+  test('extracts id and delivery count from extended XPENDING', () => {
+    // [id, consumer, idleMs, deliveryCount]
     const reply = [
-      '0-0',
-      [['1700000000000-0', ['value', payload]]],
-      [], // deleted ids
+      ['1-0', 'consumer-A', 120000, 7],
+      ['2-0', 'consumer-A', 5000, 1],
     ]
-
-    expect(parseAutoclaimReply('spotter.event', reply)).toEqual({
-      cursor: '0-0',
-      messages: [
-        {
-          topic: 'spotter.event',
-          message: { id: '1700000000000-0', value: payload },
-        },
-      ],
-    })
+    expect(parsePendingReply(reply)).toEqual([
+      { id: '1-0', deliveries: 7 },
+      { id: '2-0', deliveries: 1 },
+    ])
   })
 
-  test('returns a continuation cursor when more remain', () => {
-    const reply = ['1700000000123-0', [], []]
-    expect(parseAutoclaimReply('s', reply).cursor).toBe('1700000000123-0')
+  test('defaults missing delivery count to 0 and skips malformed rows', () => {
+    const reply = [['3-0', 'c', 1], 'garbage', [null]]
+    expect(parsePendingReply(reply)).toEqual([{ id: '3-0', deliveries: 0 }])
   })
 
-  test('returns terminal cursor for malformed replies', () => {
-    expect(parseAutoclaimReply('s', null)).toEqual({
-      cursor: '0-0',
-      messages: [],
-    })
+  test('returns empty for nil / non-array replies', () => {
+    expect(parsePendingReply(null)).toEqual([])
+    expect(parsePendingReply('nope')).toEqual([])
   })
 })

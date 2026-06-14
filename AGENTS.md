@@ -72,10 +72,15 @@ const handle = await new RedisRegulator<Context>()
 Аналогично `MqttRegulator` в sink (`.on('frigate/events', controller)`).
 
 **Модель доставки:** `RedisRegulator` читает группой через `XREADGROUP` и делает `XACK`
-**после** успешной обработки. Упавшее/зависшее сообщение остаётся в PEL и перезабирается
-`XAUTOCLAIM` (стартовый reclaim + периодический reaper по `reclaimMinIdleMs`). Группы создаются
+**после** успешной обработки. Упавшее/зависшее сообщение остаётся в PEL; reaper (стартовый +
+по таймеру) берёт зависшие записи через `XPENDING IDLE` → `XCLAIM` и повторяет. Группы создаются
 с позиции `$` — на рестарте старые события заново не пересылаются. Heartbeat'ов нет (в отличие
 от Kafka): держи `REDIS_RECLAIM_MIN_IDLE_MS` выше самой долгой операции (транскодинг).
+
+**Защита от poison-message:** `XPENDING` отдаёт счётчик доставок; запись, не обработанную успешно
+за `REDIS_MAX_DELIVERIES` (по умолч. 5) раз, регулятор переносит в dead-letter-стрим `<stream>.dead`
+(с полями `reason`/`deliveries`/`originalId` + оригинальный `value`) и `XACK`-ает оригинал — чтобы
+битое сообщение не крутилось в PEL вечно. DLQ не подрезается: разбирай вручную (`XRANGE <stream>.dead - +`).
 
 ### Паттерн Controller → Action
 - **Controller** (`*Controller.ts`): парсит сырьё (`bufferToJson(message.value)`), ранний `return` на мусоре,
