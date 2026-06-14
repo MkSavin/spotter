@@ -1,7 +1,7 @@
 import { Command } from '@grammyjs/commands'
 import type { Message } from 'kafkajs'
-import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
+import { Role } from '../../db/schema'
 import { ResourceType } from '../../endpoint/Resource'
 import { get } from '../../helpers/get'
 import { argument } from '../../middlewares/command/argument'

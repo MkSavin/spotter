@@ -1,5 +1,6 @@
 import { Command } from '@grammyjs/commands'
 import type { BotContext } from '../../context'
+import { chatsRepo, usersRepo } from '../../db/repository'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
@@ -22,22 +23,13 @@ export const logoutCommand = new Command<BotContext>(
     const chatId = context.chatId.toString()
     const userId = from.id.toString()
 
-    const chat = await context.prisma.chat.delete({
-      where: {
-        id: chatId,
-      },
-    })
+    const chat = chatsRepo.remove(context.db, chatId)
 
-    logger.info(`Chat "${chat.id}" has successfully been unauthorized`)
+    logger.info(`Chat "${chat?.id}" has successfully been unauthorized`)
 
-    const user = await context.prisma.user.delete({
-      where: {
-        id: userId,
-        chatId,
-      },
-    })
+    const user = usersRepo.remove(context.db, userId, chatId)
 
-    logger.info(`User "${user.id}" has successfully been unauthorized`)
+    logger.info(`User "${user?.id}" has successfully been unauthorized`)
 
     context.session.user.needUpdateCommands = true
     context.session.user.authorizedRole = null

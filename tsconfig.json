@@ -1,24 +1,29 @@
 {
   "compilerOptions": {
-    "outDir": "./lib",
+    // Окружение: современный таргет, модули отдаёт бандлер (Bun)
     "target": "esnext",
-    "module": "commonjs",
     "lib": ["esnext"],
-    "declaration": true,
-    "allowJs": true,
-    "skipLibCheck": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "verbatimModuleSyntax": true,
+
+    // Эмитом занимается Bun (`bun build`), tsc используется только для проверки типов
+    "noEmit": true,
+
+    // Проверка типов
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Глобальные типы Bun (Bun.S3Client, bun:test и т.д.)
+    "types": ["bun"]
   },
-  "include": ["./apps/*", "./packages/*"],
-  "exclude": ["node_modules"]
+  "include": ["apps", "packages", "*.config.ts"],
+  "exclude": ["node_modules", "**/dist", ".prisma-generated"]
 }

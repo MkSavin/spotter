@@ -2,15 +2,15 @@ import { CommandGroup } from '@grammyjs/commands'
 import type { BotContext } from '../context'
 import { eventClearCommand } from './admin/eventClearCommand'
 import { systemStatsCommand } from './admin/systemStatsCommand'
+import { systemVersionCommand } from './admin/systemVersionCommand'
 import { loginCommand } from './auth/loginCommand'
 import { logoutCommand } from './auth/logoutCommand'
 import { meCommand } from './auth/meCommand'
-import { userSignCommand } from './user/userSignCommand'
 import { startCommand } from './general/startCommand'
-import { systemVersionCommand } from './admin/systemVersionCommand'
+import { cameraListCommand } from './nvr/cameraListCommand'
 import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
 import { testPublishCommand } from './test/testPublishCommand'
-import { cameraListCommand } from './nvr/cameraListCommand'
+import { userSignCommand } from './user/userSignCommand'
 
 export const generalCommands = new CommandGroup<BotContext>().add([
   startCommand,

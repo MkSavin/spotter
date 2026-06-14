@@ -1,6 +1,6 @@
 import { Command } from '@grammyjs/commands'
-import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
+import { Role } from '../../db/schema'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'

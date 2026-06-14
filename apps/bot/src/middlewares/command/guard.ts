@@ -1,5 +1,5 @@
-import { Role } from '../../../../../.prisma-generated'
 import type { BotContext as BaseContext } from '../../context'
+import { Role } from '../../db/schema'
 import type { CommandMiddleware } from '../types'
 
 export const guard = <Context extends BaseContext>(

@@ -1,7 +1,7 @@
 import type { CommandGroup } from '@grammyjs/commands'
-import type { Middleware, Context as BaseContext } from 'grammy'
-import { Role } from '../../../../../.prisma-generated'
+import type { Context as BaseContext, Middleware } from 'grammy'
 import type { BotContext as GeneralContext } from '../../context'
+import { Role } from '../../db/schema'
 
 type CommandListPack<Context extends GeneralContext> = {
   general: CommandGroup<Context>

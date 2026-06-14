@@ -1,5 +1,5 @@
-import type { Role } from '@prisma/client'
 import type { SpotterEvent } from '@spotter/transport'
+import type { Role } from './db/schema'
 
 export type UserSession = {
   authorizedRole: Role | null | undefined

@@ -7,4 +7,4 @@ export * from './helpers/intervalHeartbeat'
 export * from './logging/kafkaLogging'
 
 export * from './context'
-export * from './types'
+export * from './schema/spotterEvent'

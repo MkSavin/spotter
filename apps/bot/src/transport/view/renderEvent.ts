@@ -1,5 +1,5 @@
-import type { Event } from '../../../../../.prisma-generated'
 import type { CoreContext } from '../../context'
+import type { Event } from '../../db/schema'
 import { get } from '../../helpers/get'
 import type { MediaTuple } from '../helpers/resolveNvrMedia'
 import { renderEventTiming } from './renderEventTiming'

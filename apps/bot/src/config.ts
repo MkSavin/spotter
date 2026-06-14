@@ -23,7 +23,7 @@ export type EnvironmentConfig = {
     token: string
   }
   database: {
-    url: string
+    path: string
   }
   nvr: {
     type: EndpointCode
@@ -77,7 +77,7 @@ export const resolveConfig = async (): Promise<Config> => {
       token: env.string('TELEGRAM_TOKEN', ''),
     },
     database: {
-      url: env.string('DATABASE_URL', ''),
+      path: env.string('DATABASE_PATH', './data/bot.sqlite'),
     },
     nvr: {
       type: env.string('NVR_TYPE', 'frigate') as EndpointCode,
@@ -99,10 +99,6 @@ export const resolveConfig = async (): Promise<Config> => {
   if (!environmentConfig.kafka.brokers.length) {
     throw new Error('Bad configuration. No kafka brokers found.')
   }
-  if (!environmentConfig.database.url) {
-    throw new Error('Bad configuration. No database url found.')
-  }
-
   const nvrType = environmentConfig.nvr.type
   const nvrConfig =
     nvrType && nvrType !== 'test' ? environmentConfig.nvr[nvrType] : undefined

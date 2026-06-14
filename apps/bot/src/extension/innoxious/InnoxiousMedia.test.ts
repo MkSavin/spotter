@@ -1,4 +1,4 @@
-import { test, expect, describe, beforeAll } from 'bun:test'
+import { beforeAll, describe, expect, test } from 'bun:test'
 import { InputFile } from 'grammy'
 import { InnoxiousMedia, InnoxiousMediaGroup } from './InnoxiousMedia'
 

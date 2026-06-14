@@ -1,6 +1,6 @@
-import { test, expect, describe, beforeAll } from 'bun:test'
-import { InnoxiousExecutor } from './InnoxiousExecutor'
+import { beforeAll, describe, expect, test } from 'bun:test'
 import { applicationLogger as logger } from '../../log'
+import { InnoxiousExecutor } from './InnoxiousExecutor'
 
 type Media = { naive: () => Promise<any>; accurate: () => Promise<any> }
 type MediaGroup = {

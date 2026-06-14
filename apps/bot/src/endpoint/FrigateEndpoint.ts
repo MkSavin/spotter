@@ -36,7 +36,7 @@ export class FrigateEndpoint extends NvrEndpoint {
     return this.settleUrl(frigateMedia[type], parameters)
   }
 
-  composeHeaders(): HeadersInit | undefined {
+  composeHeaders(): Bun.HeadersInit | undefined {
     return {
       Authorization: `Bearer ${this.generateFrigateJWT()}`,
     }

@@ -1,6 +1,7 @@
 import type { TransportContext } from '../../context'
+import { eventsRepo } from '../../db/repository'
+import type { EventMessage } from '../../db/schema'
 import { supplySubscribers } from '../helpers/supplySubscribers'
-import type { EventMessage } from '.prisma/client'
 
 export const actualizeSentMessages = async (
   id: string,
@@ -8,7 +9,7 @@ export const actualizeSentMessages = async (
   contents: string,
   context: TransportContext,
 ) => {
-  const { bot, prisma, logger } = context
+  const { bot, db, logger } = context
 
   const options = { parse_mode: 'HTML' as const }
 
@@ -28,15 +29,7 @@ export const actualizeSentMessages = async (
       .map((entry) => entry.data)
       .filter((entry): entry is EventMessage => Boolean(entry))
 
-    await prisma.event.update({
-      where: {
-        id,
-      },
-
-      data: {
-        messages: affected,
-      },
-    })
+    eventsRepo.setMessages(db, id, affected)
   } catch (error) {
     logger.error('Error when processing messages', error)
   }

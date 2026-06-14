@@ -1,4 +1,4 @@
-import type { SpotterEvent } from '@spotter/transport'
+import { type SpotterEvent, parseSpotterEvent } from '@spotter/transport'
 
 export const parseFrigateEvent = (contents: any): SpotterEvent => {
   const event = contents?.after
@@ -18,16 +18,18 @@ export const parseFrigateEvent = (contents: any): SpotterEvent => {
     throw new Error('Event has no position changes, skipping due to suspicion')
   }
 
-  return {
+  // Map Frigate's payload to the canonical contract and validate before it
+  // leaves the adapter — throws ZodError on type drift, caught by the controller.
+  return parseSpotterEvent({
     id: event.id,
     camera: event.camera,
     label: event.label,
     startTime: event.start_time,
-    endTime: event.end_time,
+    endTime: event.end_time ?? null,
     score: event.score,
-    stationary: event.stationary,
-    hasClip: event.has_clip,
-    hasSnapshot: event.has_snapshot,
+    stationary: !!event.stationary,
+    hasClip: !!event.has_clip,
+    hasSnapshot: !!event.has_snapshot,
     type,
-  }
+  })
 }

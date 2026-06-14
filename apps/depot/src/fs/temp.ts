@@ -26,7 +26,11 @@ export const temp = async (
 
   return {
     directory,
-    exists,
+    // Getter, so callers observe the live state after remove(); a plain value
+    // would be a snapshot frozen at construction time.
+    get exists() {
+      return exists
+    },
     remove: async (): Promise<void> => {
       if (!directory || !exists) {
         return

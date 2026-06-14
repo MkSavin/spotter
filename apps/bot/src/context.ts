@@ -2,25 +2,25 @@ import type { CommandsFlavor } from '@grammyjs/commands'
 import type { HydrateApiFlavor, HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
+import type { AbortSignal } from 'abort-controller'
 import type {
-  Bot,
-  SessionFlavor,
-  Context as GrammyContext,
   Api,
+  Bot,
+  Context as GrammyContext,
   RawApi,
+  SessionFlavor,
 } from 'grammy'
+import type { Message } from 'grammy/types'
+import type { Consumer, Producer } from 'kafkajs'
+import type { Stenograph } from 'stenograph'
+import type { Config } from './config'
+import type { BotDatabase } from './db/client'
+import type { NvrEndpoint } from './endpoint/NvrEndpoint'
 import type {
   InnoxiousMedia,
   InnoxiousMediaGroup,
 } from './extension/innoxious/InnoxiousMedia'
-import type { Consumer, Producer } from 'kafkajs'
-import type { Stenograph } from 'stenograph'
-import type { PrismaClient } from '../../../.prisma-generated'
-import type { Config } from './config'
-import type { NvrEndpoint } from './endpoint/NvrEndpoint'
 import type { Session } from './session'
-import type { AbortSignal } from 'abort-controller'
-import type { Message } from 'grammy/types'
 
 type Methods<R extends RawApi> = string & keyof R
 type Payload<M extends Methods<R>, R extends RawApi> = M extends unknown
@@ -42,7 +42,7 @@ export type CoreContext = {
 
   logger: Stenograph
 
-  prisma: PrismaClient
+  db: BotDatabase
   nvr: NvrEndpoint
   consumer: Consumer
   producer: Producer

@@ -6,29 +6,28 @@ import { run, sequentialize } from '@grammyjs/runner'
 import { kafkaLogging } from '@spotter/transport'
 import { Bot, session } from 'grammy'
 import { Kafka, Partitioners } from 'kafkajs'
-import { PrismaClient } from '../../../.prisma-generated'
 import information from '../../../package.json'
 import {
-  generalCommands,
   adminCommands,
   allCommands,
   anonymousCommands,
+  generalCommands,
   userCommands,
 } from './commands/commandList'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
+import { type BotDatabase, createDatabase } from './db/client'
+import { usersRepo } from './db/repository'
 import { constructEndpoint } from './endpoint/constructEndpoint'
+import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
-import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { logging } from './middlewares/bot/logging'
 import { switchCommandList } from './middlewares/bot/switchCommandList'
 import type { GlobalSession, UserSession } from './session'
 import { eventTransport } from './transport/eventTransport'
 
-const prisma = new PrismaClient({
-  log: ['info', 'warn', 'error'],
-})
+let db: BotDatabase | undefined
 
 const initialize = async (
   coreContext: CoreContext,
@@ -64,13 +63,7 @@ const initialize = async (
 
   bot.use(commands())
 
-  const listedUsers = await coreContext.prisma.user.findMany({
-    select: {
-      id: true,
-      chatId: true,
-      role: true,
-    },
-  })
+  const listedUsers = usersRepo.list(coreContext.db)
 
   bot.use(
     session({
@@ -124,6 +117,9 @@ const polling = async (): Promise<void> => {
 
   const config = await resolveConfig()
 
+  const database = createDatabase(config.database.path)
+  db = database
+
   const nvr = constructEndpoint(config.nvr.type, config)
 
   const kafka = new Kafka({
@@ -144,7 +140,7 @@ const polling = async (): Promise<void> => {
   const coreContext: CoreContext = {
     config,
     logger: applicationLogger,
-    prisma,
+    db: database,
     nvr,
     producer,
     consumer,
@@ -156,7 +152,7 @@ const polling = async (): Promise<void> => {
       applicationLogger.info(`Shutting down due to ${signal}...`)
       await coreContext.runner?.stop()
     }
-    await prisma.$disconnect()
+    database.$client.close()
     process.exit(1)
   }
 
@@ -189,8 +185,8 @@ const polling = async (): Promise<void> => {
   applicationLogger.debug('Bot is successfully connected to message transport!')
 }
 
-polling().catch(async (error) => {
+polling().catch((error) => {
   applicationLogger.error(error)
-  await prisma.$disconnect()
+  db?.$client.close()
   process.exit(1)
 })

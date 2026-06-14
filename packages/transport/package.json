@@ -8,6 +8,7 @@
   "author": "me@mksav.in",
   "license": "MIT",
   "dependencies": {
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "zod": "^4.4.3"
   }
 }

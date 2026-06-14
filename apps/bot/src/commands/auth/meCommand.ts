@@ -1,5 +1,6 @@
 import { Command } from '@grammyjs/commands'
 import type { BotContext } from '../../context'
+import { usersRepo } from '../../db/repository'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 
@@ -14,12 +15,11 @@ export const meCommand = new Command<BotContext>(
       return
     }
 
-    const user = await context.prisma.user.findUnique({
-      where: {
-        id: context.from.id.toString(),
-        chatId: context.chatId.toString(),
-      },
-    })
+    const user = usersRepo.find(
+      context.db,
+      context.from.id.toString(),
+      context.chatId.toString(),
+    )
 
     if (!user) {
       return

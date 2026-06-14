@@ -7,7 +7,6 @@
 /.docker
 /.turbo
 /.vite
-/.prisma-generated
 /*/**/.turbo
 /*/**/.vite
 
@@ -19,6 +18,9 @@
 # Databases
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+/apps/*/data
 
 # Environment
 .env

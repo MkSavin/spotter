@@ -31,7 +31,7 @@ export abstract class NvrEndpoint {
   composeHeaders(
     type: ResourceType,
     parameters: ResourceParams,
-  ): HeadersInit | undefined {
+  ): Bun.HeadersInit | undefined {
     return undefined
   }
 

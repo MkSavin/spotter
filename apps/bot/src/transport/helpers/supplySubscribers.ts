@@ -1,5 +1,6 @@
-import type { Chat, EventMessage } from '../../../../../.prisma-generated'
 import type { CoreContext } from '../../context'
+import { chatsRepo } from '../../db/repository'
+import type { Chat, EventMessage } from '../../db/schema'
 
 type Devoidify<Data> = Data extends void ? undefined : Data
 
@@ -88,13 +89,9 @@ export const supplySubscribers = async <
   context: CoreContext,
   supplyContext: SupplyContext<Create, Update, Remove>,
 ): Promise<SuppliedMessage<Devoidify<Create | Update | Remove>>[]> => {
-  const { prisma } = context
+  const { db } = context
 
-  const subscribedChats = await prisma.chat.findMany({
-    select: {
-      id: true,
-    },
-  })
+  const subscribedChats = chatsRepo.listIds(db)
 
   return supplySubscribedChats<Create, Update, Remove>(
     subscribedChats,

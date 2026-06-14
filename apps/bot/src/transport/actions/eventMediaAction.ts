@@ -1,9 +1,10 @@
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
 import type { TransportContext } from '../../context'
+import { eventsRepo } from '../../db/repository'
+import type { EventMessage } from '../../db/schema'
 import { InnoxiousMediaGroup } from '../../extension/innoxious/InnoxiousMedia'
 import { supplySubscribers } from '../helpers/supplySubscribers'
 import { renderEvent } from '../view/renderEvent'
-import type { EventMessage } from '.prisma/client'
 
 type EventMediaPayload = {
   eventId: string
@@ -14,14 +15,10 @@ export const eventMediaAction = async (
   payload: EventMediaPayload,
   context: TransportContext,
 ): Promise<void> => {
-  const { bot, logger, prisma } = context
+  const { bot, logger, db } = context
   const { eventId, media } = payload
 
-  const storedEvent = await prisma.event.findUnique({
-    where: {
-      id: eventId,
-    },
-  })
+  const storedEvent = eventsRepo.find(db, eventId)
 
   if (!storedEvent) {
     return

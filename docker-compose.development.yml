@@ -1,39 +1,4 @@
 services:
-  mongo:
-    build:
-      context: .deployment/mongo
-      args:
-        MONGO_VERSION: 6
-    environment:
-      MONGO_REPLICA_HOST: host.docker.internal
-      MONGO_REPLICA_PORT: 27017
-      # Use "mongo" instead of "mongosh" before v5.0
-      MONGO_COMMAND: 'mongosh'
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    ports:
-      - '27017:27017'
-    restart: unless-stopped
-    healthcheck:
-      # Use "mongo" instead of "mongosh" before v5.0
-      test: [ 'CMD', 'mongosh', 'admin', '--port', '27017', '--eval', "db.adminCommand('ping').ok" ]
-      interval: 5s
-      timeout: 2s
-      retries: 20
-
-  mongo-express:
-    image: mongo-express
-    restart: unless-stopped
-    ports:
-      - '8081:8081'
-    depends_on:
-      - mongo
-    environment:
-      #  ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      #  ME_CONFIG_MONGODB_ADMINPASSWORD: example
-      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
-      ME_CONFIG_BASICAUTH: false
-
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     restart: unless-stopped

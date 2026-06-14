@@ -1,5 +1,5 @@
 import type { ChatTypeContext, CommandContext, Middleware } from 'grammy'
-import type { Chat } from 'grammy/out/types'
+import type { Chat } from 'grammy/types'
 import type { BotContext as BaseContext } from '../context'
 
 export type CommandMiddleware<

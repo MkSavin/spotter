@@ -41,6 +41,12 @@ export const resolveNvrMedia = async (
     `Clip ${hasClip ? '' : 'NOT '}found. Snapshot ${hasSnapshot ? '' : 'NOT '}found`,
   )
 
+  // We only need existence (.ok) and the request's auth header here; the actual
+  // download happens in depot. Release the unconsumed response bodies so the
+  // underlying connections are not leaked. `.url` stays available afterwards.
+  void clipResponse?.body?.cancel().catch(() => undefined)
+  void snapshotResponse?.body?.cancel().catch(() => undefined)
+
   return {
     clip: clipResponse,
     snapshot: snapshotResponse,

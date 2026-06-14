@@ -1,6 +1,7 @@
 import { Command } from '@grammyjs/commands'
-import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
+import { chatsRepo, eventsRepo, usersRepo } from '../../db/repository'
+import { Role } from '../../db/schema'
 import { guard } from '../../middlewares/command/guard'
 import { sender } from '../../middlewares/command/sender'
 import { commandScopes } from '../commandScopes'
@@ -12,9 +13,9 @@ export const systemStatsCommand = new Command<BotContext>(
   guard(Role.ADMIN),
   sender('present'),
   async (context, next) => {
-    const eventCount = await context.prisma.event.count()
-    const chatCount = await context.prisma.chat.count()
-    const userCount = await context.prisma.user.count()
+    const eventCount = eventsRepo.count(context.db)
+    const chatCount = chatsRepo.count(context.db)
+    const userCount = usersRepo.count(context.db)
 
     await context.replyWithHTML(
       `📊 <b>Статистика базы данных</b>

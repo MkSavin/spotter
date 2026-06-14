@@ -21,11 +21,16 @@ export const dir = async (path: string): Promise<DirectoryController> => {
 
   return {
     directory: path,
-    exists,
+    // Getter, so callers observe the live state after remove(); a plain value
+    // would be a snapshot frozen at construction time.
+    get exists() {
+      return exists
+    },
     remove: async (): Promise<void> => {
       if (!exists) {
         return
       }
+
       try {
         await fs.rm(path, {
           recursive: true,
@@ -34,6 +39,7 @@ export const dir = async (path: string): Promise<DirectoryController> => {
       } catch (error) {
         logger.error(error)
       }
+
       exists = false
     },
   }

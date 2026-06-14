@@ -1,7 +1,7 @@
 import { Command } from '@grammyjs/commands'
 import jwt from 'jsonwebtoken'
-import { Role } from '../../../../../.prisma-generated'
 import type { BotContext } from '../../context'
+import { Role } from '../../db/schema'
 import { argument } from '../../middlewares/command/argument'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
@@ -30,7 +30,7 @@ export const userSignCommand = new Command<BotContext>(
     )
 
     logger.info(
-      `User @${context.from.username}#${context.from.id} created ${role} token "${publicToken}"`,
+      `User @${context.from.username}#${context.from.id} created a ${role} access token`,
     )
 
     await context.replyWithHTML(

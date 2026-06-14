@@ -19,20 +19,20 @@
   "author": "me@mksav.in",
   "license": "MIT",
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.9"
+    "@types/jsonwebtoken": "^9.0.9",
+    "drizzle-kit": "^0.31.10"
   },
   "dependencies": {
-    "@spotter/transport": "*",
-    "stenograph": "*",
     "@grammyjs/commands": "^1.0.5",
     "@grammyjs/hydrate": "^1.4.1",
     "@grammyjs/parse-mode": "^1.11.1",
     "@grammyjs/runner": "^2.0.3",
-    "@prisma/client": "^6.4.1",
-    "kafkajs": "^2.2.4",
+    "@spotter/transport": "*",
+    "commander": "^13.1.0",
+    "drizzle-orm": "^0.45.2",
     "grammy": "^1.35.0",
     "jsonwebtoken": "^9.0.2",
-    "commander": "^13.1.0",
-    "cassandra-driver": "^4.8.0"
+    "kafkajs": "^2.2.4",
+    "stenograph": "*"
   }
 }

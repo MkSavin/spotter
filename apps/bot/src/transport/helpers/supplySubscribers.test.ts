@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { Chat, EventMessage } from '../../../../../.prisma-generated'
+import type { Chat, EventMessage } from '../../db/schema'
 import { timeout } from '../../helpers/timeout'
 import { supplySubscribedChats } from './supplySubscribers'
 

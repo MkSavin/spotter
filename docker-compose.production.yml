@@ -7,13 +7,13 @@ services:
     volumes:
       - ./.env.bot:/app/.env
       - ./bot.config.ts:/app/config.ts
+      # Persist the SQLite database across container restarts.
+      - ./.docker/bot:/app/data
     networks:
       - kafka
-      - mongo
       - minio
     depends_on:
       - kafka
-      - mongo
       - minio
 
   spotter-depot-1:
@@ -170,49 +170,10 @@ services:
   #      timeout: 5s
   #      retries: 5
 
-  mongo:
-    build:
-      context: .deployment/mongo
-      args:
-        MONGO_VERSION: 6
-    restart: unless-stopped
-    environment:
-      MONGO_REPLICA_HOST: host.docker.internal
-      MONGO_REPLICA_PORT: 27017
-      # Use "mongo" instead of "mongosh" before v5.0
-      MONGO_COMMAND: 'mongosh'
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    ports:
-      - '27017:27017'
-    networks:
-      - mongo
-    healthcheck:
-      # Use "mongo" instead of "mongosh" before v5.0
-      test: [ 'CMD', 'mongosh', 'admin', '--port', '27017', '--eval', "db.adminCommand('ping').ok" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  mongo-express:
-    image: mongo-express
-    restart: unless-stopped
-    ports:
-      - '8081:8081'
-    networks:
-      - mongo
-    environment:
-      #  ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      #  ME_CONFIG_MONGODB_ADMINPASSWORD: example
-      ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/
-      ME_CONFIG_BASICAUTH: false
-
 networks:
   minio:
     driver: bridge
   kafka:
-    driver: bridge
-  mongo:
     driver: bridge
   mosquitto:
     external: true

@@ -15,13 +15,6 @@ COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
 RUN bun install
 
-FROM base AS schema
-
-COPY --from=install --parents **/node_modules ./
-COPY package.json .npmrc prisma/ ./
-
-RUN bunx prisma generate
-
 FROM base AS bundle
 
 COPY --from=install --parents **/node_modules ./
@@ -31,13 +24,13 @@ RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/cli.ts --outfile ${APP_RELA
 
 FROM base AS release
 
-# Copy binary tooling
-COPY --from=schema .prisma-generated ./.prisma-generated
-
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/dist/spotter ./
 
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/dist/index.js ./
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/package.json ./
+
+# Drizzle migrations are applied on startup; must sit at /app/drizzle (cwd-relative).
+COPY --from=bundle /app/${APP_RELATIVE_PATH}/drizzle ./drizzle
 
 USER bun
 EXPOSE 4000

@@ -19,7 +19,11 @@ type MediaHandler<Input extends MediaInput = MediaInput> =
       type: 'file' | 'local' | 'remote'
     }
 
-const localHostnames = /localhost|192\.168\.\d{1,3}\.\d{1,3}|127\.0\.0\.1/gi
+// Matches hostnames Telegram cannot reach (private / loopback). Anchored and
+// WITHOUT the `g` flag — `.test()` on a global regex is stateful (advances
+// lastIndex) and would alternate results across calls within a media group.
+const localHostnames =
+  /^(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})$/i
 
 const fetchUrl = async (url: string): Promise<InputFile> => {
   const response = await fetch(url, {

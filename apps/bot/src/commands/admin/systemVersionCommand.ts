@@ -1,8 +1,8 @@
 import { Command } from '@grammyjs/commands'
 import Bun from 'bun'
-import { Role } from '../../../../../.prisma-generated'
 import information from '../../../package.json'
 import type { BotContext } from '../../context'
+import { Role } from '../../db/schema'
 import { guard } from '../../middlewares/command/guard'
 import { commandScopes } from '../commandScopes'
 

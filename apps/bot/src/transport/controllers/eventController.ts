@@ -2,13 +2,13 @@ import {
   type KafkaMessageController,
   bufferToJson,
   intervalHeartbeat,
+  safeParseSpotterEvent,
 } from '@spotter/transport'
 import type { Message } from 'kafkajs'
 import type { TransportContext } from '../../context'
 import { actualizeEventAction } from '../actions/actualizeEventAction'
 import { eventCode } from '../helpers/eventCode'
 import { resolveNvrMedia } from '../helpers/resolveNvrMedia'
-import { parseSpotterEvent } from '../parsing/parseSpotterEvent'
 
 export const eventController: KafkaMessageController<TransportContext> = async (
   payload,
@@ -23,7 +23,7 @@ export const eventController: KafkaMessageController<TransportContext> = async (
     return
   }
 
-  const event = parseSpotterEvent(value)
+  const event = safeParseSpotterEvent(value)
 
   if (!event) {
     return
