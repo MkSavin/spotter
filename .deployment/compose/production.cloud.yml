@@ -1,0 +1,47 @@
+# Production — cloud node (stable, reachable address). Holds the main durable
+# Redis Streams buffer and the Telegram bot. An ingest node's forwarder
+# pushes/pulls here over a site-to-site VPN tunnel between the two nodes.
+#
+# Run from the repo root:
+#   docker compose --project-directory . -f .deployment/compose/production.cloud.yml up -d
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - spotter
+    # In a real deployment bind Redis to the private VPN interface only (e.g.
+    # '10.0.0.1:6379:6379'), never publicly — the ingest forwarder connects
+    # through the tunnel.
+    ports:
+      - '6379:6379'
+    # appendonly = the main durable buffer; survives bot restarts, XACK/DLQ model
+    # reclaims anything left pending.
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - ./.docker/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  spotter-bot:
+    image: ghcr.io/mksavin/spotter-bot:latest
+    container_name: spotter-bot
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./.env.bot:/app/.env
+      - ./bot.config.ts:/app/config.ts
+      # Persist the SQLite database across container restarts.
+      - ./.docker/bot:/app/data
+    depends_on:
+      - redis
+
+networks:
+  spotter:
+    driver: bridge

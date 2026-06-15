@@ -6,9 +6,10 @@
 ## TL;DR
 
 - **Рантайм — только Bun.** Никаких `npm`/`node`/`ts-node`. Запуск: `bun start`, тесты: `bun test`.
-- **Монорепо** Turborepo: 3 сервиса (`apps/*`) + 2 пакета (`packages/*`).
+- **Монорепо** Turborepo: 4 сервиса (`apps/*`) + 2 пакета (`packages/*`).
 - **Связь между сервисами — через Redis Streams** (и MQTT на входе). Прямых вызовов между сервисами нет.
 - **Стиль:** Biome — одинарные кавычки, без `;`, отступ 2 пробела. Запускай `bunx biome check --write` перед завершением.
+- **Open-source self-hosting:** проект рассчитан на развёртывание сторонними людьми у себя.
 
 ## Архитектура потока данных
 
@@ -16,15 +17,18 @@
 Frigate ──MQTT(frigate/events)──▶ sink ──Redis(spotter.event)──▶ bot ──▶ Telegram
                                                                   │ ▲
                                             spotter.*.requested   ▼ │  spotter.*.processed
-                                                                 depot ──▶ S3/MinIO
+                                                                 depot ──▶ S3
 ```
 
 1. Frigate шлёт MQTT-событие → **sink** парсит (`parseFrigateEvent`) → публикует в стрим `spotter.event`.
 2. **bot** слушает `spotter.event`, обновляет БД (SQLite), шлёт уведомление. На `end`-событиях запрашивает медиа.
 3. **depot** ловит `*.media_requested` / `*.frame_requested`, качает с NVR, обрабатывает, кладёт в S3, отвечает `*_processed`.
 4. **bot** ловит `*_processed` и отправляет медиа в Telegram-чат.
+5. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между
+   локальным и удалённым Redis (store-and-forward, `XACK`-после-успеха). Сам бизнес-логику не трогает.
 
-Стримы (= имена топиков) целиком — в [README.md](README.md#redis-streams).
+Стримы (= имена топиков) целиком — в [README.md](README.md#redis-streams). Деплой-профили
+(dev / single / ingest / cloud) — в [README.md](README.md#развёртывание-docker).
 
 ## Команды
 

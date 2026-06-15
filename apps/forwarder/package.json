@@ -1,0 +1,22 @@
+{
+  "name": "@spotter/forwarder",
+  "version": "1.0.0",
+  "description": "Bidirectional Redis Streams bridge between the home box and the VPS",
+  "main": "index.js",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "start:watch": "bun --watch src/index.ts",
+    "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "private": "true",
+  "sideEffects": "false",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "dependencies": {
+    "@spotter/transport": "*",
+    "stenograph": "*"
+  }
+}

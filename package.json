@@ -12,8 +12,10 @@
     "typecheck": "tsc --noEmit",
     "sign:token": "bun apps/bot/src/cli.ts sign",
     "publish": "bunx changeset tag",
-    "docker:dev": "ln -sf docker-compose.development.yml docker-compose.yml",
-    "docker:prod": "ln -sf docker-compose.production.yml docker-compose.yml"
+    "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d",
+    "docker:single": "docker compose --project-directory . -f .deployment/compose/production.single.yml up -d",
+    "docker:ingest": "docker compose --project-directory . -f .deployment/compose/production.ingest.yml up -d",
+    "docker:cloud": "docker compose --project-directory . -f .deployment/compose/production.cloud.yml up -d"
   },
   "private": "true",
   "keywords": [],

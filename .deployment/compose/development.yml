@@ -1,0 +1,40 @@
+# Development — single box. Infra only (one Redis + MQTT); the apps run on the
+# host via `turbo` (`bun run start`). No forwarder is needed with a single Redis.
+#
+# Run from the repo root so relative paths (./.docker, ./.deployment) resolve:
+#   docker compose --project-directory . -f .deployment/compose/development.yml up -d
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - spotter
+    ports:
+      - '6379:6379'
+    # appendonly keeps the streams durable across restarts (a crashed consumer's
+    # pending entries survive and get reclaimed by the reaper).
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - ./.docker/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    networks:
+      - spotter
+    ports:
+      - '1883:1883'
+      - '8883:8883'
+      - '9001:9001'
+    volumes:
+      - ./.deployment/mosquitto/config:/mosquitto/config
+      - ./.docker/mosquitto/data:/mosquitto/data
+
+networks:
+  spotter:
+    driver: bridge

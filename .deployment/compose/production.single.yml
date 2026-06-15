@@ -1,0 +1,85 @@
+# Production — single machine. The whole stack (Redis, MQTT, sink, depot, bot)
+# runs in containers on one host. No forwarder is needed: with a single Redis
+# there is no cross-node hop to bridge.
+#
+# This is the simplest production layout — pick it when one box can both ingest
+# from the NVR and reach Telegram. Split into ingest/cloud profiles only when the
+# uplink is unreliable or restricted (see production.ingest.yml / production.cloud.yml).
+#
+# Run from the repo root:
+#   docker compose --project-directory . -f .deployment/compose/production.single.yml up -d
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - spotter
+    # appendonly = durable Redis Streams: a crashed consumer's pending entries
+    # survive restarts and get reclaimed by the reaper (XACK/DLQ model).
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - ./.docker/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    networks:
+      - spotter
+    volumes:
+      - ./.deployment/mosquitto/config:/mosquitto/config
+      - ./.docker/mosquitto/data:/mosquitto/data
+
+  spotter-sink:
+    image: ghcr.io/mksavin/spotter-sink:latest
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+      SOURCE_TYPE: frigate
+      MQTT_BROKER: mqtt://mosquitto:1883
+    volumes:
+      - ./.env.sink:/app/.env
+    depends_on:
+      - redis
+      - mosquitto
+
+  spotter-depot:
+    image: ghcr.io/mksavin/spotter-depot:latest
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+      REDIS_CLIENT_ID: '@spotter/depot'
+    volumes:
+      - ./.env.depot:/app/.env
+    depends_on:
+      - redis
+    # To use an NVIDIA GPU for transcoding, add the `deploy.resources` /
+    # `devices` blocks from production.ingest.yml here.
+
+  spotter-bot:
+    image: ghcr.io/mksavin/spotter-bot:latest
+    container_name: spotter-bot
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./.env.bot:/app/.env
+      - ./bot.config.ts:/app/config.ts
+      # Persist the SQLite database across container restarts.
+      - ./.docker/bot:/app/data
+    depends_on:
+      - redis
+
+networks:
+  spotter:
+    driver: bridge

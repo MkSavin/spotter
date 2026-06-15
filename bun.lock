@@ -48,6 +48,14 @@
         "stenograph": "*",
       },
     },
+    "apps/forwarder": {
+      "name": "@spotter/forwarder",
+      "version": "1.0.0",
+      "dependencies": {
+        "@spotter/transport": "*",
+        "stenograph": "*",
+      },
+    },
     "apps/sink": {
       "name": "@spotter/sink",
       "version": "1.0.3",
@@ -260,6 +268,8 @@
     "@spotter/bot": ["@spotter/bot@workspace:apps/bot"],
 
     "@spotter/depot": ["@spotter/depot@workspace:apps/depot"],
+
+    "@spotter/forwarder": ["@spotter/forwarder@workspace:apps/forwarder"],
 
     "@spotter/sink": ["@spotter/sink@workspace:apps/sink"],
 
