@@ -4,8 +4,10 @@ import { env } from '../helpers/env'
 export type RedisConfig = {
   url: string
   group: string
-  // Consumer name within the group. Must be unique per running instance so two
-  // replicas (e.g. depot-1/depot-2) don't share a pending-entries list.
+  /**
+   * Consumer name within the group. Must be unique per running instance so two
+   * replicas (e.g. depot-1/depot-2) don't share a pending-entries list.
+   */
   consumer: string
   blockMs: number
   count: number
@@ -15,9 +17,11 @@ export type RedisConfig = {
   maxLen: number
 }
 
-// Reads the REDIS_* env block shared by all three services. `group` is the
-// consumer-group default (one per service); `clientId` seeds the per-instance
-// consumer name.
+/**
+ * Reads the REDIS_* env block shared by all three services. `group` is the
+ * consumer-group default (one per service); `clientId` seeds the per-instance
+ * consumer name.
+ */
 export const resolveRedisConfig = (defaults: {
   group: string
   clientId: string

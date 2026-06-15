@@ -11,8 +11,10 @@ const sources = {
 
 export type SourceCode = keyof typeof sources
 
-// Picks the ingestion adapter for the configured NVR. One sink instance runs
-// one source; deploy a sink per NVR. Unknown codes fall back to Frigate.
+/**
+ * Picks the ingestion adapter for the configured NVR. One sink instance runs
+ * one source; deploy a sink per NVR. Unknown codes fall back to Frigate.
+ */
 export const constructSource = (
   type: SourceCode,
   config: CoreConfig,

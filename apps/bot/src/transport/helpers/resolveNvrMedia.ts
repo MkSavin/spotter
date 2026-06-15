@@ -12,6 +12,12 @@ export type MediaTuple = {
   endpointAuthorization: string | undefined
 }
 
+/**
+ * Pre-flights an event's clip/snapshot against the NVR: fetches only the media
+ * the event advertises, reports which actually exist (`.ok`), and surfaces the
+ * request's Authorization header so depot can reuse it for the real download.
+ * Response bodies are released — only existence and the auth header are needed.
+ */
 export const resolveNvrMedia = async (
   event: SpotterEvent,
   context: CoreContext,

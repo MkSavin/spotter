@@ -7,10 +7,6 @@
 /apps/*/dist
 /packages/*/dist
 
-# Dependencies (installed fresh in the `install` stage; never ship host copies)
-node_modules
-**/node_modules
-
 # System-related
 /.DS_Store
 

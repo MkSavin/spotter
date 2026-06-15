@@ -68,12 +68,16 @@ export class Stenograph {
    * Create logger clone
    */
   clone(): Stenograph {
-    return new Stenograph({
+    const cloned = new Stenograph({
       path: this.pathParts,
       levels: this.levels,
       transport: this.transport,
       format: this.format,
     })
+    // Children must inherit the enabled state — otherwise disabling a root
+    // logger (e.g. during tests) leaves every `.sub()` child still logging.
+    cloned.enabled = this.enabled
+    return cloned
   }
 
   /**

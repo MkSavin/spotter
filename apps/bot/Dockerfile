@@ -19,8 +19,8 @@ FROM base AS bundle
 
 COPY --from=install --parents **/node_modules ./
 COPY . .
-RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable --minify
-RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/cli.ts --outfile ${APP_RELATIVE_PATH}/dist/spotter --target bun --env disable --minify
+RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable
+RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/cli.ts --outfile ${APP_RELATIVE_PATH}/dist/spotter --target bun --env disable
 
 FROM base AS release
 

@@ -27,8 +27,10 @@ export type RegulatorOptions = {
   count?: number
   reclaimMinIdleMs?: number
   reaperIntervalMs?: number
-  // After this many failed deliveries an entry is treated as poison: moved to
-  // `<stream>.dead` and acked instead of being retried forever.
+  /**
+   * After this many failed deliveries an entry is treated as poison: moved to
+   * `<stream>.dead` and acked instead of being retried forever.
+   */
   maxDeliveries?: number
 }
 
@@ -42,10 +44,12 @@ type BaseContext = {
   logger: Stenograph
 }
 
-// Thin wrapper over a Bun RedisClient used for non-blocking writes: XADD from
-// controllers plus admin commands (XGROUP/XACK/XAUTOCLAIM) from the regulator.
-// Kept separate from the subscriber connection so a blocking XREADGROUP never
-// stalls publishing.
+/**
+ * Thin wrapper over a Bun RedisClient used for non-blocking writes: XADD from
+ * controllers plus admin commands (XGROUP/XACK/XCLAIM) from the regulator. Kept
+ * separate from the subscriber connection so a blocking XREADGROUP never stalls
+ * publishing.
+ */
 export class StreamProducer {
   private connected = false
 
@@ -80,7 +84,7 @@ export class StreamProducer {
     ]) as Promise<string>
   }
 
-  // Low-level passthrough for the regulator's admin commands.
+  /** Low-level passthrough for the regulator's admin commands. */
   send(command: string, args: string[]): Promise<unknown> {
     return this.client.send(command, args)
   }
@@ -98,10 +102,14 @@ export class RedisRegulator<Context extends BaseContext> {
     return Object.keys(this.subscribers)
   }
 
-  // Starts consuming WITHOUT blocking the caller: groups are created, a startup
-  // reclaim runs once, a periodic reaper is scheduled, and the read loop is left
-  // running detached. Open connections keep the process alive. Returns a handle
-  // whose stop() halts the loop and reaper (connections are closed by the caller).
+  /**
+   * Starts consuming WITHOUT blocking the caller: groups are created, a startup
+   * reclaim runs once, a periodic reaper is scheduled, and the read loop is left
+   * running detached. Open connections keep the process alive.
+   *
+   * @returns a handle whose `stop()` halts the loop and reaper (connections are
+   * closed by the caller).
+   */
   async run(
     context: Context,
     options: RegulatorOptions,

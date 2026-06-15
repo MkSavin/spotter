@@ -4,10 +4,12 @@ import { parseFrigateEvent } from '../parsing/parseFrigateEvent'
 import { MqttRegulator } from '../regulators/MqttRegulator'
 import { type EventSink, Source, type SourceHandle } from './Source'
 
-// Ingests Frigate events over MQTT (`frigate/events`), normalizes them via
-// parseFrigateEvent (which validates against the SpotterEvent contract) and
-// emits. Owns its own MQTT connection so the rest of the sink stays transport-
-// agnostic.
+/**
+ * Ingests Frigate events over MQTT (`frigate/events`), normalizes them via
+ * parseFrigateEvent (which validates against the SpotterEvent contract) and
+ * emits. Owns its own MQTT connection so the rest of the sink stays
+ * transport-agnostic.
+ */
 export class FrigateSource extends Source {
   get code(): string {
     return 'frigate'

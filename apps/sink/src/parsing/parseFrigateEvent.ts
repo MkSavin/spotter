@@ -1,5 +1,10 @@
 import { type SpotterEvent, parseSpotterEvent } from '@spotter/transport'
 
+/**
+ * Maps a raw Frigate MQTT payload (`frigate/events`) to the canonical
+ * `SpotterEvent` contract, validating it before it leaves the adapter. Throws on
+ * unparsable or suspicious events so the controller can skip them.
+ */
 export const parseFrigateEvent = (contents: any): SpotterEvent => {
   const event = contents?.after
 
@@ -12,14 +17,12 @@ export const parseFrigateEvent = (contents: any): SpotterEvent => {
       ? 'start'
       : contents.type
 
-  // Possibly a buggy event
-  // Look: https://github.com/blakeblackshear/frigate/discussions/9974
+  // Frigate sometimes emits buggy zero-movement events — skip them.
+  // https://github.com/blakeblackshear/frigate/discussions/9974
   if (event.position_changes === 0) {
     throw new Error('Event has no position changes, skipping due to suspicion')
   }
 
-  // Map Frigate's payload to the canonical contract and validate before it
-  // leaves the adapter — throws ZodError on type drift, caught by the controller.
   return parseSpotterEvent({
     id: event.id,
     camera: event.camera,
