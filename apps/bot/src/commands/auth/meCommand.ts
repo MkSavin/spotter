@@ -1,16 +1,14 @@
-import { Command } from '@grammyjs/commands'
 import type { BotContext } from '../../context'
 import { usersRepo } from '../../db/repository'
-import { guard } from '../../middlewares/command/guard'
-import { sender } from '../../middlewares/command/sender'
+import { roleTitle } from '../../helpers/role'
+import { SpotterCommand } from '../framework/SpotterCommand'
 
-export const meCommand = new Command<BotContext>(
-  'me',
-  'Информация об авторизации',
-).addToScope({ type: 'all_private_chats' }, [
-  guard('authorized'),
-  sender('present'),
-  async (context, next) => {
+class MeCommand extends SpotterCommand {
+  readonly name = 'me'
+  readonly description = 'Информация об авторизации'
+  readonly access = 'authorized' as const
+
+  async handle(context: BotContext): Promise<void> {
     if (!context.chatId || !context.from) {
       return
     }
@@ -34,10 +32,10 @@ export const meCommand = new Command<BotContext>(
       `🤷 <b>Информация об авторизованном пользователе</b>
 
 🧑 @${context.from.username ?? 'никнейм не задан'} | #${context.from.id}
-💼 <b>${user.role === 'ADMIN' ? 'администратор' : 'пользователь'}</b>
+💼 <b>${roleTitle(user.role)}</b>
 📆 авторизация ${formattedDate}`,
     )
+  }
+}
 
-    return next()
-  },
-])
+export const meCommand = new MeCommand()

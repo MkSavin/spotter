@@ -1,82 +1,47 @@
-import { CommandGroup } from '@grammyjs/commands'
-import type { BotContext } from '../context'
+import { deploymentVersionCommand } from './admin/deploymentVersionCommand'
 import { eventClearCommand } from './admin/eventClearCommand'
-import { systemStatsCommand } from './admin/systemStatsCommand'
-import { systemVersionCommand } from './admin/systemVersionCommand'
+import { eventInfoCommand } from './admin/eventInfoCommand'
 import { loginCommand } from './auth/loginCommand'
 import { logoutCommand } from './auth/logoutCommand'
 import { meCommand } from './auth/meCommand'
+import type { SpotterCommand } from './framework/SpotterCommand'
 import { startCommand } from './general/startCommand'
 import { cameraListCommand } from './nvr/cameraListCommand'
 import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
 import { testPublishCommand } from './test/testPublishCommand'
+import { userDemoteCommand } from './user/userDemoteCommand'
+import { userPromoteCommand } from './user/userPromoteCommand'
+import { userRevokeCommand } from './user/userRevokeCommand'
 import { userSignCommand } from './user/userSignCommand'
 
-export const generalCommands = new CommandGroup<BotContext>().add([
+// Single source of truth: every command, ordered as it should appear in the
+// menu. Access (and thus visibility) lives on each command via its `access`
+// field — see commands/framework. Registration and the per-role menu are derived
+// from this list (registerCommands / syncCommandMenu), nothing is duplicated.
+export const commandRegistry: SpotterCommand[] = [
+  // Base
   startCommand,
-])
 
-export const anonymousCommands = new CommandGroup<BotContext>().add([
+  // Auth
   loginCommand,
-])
-
-export const userCommands = new CommandGroup<BotContext>().add([
-  logoutCommand,
-  meCommand,
-])
-
-export const adminCommands = new CommandGroup<BotContext>().add([
   logoutCommand,
   meCommand,
 
+  // Cameras (user+)
   cameraListCommand,
   cameraSnapshotCommand,
 
-  systemVersionCommand,
-  systemStatsCommand,
-
-  testPublishCommand,
-
+  // Users (admin)
   userSignCommand,
+  userRevokeCommand,
+  userPromoteCommand,
+  userDemoteCommand,
 
+  // Events (admin)
+  eventInfoCommand,
   eventClearCommand,
-])
 
-/*
-  Base:
-  /start
-
-  Auth:
-  [anonymous] /login
-  [authorized] /logout
-  [authorized] /me
-
-  Deployment:
-  /deployment_version
-
-  Testing:
-  /test_publish
-
-  Users:
-  /user_sign [user] - only for users role
-  /user_revoke [user]
-  /user_promote [user] [role]
-  /user_demote [user] - set role to viewer
-
-  Cameras:
-  /camera_list
-  /camera_snapshot [camera]
-
-  Events:
-  /event_clear
-  /event_info [event]
-* */
-
-export const allCommands = new CommandGroup<BotContext>().add(
-  [
-    ...generalCommands.commands,
-    ...anonymousCommands.commands,
-    ...userCommands.commands,
-    ...adminCommands.commands,
-  ].filter((value, index, array) => array.indexOf(value) === index),
-)
+  // Deployment / testing (admin)
+  deploymentVersionCommand,
+  testPublishCommand,
+]

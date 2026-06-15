@@ -7,16 +7,25 @@ import {
   text,
 } from 'drizzle-orm/sqlite-core'
 
-export const ROLES = ['USER', 'ADMIN'] as const
+// Ordered from least to most privileged: anonymous (no row) < VIEWER < USER < ADMIN.
+export const ROLES = ['VIEWER', 'USER', 'ADMIN'] as const
 
 export type Role = (typeof ROLES)[number]
 
 // Value object mirroring the old Prisma enum, so `Role.ADMIN` keeps working
 // alongside `Role` used as a type.
 export const Role = {
+  VIEWER: 'VIEWER',
   USER: 'USER',
   ADMIN: 'ADMIN',
 } as const satisfies Record<Role, Role>
+
+// Privilege rank used by the command access system (anonymous = 0).
+export const ROLE_RANK: Record<Role, number> = {
+  VIEWER: 1,
+  USER: 2,
+  ADMIN: 3,
+}
 
 const authorizedAt = integer('authorized_at', { mode: 'timestamp_ms' })
   .notNull()
@@ -33,13 +42,29 @@ export const users = sqliteTable(
   {
     id: text('id').notNull(),
     chatId: text('chat_id').notNull(),
-    role: text('role', { enum: ROLES }).notNull().default('USER'),
+    // Telegram @username (normalized, lowercase, no leading @). Nullable: not
+    // every Telegram account has one. Used to address users in admin commands.
+    username: text('username'),
+    role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
     token: text('token').notNull(),
     authorizedAt,
   },
   // Composite PK (id, chat_id): one user may be authorized in multiple chats.
   (table) => [primaryKey({ columns: [table.id, table.chatId] })],
 )
+
+// Single-use access tokens minted by /user_sign (or the CLI bootstrap). Redeemed
+// via /login or the /start deep-link, then deleted. The granted role is always
+// VIEWER from the bot; the CLI may mint higher roles to bootstrap the first admin.
+export const accessTokens = sqliteTable('access_tokens', {
+  id: text('id').primaryKey(),
+  role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
+  // Optional binding: only a user with this normalized @username may redeem it.
+  username: text('username'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+})
 
 export const events = sqliteTable('events', {
   id: text('id').primaryKey(),
@@ -73,6 +98,7 @@ export const eventMessages = sqliteTable(
 
 export type Chat = InferSelectModel<typeof chats>
 export type User = InferSelectModel<typeof users>
+export type AccessToken = InferSelectModel<typeof accessTokens>
 export type Event = InferSelectModel<typeof events>
 
 // In-memory shape used across the bot (Telegram message id + chat id). Maps to

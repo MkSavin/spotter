@@ -1,44 +1,68 @@
-import { Command } from '@grammyjs/commands'
-import jwt from 'jsonwebtoken'
+import { InputFile } from 'grammy'
+import { renderQr } from '../../auth/qr'
+import { deepLink, generateCode } from '../../auth/token'
 import type { BotContext } from '../../context'
+import { tokensRepo } from '../../db/repository'
 import { Role } from '../../db/schema'
+import { normalizeUsername } from '../../helpers/username'
 import { argument } from '../../middlewares/command/argument'
-import { guard } from '../../middlewares/command/guard'
-import { commandScopes } from '../commandScopes'
+import { SpotterCommand } from '../framework/SpotterCommand'
 
-export const userSignCommand = new Command<BotContext>(
-  'user_sign',
-  'Создать код доступа',
-).addToScope(commandScopes.private, [
-  guard(Role.ADMIN),
-  argument(argument.stringOptional, 'user_sign [роль]'),
-  async (context, next) => {
+class UserSignCommand extends SpotterCommand {
+  readonly name = 'user_sign'
+  readonly description = 'Создать код доступа и QR-код'
+  readonly access = 'ADMIN' as const
+
+  protected readonly matcher = argument.stringOptional
+  protected readonly signature = 'user_sign [@username?]'
+
+  async handle(context: BotContext): Promise<void> {
     const logger = context.logger.sub('auth')
 
-    const role =
-      typeof context.match === 'string' &&
-      context.match.toLowerCase() === 'admin'
-        ? 'admin'
-        : 'user'
+    const from = context.from
+    if (!from) {
+      return
+    }
 
-    const publicToken = jwt.sign(
-      {
-        role,
-      },
-      process.env.AUTH_SECRET || '',
-      { algorithm: 'HS256' },
-    )
+    const username =
+      typeof context.match === 'string' && context.match.trim()
+        ? normalizeUsername(context.match)
+        : null
+
+    const code = generateCode()
+
+    tokensRepo.create(context.db, {
+      id: code,
+      role: Role.VIEWER,
+      username,
+    })
+
+    const link = deepLink(context.me.username, code)
+    const qr = await renderQr(link)
 
     logger.info(
-      `User @${context.from.username}#${context.from.id} created a ${role} access token`,
+      `@${from.username}#${from.id} issued an access code${
+        username ? ` bound to @${username}` : ''
+      }`,
     )
 
-    await context.replyWithHTML(
-      `🔑 <b>Токен авторизации ${role === 'admin' ? 'администратора' : 'пользователя'} успешно создан!</b>
-      
-Используйте код с умом: <code>${publicToken}</code>`,
-    )
+    const binding = username
+      ? `🔒 Активировать сможет только <b>@${username}</b>`
+      : '🔓 Активировать сможет любой пользователь'
 
-    return next()
-  },
-])
+    await context.replyWithPhoto(new InputFile(qr, 'access-code.png'), {
+      parse_mode: 'HTML',
+      caption: `🔑 <b>Код доступа создан!</b>
+
+Роль: <b>наблюдатель</b>
+${binding}
+
+Отсканируйте QR-код или активируйте вручную:
+<code>/login ${code}</code>
+
+🔗 ${link}`,
+    })
+  }
+}
+
+export const userSignCommand = new UserSignCommand()

@@ -1,18 +1,13 @@
-import { Command } from '@grammyjs/commands'
 import type { BotContext } from '../../context'
 import { eventsRepo } from '../../db/repository'
-import { Role } from '../../db/schema'
-import { guard } from '../../middlewares/command/guard'
-import { sender } from '../../middlewares/command/sender'
-import { commandScopes } from '../commandScopes'
+import { SpotterCommand } from '../framework/SpotterCommand'
 
-export const eventClearCommand = new Command<BotContext>(
-  'event_clear',
-  'Очистить список событий',
-).addToScope(commandScopes.private, [
-  guard(Role.ADMIN),
-  sender('present'),
-  async (context, next) => {
+class EventClearCommand extends SpotterCommand {
+  readonly name = 'event_clear'
+  readonly description = 'Очистить список событий'
+  readonly access = 'ADMIN' as const
+
+  async handle(context: BotContext): Promise<void> {
     const affected = eventsRepo.clear(context.db)
 
     await context.replyWithHTML(
@@ -20,7 +15,7 @@ export const eventClearCommand = new Command<BotContext>(
 
 Затронуто событий: ${affected}`,
     )
+  }
+}
 
-    return next()
-  },
-])
+export const eventClearCommand = new EventClearCommand()

@@ -25,37 +25,54 @@ bun test
 
 ## Команды
 
-Структура `src/commands/<домен>/<name>Command.ts`, домены: `general`, `auth`, `nvr`,
-`admin`, `user`, `test`. Регистрация и группировка по ролям — в
-[src/commands/commandList.ts](src/commands/commandList.ts).
-
-Команда строится так:
+Своя система команд (не `@grammyjs/commands` — он удалён). Команда — это **класс**,
+наследник [SpotterCommand](src/commands/framework/SpotterCommand.ts). Структура файлов —
+`src/commands/<домен>/<name>Command.ts`, домены: `general`, `auth`, `nvr`, `admin`, `user`, `test`.
+Каркас — в [src/commands/framework/](src/commands/framework/).
 
 ```ts
-export const cameraListCommand = new Command<BotContext>('camera_list', 'Описание')
-  .addToScope(commandScopes.private, [
-    guard(Role.ADMIN),     // проверка роли из сессии
-    sender('present'),     // подготовка отправителя
-    async (context, next) => { /* ... */ ; return next() },
-  ])
+class CameraListCommand extends SpotterCommand {
+  readonly name = 'camera_list'
+  readonly description = 'Получить список камер'
+  readonly access = 'USER' as const            // 'all' | 'anonymous' | 'authorized' | Role
+  protected readonly matcher = argument.string // опц. валидация аргумента
+  protected readonly signature = 'camera_list [камера]'
+  async handle(context) { /* ... */ }
+}
+export const cameraListCommand = new CameraListCommand()
 ```
 
-Видимость команд переключается по роли пользователя через middleware
-[switchCommandList](src/middlewares/bot/switchCommandList.ts).
+`SpotterCommand.middlewares()` собирает цепочку `accessGuard(access) → argument? → sender? → handle`.
+
+**Реестр** ([commandList.ts](src/commands/commandList.ts)) — единый массив `commandRegistry`
+(порядок = порядок в меню). Из него [registry.ts](src/commands/framework/registry.ts):
+- `registerCommands(bot, registry)` — вешает хендлеры через `bot.chatType('private').command(...)`;
+- `syncCommandMenu(registry)` — на смене роли (`needUpdateCommands`) **пересоздаёт** меню на лету:
+  фильтрует реестр по `isVisible(access, role)` и зовёт `ctx.api.setMyCommands(list, { scope: chat })`.
+
+**Доступ** ([access.ts](src/commands/framework/access.ts)): `canAccess`/`isVisible` по рангам ролей
+(`ROLE_RANK`: VIEWER<USER<ADMIN; anonymous = нет роли). Прав на команду больше не навешивают вручную —
+всё из поля `access`. Ничего не дублируется: и регистрация, и меню берутся из одного реестра.
 
 ### Middleware команд (`src/middlewares/command/`)
-- `guard(role | 'authorized' | 'anonymous')` — отсекает по роли (`USER`/`ADMIN`), берёт роль из `context.session.user.authorizedRole`.
-- `sender(...)` — подготовка контекста отправки.
-- `argument(...)` — разбор аргументов команды.
+- `sender('present')` — требует наличие `ctx.from`.
+- `argument(matcher, signature)` — валидация аргумента, ответ-подсказка при ошибке.
 
 ## Авторизация и сессии
 
 [src/session.ts](src/session.ts): multi-session (`user` + `global`).
-- `user.authorizedRole` — роль, кешируется из таблицы `User` при первом сообщении (см. session-middleware в `index.ts`, список юзеров грузится один раз на старте).
+- `user.authorizedRole` — роль, кешируется из таблицы `users` при первом сообщении (см. session-middleware в `index.ts`, список юзеров грузится один раз на старте).
 - `global.events` — кеш активных событий по id.
 
-Токены — JWT, подписанные `AUTH_SECRET`. Выдать: `bun run sign:token <role>` (CLI в [src/cli.ts](src/cli.ts)).
-Оператор активирует токен командой `/login`.
+Роли: `anonymous → VIEWER → USER → ADMIN`; новый пользователь всегда `VIEWER` (только нотификации).
+Доступ — по одноразовым кодам в таблице `access_tokens` (не JWT). Логика — в [src/auth/](src/auth/):
+`token.ts` (`generateCode`, `redeemToken`, `deepLink`), `login.ts` (общий флоу `/login` и `/start`),
+`qr.ts` (PNG QR через `qrcode`). Первого админа создаёт CLI: `bun run sign:token admin`
+([src/cli.ts](src/cli.ts), пишет код в БД по `DATABASE_PATH`). Внутри бота `/user_sign [@username?]`
+выдаёт QR с deep-link `t.me/<bot>?start=<код>` (роль всегда `viewer`); роль меняют `/user_promote`/`/user_demote`.
+
+> ⚠️ Смена роли/`/user_revoke` затрагивает БД, но кеш `authorizedRole` в чужой сессии живёт до
+> её сброса — у затронутого пользователя изменения вступают в силу после переподключения сессии.
 
 ## Транспорт (Redis Streams)
 

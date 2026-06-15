@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { SpotterEvent } from '@spotter/transport'
 import { type BotDatabase, createDatabase } from './client'
-import { chatsRepo, eventsRepo, usersRepo } from './repository'
+import { chatsRepo, eventsRepo, tokensRepo, usersRepo } from './repository'
 
 const makeEvent = (overrides: Partial<SpotterEvent> = {}): SpotterEvent => ({
   id: 'cam-1700000000.123-abc',
@@ -69,6 +69,48 @@ describe('db repository', () => {
     expect(usersRepo.find(db, 'u1', 'c1')).toBeUndefined()
   })
 
+  test('users: findByRef by id and @username, setRoleById / removeById', () => {
+    usersRepo.upsert(db, {
+      id: '12345',
+      chatId: '12345',
+      username: 'alice',
+      role: 'VIEWER',
+      token: 't1',
+    })
+
+    // by numeric id
+    expect(usersRepo.findByRef(db, '12345')?.username).toBe('alice')
+    // by @username, case-insensitive, leading @ tolerated
+    expect(usersRepo.findByRef(db, '@Alice')?.id).toBe('12345')
+    expect(usersRepo.findByRef(db, 'nobody')).toBeUndefined()
+
+    const promoted = usersRepo.setRoleById(db, '12345', 'USER')
+    expect(promoted).toHaveLength(1)
+    expect(usersRepo.findByRef(db, '12345')?.role).toBe('USER')
+
+    const removed = usersRepo.removeById(db, '12345')
+    expect(removed).toHaveLength(1)
+    expect(usersRepo.count(db)).toBe(0)
+  })
+
+  test('tokens: create / find / single-use consume', () => {
+    const token = tokensRepo.create(db, {
+      id: 'code-1',
+      role: 'VIEWER',
+      username: 'bob',
+    })
+    expect(token.role).toBe('VIEWER')
+    expect(token.username).toBe('bob')
+
+    expect(tokensRepo.find(db, 'code-1')?.id).toBe('code-1')
+
+    const consumed = tokensRepo.consume(db, 'code-1')
+    expect(consumed?.id).toBe('code-1')
+    // consumed tokens are gone (single-use)
+    expect(tokensRepo.find(db, 'code-1')).toBeUndefined()
+    expect(tokensRepo.consume(db, 'code-1')).toBeUndefined()
+  })
+
   test('events: upsert returns messages, setMessages replaces them', () => {
     const created = eventsRepo.upsert(db, makeEvent())
     expect(created.messages).toEqual([])
@@ -93,6 +135,19 @@ describe('db repository', () => {
     expect(eventsRepo.find(db, created.id)?.messages).toEqual([
       { id: 30, chatId: 'c1' },
     ])
+  })
+
+  test('events: findByCode resolves via the supplied code resolver', () => {
+    const event = eventsRepo.upsert(db, makeEvent())
+    // Frigate-style resolver: code is the second dash-segment of the id.
+    const resolve = (id: string) => id.split('-').at(1) ?? id
+    // id 'cam-1700000000.123-abc' → code '1700000000.123'
+    expect(eventsRepo.findByCode(db, '1700000000.123', resolve)?.id).toBe(
+      event.id,
+    )
+    // 'abc' appears in the id but is not the resolved code → no match
+    expect(eventsRepo.findByCode(db, 'abc', resolve)).toBeUndefined()
+    expect(eventsRepo.findByCode(db, 'nope', resolve)).toBeUndefined()
   })
 
   test('events: clear returns affected count and cascades messages', () => {

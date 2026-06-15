@@ -1,27 +1,23 @@
-import { Command } from '@grammyjs/commands'
 import type { BotContext } from '../../context'
-import { Role } from '../../db/schema'
 import { ResourceType } from '../../endpoint/Resource'
 import { get } from '../../helpers/get'
 import { argument } from '../../middlewares/command/argument'
-import { guard } from '../../middlewares/command/guard'
-import { sender } from '../../middlewares/command/sender'
-import { commandScopes } from '../commandScopes'
+import { SpotterCommand } from '../framework/SpotterCommand'
 
-export const cameraSnapshotCommand = new Command<BotContext>(
-  'camera_snapshot',
-  'Получить последний кадр с камеры',
-).addToScope(commandScopes.private, [
-  guard(Role.ADMIN),
-  sender('present'),
-  argument(argument.string, 'camera_snapshot [камера]'),
-  async (context, next) => {
+class CameraSnapshotCommand extends SpotterCommand {
+  readonly name = 'camera_snapshot'
+  readonly description = 'Получить последний кадр с камеры'
+  readonly access = 'USER' as const
+
+  protected readonly matcher = argument.string
+  protected readonly signature = 'camera_snapshot [камера]'
+
+  async handle(context: BotContext): Promise<void> {
     if (typeof context.match !== 'string') {
-      return next()
+      return
     }
 
     const cameraName = context.match.trim().toLowerCase()
-
     const cameraLabel = get(context.config.cameraLabels, cameraName, cameraName)
 
     const message = await context.replyWithHTML(
@@ -33,9 +29,7 @@ export const cameraSnapshotCommand = new Command<BotContext>(
     try {
       const request = context.nvr.composeResourceRequest(
         ResourceType.latestFrame,
-        {
-          camera: cameraName,
-        },
+        { camera: cameraName },
       )
 
       const response = await context.nvr.fetchRequest(request)
@@ -45,12 +39,10 @@ export const cameraSnapshotCommand = new Command<BotContext>(
 
         await message.editText(
           '\u{26a0}\u{fe0f} <b>Ошибка при получении снимка...</b>',
-          {
-            parse_mode: 'HTML',
-          },
+          { parse_mode: 'HTML' },
         )
 
-        return next()
+        return
       }
 
       const { producer } = context
@@ -65,21 +57,17 @@ export const cameraSnapshotCommand = new Command<BotContext>(
 
       await message.editText(
         `🖼 <b>Обрабатываем снимок с камеры ${cameraLabel}...</b>`,
-        {
-          parse_mode: 'HTML',
-        },
+        { parse_mode: 'HTML' },
       )
     } catch (error) {
       await message.editText(
         '\u{26a0}\u{fe0f} <b>Ошибка при обработке снимка...</b>',
-        {
-          parse_mode: 'HTML',
-        },
+        { parse_mode: 'HTML' },
       )
 
       context.logger.error(error)
     }
+  }
+}
 
-    return next()
-  },
-])
+export const cameraSnapshotCommand = new CameraSnapshotCommand()

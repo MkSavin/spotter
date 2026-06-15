@@ -1,7 +1,7 @@
 import type { BotContext as BaseContext } from '../../context'
 import type { CommandMiddleware } from '../types'
 
-type ArgumentMatcher = <Context extends BaseContext>(
+export type ArgumentMatcher = <Context extends BaseContext>(
   match: string | RegExpMatchArray | undefined,
   context: Context,
 ) => boolean

@@ -1,5 +1,4 @@
 import process from 'node:process'
-import { commands } from '@grammyjs/commands'
 import { hydrateApi, hydrateContext } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
@@ -7,13 +6,11 @@ import { type RegulatorHandle, StreamProducer } from '@spotter/transport'
 import { RedisClient } from 'bun'
 import { Bot, session } from 'grammy'
 import information from '../../../package.json'
+import { commandRegistry } from './commands/commandList'
 import {
-  adminCommands,
-  allCommands,
-  anonymousCommands,
-  generalCommands,
-  userCommands,
-} from './commands/commandList'
+  registerCommands,
+  syncCommandMenu,
+} from './commands/framework/registry'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
 import { type BotDatabase, createDatabase } from './db/client'
@@ -23,7 +20,6 @@ import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
 import { logging } from './middlewares/bot/logging'
-import { switchCommandList } from './middlewares/bot/switchCommandList'
 import type { GlobalSession, UserSession } from './session'
 import { eventTransport } from './transport/eventTransport'
 
@@ -60,8 +56,6 @@ const initialize = async (
   bot.use(hydrateReply, hydrateContext())
 
   bot.api.config.use(hydrateApi())
-
-  bot.use(commands())
 
   const listedUsers = usersRepo.list(coreContext.db)
 
@@ -162,15 +156,10 @@ const polling = async (): Promise<void> => {
 
   const bot = await initialize(coreContext)
 
-  bot.use(
-    allCommands,
-    switchCommandList({
-      general: generalCommands,
-      anonymous: anonymousCommands,
-      user: userCommands,
-      admin: adminCommands,
-    }),
-  )
+  // Rebuild the per-chat menu on role changes, then register all command handlers
+  // (both derived from the single command registry — no hardcoded role packs).
+  bot.use(syncCommandMenu(commandRegistry))
+  registerCommands(bot, commandRegistry)
 
   applicationLogger.debug('Starting up...')
 

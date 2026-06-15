@@ -1,4 +1,3 @@
-import type { CommandsFlavor } from '@grammyjs/commands'
 import type { HydrateApiFlavor, HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
@@ -52,9 +51,7 @@ export type CoreContext = {
 }
 
 export type BotContext = ParseModeFlavor<
-  HydrateFlavor<
-    CommandsFlavor<GrammyContext> & SessionFlavor<Session> & CoreContext
-  >
+  HydrateFlavor<GrammyContext & SessionFlavor<Session> & CoreContext>
 >
 
 type ChatId = number | string

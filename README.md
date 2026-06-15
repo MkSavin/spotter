@@ -53,7 +53,7 @@ Spotter подхватывает событие, отправляет уведо
 - **Транспорт:** Redis Streams (встроенный `Bun.RedisClient`, consumer groups) + MQTT (Mosquitto)
 - **БД:** SQLite (`bun:sqlite`) + Drizzle ORM (схема в [apps/bot/src/db/schema.ts](apps/bot/src/db/schema.ts))
 - **Хранилище:** любое S3-совместимое (внешний провайдер или self-hosted MinIO/Garage)
-- **Telegram:** grammY (+ `@grammyjs/commands`, `hydrate`, `parse-mode`, `runner`)
+- **Telegram:** grammY (+ `hydrate`, `parse-mode`, `runner`); своя система команд (классы + роли)
 - **Качество:** Biome (линт + формат), Changesets (версии), commitlint
 
 ## Быстрый старт
@@ -112,7 +112,7 @@ cd apps/bot && bun start
 | `bun test:coverage`         | Тесты с покрытием                                      |
 | `bun run build`             | Сборка всех сервисов (`bun build`)                     |
 | `bun run typecheck`         | Проверка типов (`tsc --noEmit`)                        |
-| `bun run sign:token`        | Подписать JWT-токен авторизации (см. ниже)             |
+| `bun run sign:token`        | Создать код доступа (см. ниже)                         |
 | `bunx biome check --write`  | Линт + автоформат                                      |
 | `bun run docker:dev`        | Поднять dev-инфру (redis + mosquitto)                  |
 | `bun run docker:single`     | Поднять весь прод-стек на одной машине (redis, mosquitto, sink, depot, bot) |
@@ -121,15 +121,22 @@ cd apps/bot && bun start
 
 ## Авторизация
 
-Доступ к боту — по JWT-токену, подписанному секретом `AUTH_SECRET`. Выдать токен роли:
+Роли: `anonymous → viewer → user → admin`. Новый пользователь всегда получает роль
+`viewer` (только нотификации); роль повышает админ командами `/user_promote` / `/user_demote`.
+
+Доступ — по одноразовым кодам, хранящимся в БД (таблица `access_tokens`). Первого админа
+создаёт CLI (БД задаётся `DATABASE_PATH`):
 
 ```bash
-bun run sign:token admin          # роль admin
-# или напрямую с явным секретом:
-bun apps/bot/src/cli.ts sign admin -t <AUTH_SECRET>
+bun run sign:token admin                       # код доступа для роли admin
+# опции: -u <username> (привязка к @username), -b <bot> (добавить deep-link), -r (только код)
+bun apps/bot/src/cli.ts sign admin -b <bot_username>
 ```
 
-Полученный токен оператор отправляет боту командой `/login <token>`.
+Активация: оператор отправляет боту `/login <код>` либо открывает deep-link из QR-кода
+(`https://t.me/<bot>?start=<код>` → автологин через `/start`). Код одноразовый.
+Внутри бота админ выдаёт коды (роли `viewer`) командой `/user_sign [@username?]` —
+бот присылает QR-код с deep-link.
 
 ## Redis Streams
 
@@ -190,7 +197,60 @@ apps/bot/drizzle/     Сгенерированные миграции Drizzle
 .deployment/compose/  Compose-профили: development, production.single, production.ingest, production.cloud
 .deployment/          Конфиги инфраструктуры (mosquitto, …)
 .env.*.example        Шаблоны окружения по сервисам
+.github/workflows/    CI: lint.yml (ветки) + release.yml (master)
+.integration/         zx-скрипты релиза: conventional.mjs, imperative.mjs
+.changeset/           Changesets: конфиг + pending-changeset'ы
 ```
+
+## CI/CD и релизы
+
+Два GitHub Actions workflow:
+
+| Workflow | Триггер | Что делает |
+| --- | --- | --- |
+| [lint.yml](.github/workflows/lint.yml) | push в любую ветку **кроме** `master` | Biome (`biome ci`), commitlint (Conventional Commits), `bun run test` |
+| [release.yml](.github/workflows/release.yml) | push в `master` | версионирование (changesets) → git-теги + GitHub Releases → сборка/пуш Docker-образов |
+
+### Как работает релиз
+
+Версионирование — через [changesets](https://github.com/changesets/changesets).
+Релиз идёт в **два прохода** по `master`:
+
+1. **Накопление.** В `master` лежат **changeset-файлы** (`.changeset/*.md`) — каждый
+   описывает, какие пакеты и как бампнуть (`patch`/`minor`/`major`).
+   `changesets/action` видит их и **открывает PR** «chore(ci): Update packages
+   versions»: внутри PR выполняется `changeset version` — поднимаются версии в
+   `package.json`, пишутся `CHANGELOG.md`, использованные changeset'ы удаляются.
+2. **Публикация.** Когда этот PR смержен, на следующем прогоне `release.yml`
+   pending-changeset'ов больше нет → запускается `publish` (`bun run publish` =
+   `bunx changeset tag`): создаются **git-теги** и **GitHub Releases**
+   (`createGithubReleases: true`). В npm пакеты **не** публикуются (они приватные,
+   `access: restricted`) — распространение идёт Docker-образами.
+3. **Образы.** Если что-то зарелизено (`published == true`),
+   [imperative.mjs](.integration/imperative.mjs) собирает Docker-образ для каждого
+   зарелизенного **приложения** (`apps/*`; у `packages/*` нет `Dockerfile`) и пушит
+   в `ghcr.io/<owner>/<app>:latest` и `:<version>-alpine`. При бампе общего пакета
+   (`transport`/`stenograph`) зависящие приложения получают `patch`-бамп
+   (`updateInternalDependencies: patch`) и пересобираются автоматически.
+
+Секреты: `GH_BYPASS_TOKEN` (PAT — пуш version-PR и тегов в обход branch protection),
+`GITHUB_TOKEN` (логин в ghcr.io + создание Releases).
+
+### Как выпустить новую версию
+
+1. Веди работу в ветке, коммить по **Conventional Commits** (`fix:` → patch,
+   `feat:` → minor, `feat!:` / `BREAKING CHANGE` → major). Иначе упадёт commitlint.
+2. Добавь changeset, описывающий релиз:
+   ```bash
+   bunx changeset            # выбрать затронутые пакеты и тип бампа
+   ```
+   > Опционально changeset'ы можно сгенерировать из conventional-коммитов локально:
+   > `bunx zx .integration/conventional.mjs` (в CI этот скрипт **не** запускается).
+3. Закоммить `.changeset/*.md`, открой PR, проведи через `lint.yml`, смержи в `master`.
+4. CI откроет PR «**Update packages versions**» — проверь бампы версий и `CHANGELOG`,
+   смержи его.
+5. На мерж этого PR `release.yml` проставит теги, создаст GitHub Releases и
+   соберёт/запушит Docker-образы.
 
 ## Дорожная карта
 

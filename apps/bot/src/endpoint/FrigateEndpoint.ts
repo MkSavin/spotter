@@ -1,5 +1,5 @@
-import jwt from 'jsonwebtoken'
 import type { Config, FrigateConfig } from '../config'
+import jwt from '../helpers/jwt'
 import { NvrEndpoint } from './NvrEndpoint'
 import { type ResourceParams, ResourceType } from './Resource'
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import jwt from 'jsonwebtoken'
 import type { Config } from '../config'
+import jwt, { type JwtPayload } from '../helpers/jwt'
 import { FrigateEndpoint } from './FrigateEndpoint'
 import { NvrEndpoint } from './NvrEndpoint'
 import { ResourceType } from './Resource'
@@ -83,7 +83,7 @@ describe('FrigateEndpoint', () => {
     const headers = endpoint.composeHeaders() as Record<string, string>
 
     const token = headers.Authorization.replace('Bearer ', '')
-    const payload = jwt.verify(token, 'topsecret') as jwt.JwtPayload
+    const payload = jwt.verify(token, 'topsecret') as JwtPayload
 
     expect(payload.sub).toBe('spotter')
     expect(payload.exp).toBeGreaterThan(Date.now() / 1000)

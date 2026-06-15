@@ -1,13 +1,16 @@
 import type { SpotterEvent } from '@spotter/transport'
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, like } from 'drizzle-orm'
+import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { BotDatabase } from './client'
 import {
   events,
+  type AccessToken,
   type Chat,
   type Event,
   type EventMessage,
   type Role,
   type User,
+  accessTokens,
   chats,
   eventMessages,
   users,
@@ -21,9 +24,16 @@ const total = (
 ): number => db.select({ value: count() }).from(table).get()?.value ?? 0
 
 export const usersRepo = {
-  list: (db: BotDatabase): Pick<User, 'id' | 'chatId' | 'role'>[] =>
+  list: (
+    db: BotDatabase,
+  ): Pick<User, 'id' | 'chatId' | 'username' | 'role'>[] =>
     db
-      .select({ id: users.id, chatId: users.chatId, role: users.role })
+      .select({
+        id: users.id,
+        chatId: users.chatId,
+        username: users.username,
+        role: users.role,
+      })
       .from(users)
       .all(),
 
@@ -34,19 +44,46 @@ export const usersRepo = {
       .where(and(eq(users.id, id), eq(users.chatId, chatId)))
       .get(),
 
+  // Resolves a user by an admin-supplied reference: numeric Telegram id or
+  // @username. Returns the first matching row (in private chats a user has one).
+  findByRef: (db: BotDatabase, ref: string): User | undefined =>
+    db
+      .select()
+      .from(users)
+      .where(
+        isNumericId(ref)
+          ? eq(users.id, ref.trim())
+          : eq(users.username, normalizeUsername(ref)),
+      )
+      .get(),
+
   upsert: (
     db: BotDatabase,
-    input: { id: string; chatId: string; role: Role; token: string },
+    input: {
+      id: string
+      chatId: string
+      username?: string | null
+      role: Role
+      token: string
+    },
   ): User =>
     db
       .insert(users)
       .values(input)
       .onConflictDoUpdate({
         target: [users.id, users.chatId],
-        set: { role: input.role, token: input.token },
+        set: {
+          username: input.username,
+          role: input.role,
+          token: input.token,
+        },
       })
       .returning()
       .get(),
+
+  // Changes a user's role across every chat they belong to.
+  setRoleById: (db: BotDatabase, id: string, role: Role): User[] =>
+    db.update(users).set({ role }).where(eq(users.id, id)).returning().all(),
 
   remove: (db: BotDatabase, id: string, chatId: string): User | undefined =>
     db
@@ -55,7 +92,25 @@ export const usersRepo = {
       .returning()
       .get(),
 
+  // Removes a user from every chat (used by /user_revoke).
+  removeById: (db: BotDatabase, id: string): User[] =>
+    db.delete(users).where(eq(users.id, id)).returning().all(),
+
   count: (db: BotDatabase): number => total(db, users),
+}
+
+export const tokensRepo = {
+  create: (
+    db: BotDatabase,
+    input: { id: string; role: Role; username?: string | null },
+  ): AccessToken => db.insert(accessTokens).values(input).returning().get(),
+
+  find: (db: BotDatabase, id: string): AccessToken | undefined =>
+    db.select().from(accessTokens).where(eq(accessTokens.id, id)).get(),
+
+  // Single-use: deletes the token and returns it if it existed.
+  consume: (db: BotDatabase, id: string): AccessToken | undefined =>
+    db.delete(accessTokens).where(eq(accessTokens.id, id)).returning().get(),
 }
 
 export const chatsRepo = {
@@ -88,6 +143,26 @@ const withMessages = (db: BotDatabase, event: Event): EventWithMessages => ({
 export const eventsRepo = {
   find: (db: BotDatabase, id: string): EventWithMessages | undefined => {
     const event = db.select().from(events).where(eq(events.id, id)).get()
+    return event ? withMessages(db, event) : undefined
+  },
+
+  // Looks up an event by the short code shown to users. How a code maps to an id
+  // is endpoint-specific (`nvr.resolveEventCode`), so we narrow candidates with a
+  // LIKE and disambiguate with the supplied resolver — keeping this repo
+  // NVR-agnostic.
+  findByCode: (
+    db: BotDatabase,
+    code: string,
+    resolveCode: (id: string) => string,
+  ): EventWithMessages | undefined => {
+    const candidates = db
+      .select()
+      .from(events)
+      .where(like(events.id, `%${code}%`))
+      .all()
+    const event = candidates.find(
+      (candidate) => resolveCode(candidate.id) === code,
+    )
     return event ? withMessages(db, event) : undefined
   },
 
