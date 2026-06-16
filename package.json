@@ -15,6 +15,7 @@
     "typecheck:full": "tsc --noEmit",
     "green": "turbo run typecheck test --affected && biome check",
     "sign:token": "bun apps/server/src/cli.ts sign",
+    "changeset:conventional": "bunx zx .integration/conventional.mjs",
     "publish": "bunx changeset tag",
     "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d",
     "docker:single": "docker compose --project-directory . -f .deployment/compose/production.single.yml up -d",

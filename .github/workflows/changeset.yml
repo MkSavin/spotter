@@ -1,0 +1,42 @@
+name: 'Changeset'
+
+on:
+  workflow_dispatch:
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  conventional:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+        token: ${{ secrets.GH_BYPASS_TOKEN }}
+
+    - name: 'Install bun'
+      uses: oven-sh/setup-bun@v2
+
+    - name: 'Install dependencies'
+      run: bun install
+
+    - name: 'Generate conventional changesets'
+      run: bun run changeset:conventional
+
+    - name: 'Commit and push changesets'
+      run: |
+        if [ -z "$(git status --porcelain .changeset)" ]; then
+          echo 'No new changesets generated; nothing to commit.'
+          exit 0
+        fi
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git add .changeset
+        git commit -m 'ci: Generate conventional changesets'
+        git push origin HEAD:${{ github.ref_name }}

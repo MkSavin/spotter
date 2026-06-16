@@ -68,7 +68,7 @@ await Promise.all(
     const tagArgs = tags.map((tag) => `-t "${tag}"`).join(' ')
 
     const buildCommand =
-      `docker build . ${buildArgs} -f "${entry.path}/Dockerfile" ${tagArgs}`.replaceAll(
+      `docker build -f "${entry.path}/Dockerfile" "${entry.path}" ${buildArgs} ${tagArgs}`.replaceAll(
         /&&;/g,
         '',
       )
