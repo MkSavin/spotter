@@ -1,6 +1,6 @@
 {
   "name": "@spotter/test",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Test NVR adapter — a REPL-driven source with local fixtures for offline pipeline development",
   "main": "index.js",
   "scripts": {
