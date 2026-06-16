@@ -31,14 +31,14 @@ describe('forward', () => {
 
     await handler(
       {
-        topic: 'spotter.event.media_requested',
+        topic: 'spotter.media.request.frigate',
         message: { id: '6-0', value: raw },
       },
       {},
     )
 
     const [, args] = send.mock.calls[0] as [string, string[]]
-    expect(args[0]).toBe('spotter.event.media_requested')
+    expect(args[0]).toBe('spotter.media.request.frigate')
     expect(args.at(-1)).toBe(raw)
   })
 })

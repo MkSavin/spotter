@@ -11,8 +11,9 @@ bun start            # или bun start:watch
 bun test
 ```
 Нужен `.env.bot` в корне (см. `.env.bot.example`): `TELEGRAM_TOKEN`, `REDIS_URL`,
-`FRIGATE_REMOTE_URL`, `MEDIA_STRATEGY`. БД — SQLite-файл `DATABASE_PATH` (по умолчанию
-`./data/bot.sqlite`), миграции применяются автоматически при старте.
+`S3_*` (для пресайна обработанного медиа), `SOURCE_ID` (дефолтный источник для команд
+камер и рендера лейблов). Бот **не** держит креды NVR. БД — SQLite-файл `DATABASE_PATH`
+(по умолчанию `./data/bot.sqlite`), миграции применяются автоматически при старте.
 
 ## Точка входа
 
@@ -79,25 +80,31 @@ export const cameraListCommand = new CameraListCommand()
 [src/transport/eventTransport.ts](src/transport/eventTransport.ts) через `RedisRegulator`
 (группа `spotter-bot`) подписывается на:
 - `spotter.event` → `eventController` — создаёт/обновляет событие, шлёт/актуализирует уведомление,
-  на `end` публикует `spotter.event.media_requested` через `producer.publish`.
-- `spotter.event.media_processed` → `eventMediaController` — досылает медиа к уведомлению.
-- `spotter.camera.frame_processed` → `cameraFrameController` — отдаёт кадр по запросу `/camera_snapshot`.
+  на `end` публикует `spotter.media.request.<source>` (`{eventId, source, want}`) — **без** обращения к NVR.
+- `spotter.event.media_processed` → `eventMediaController` — пресайнит S3-ключи (`clipKey`/`snapshotKey`) и досылает медиа.
+- `spotter.camera.frame_processed` → `cameraFrameController` — пресайнит `frameKey` и отдаёт кадр по запросу `/camera_snapshot`.
+- `spotter.catalog.updated` → `catalogController` — обновляет кэш каталога (`CatalogCache`).
 
 `run()` возвращает `{ stop() }` (хранится в `index.ts` для graceful shutdown). Ack — после
 успешной обработки; долгая работа безопасна (см. модель доставки в корневом AGENTS.md).
 Контроллеры → `actions/` (бизнес-логика), `view/` (рендер сообщений), `parsing/`, `helpers/`, `mixins/`.
 
-## NVR-эндпоинты
+## Каталог и медиа (абстракция NVR)
 
-`src/endpoint/`: абстракция `NvrEndpoint`, реализации `FrigateEndpoint` и `TestEndpoint`,
-выбор через `constructEndpoint(config.nvr.type, ...)`. `NVR_TYPE=test` отключает реальные запросы.
+Бот не знает ни одного NVR. Лейблы камер/объектов берутся из [CatalogCache](src/catalog/CatalogCache.ts):
+бутстрап из ключа `spotter.catalog.<source>` на старте + обновления из стрима `spotter.catalog.updated`.
+Команды `/camera_list`/`/camera_snapshot` и `renderEvent` читают каталог из кэша.
+
+Медиа возвращается из depot как **S3-ключи**; `eventMediaController`/`cameraFrameController`
+пресайнят их (`context.s3.presign(key, { expiresIn: config.presignExpiry })`) в короткоживущие
+URL для Telegram. Креды NVR в боте отсутствуют (нет `frigate`/`jwt`/`clipUrl`/`cameraLabels`).
 
 ## Innoxious — надёжная отправка медиа
 
-`src/extension/innoxious/`. Telegram не достучится до локальных IP NVR, поэтому отправка медиа
+`src/extension/innoxious/`. Telegram не всегда дотягивается до источника медиа, поэтому отправка
 идёт с retry и фолбэком стратегий ([InnoxiousExecutor](src/extension/innoxious/InnoxiousExecutor.ts)):
 
-1. **naive** (2 попытки) — отдаём URL/путь напрямую (минимум трафика).
+1. **naive** (2 попытки) — отдаём URL (пресайн-ссылку S3) напрямую (минимум трафика).
 2. **accurate** (фолбэк) — скачиваем в `Buffer`, шлём как файл (гарантия доставки).
 
 API подключается к боту через `attachInnoxious(bot.api)` и доступен как:
@@ -107,8 +114,6 @@ const media = new InnoxiousMediaGroup([{ type: 'photo', media: url }])
 await bot.api.innoxious.sendMediaGroup(chatId, media)
 // также: sendPhoto / sendDocument / sendVideo
 ```
-
-`MEDIA_STRATEGY` (env) задаёт дефолтную стратегию формирования источника медиа.
 
 ## Особенности
 

@@ -7,9 +7,10 @@ import {
   StreamProducer,
   connectRedis,
 } from '@spotter/transport'
-import { RedisClient } from 'bun'
+import { RedisClient, S3Client } from 'bun'
 import { Bot, session } from 'grammy'
 import information from '../../../package.json'
+import { CatalogCache } from './catalog/CatalogCache'
 import { commandRegistry } from './commands/commandList'
 import {
   registerCommands,
@@ -19,7 +20,6 @@ import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
 import { type BotDatabase, createDatabase } from './db/client'
 import { usersRepo } from './db/repository'
-import { constructEndpoint } from './endpoint/constructEndpoint'
 import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
@@ -113,12 +113,20 @@ const polling = async (): Promise<void> => {
     `Initializing ${information.name} v${information.version}...`,
   )
 
-  const config = await resolveConfig()
+  const config = resolveConfig()
 
   const database = createDatabase(config.database.path)
   db = database
 
-  const nvr = constructEndpoint(config.nvr.type, config)
+  // S3 is read-only here: the bot presigns processed media keys for Telegram.
+  const s3 = new S3Client({
+    endpoint: config.s3.host,
+    accessKeyId: config.s3.accessKey,
+    secretAccessKey: config.s3.secretKey,
+    bucket: config.s3.bucket,
+  })
+
+  const catalog = new CatalogCache(applicationLogger.sub('catalog'))
 
   // Dedicated blocking connection for XREADGROUP; the producer connection stays
   // free for XADD and the regulator's acks/reclaims.
@@ -131,13 +139,18 @@ const polling = async (): Promise<void> => {
   await producer.connect()
   await connectRedis(subscriber, { url: config.redis.url })
 
+  // Bootstrap labels from the stored snapshot; the catalog.updated stream keeps
+  // it fresh afterwards.
+  await catalog.bootstrap(config.source, producer)
+
   let transport: RegulatorHandle | null = null
 
   const coreContext: CoreContext = {
     config,
     logger: applicationLogger,
     db: database,
-    nvr,
+    catalog,
+    s3,
     producer,
     subscriber,
     runner: undefined,

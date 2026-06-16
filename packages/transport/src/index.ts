@@ -8,3 +8,5 @@ export * from './helpers/env'
 export * from './config/redis'
 
 export * from './schema/spotterEvent'
+export * from './schema/mediaPipeline'
+export * from './schema/catalog'

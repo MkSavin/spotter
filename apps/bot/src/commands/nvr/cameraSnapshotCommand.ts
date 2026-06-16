@@ -1,6 +1,5 @@
+import { type CameraRequest, mediaStreams } from '@spotter/transport'
 import type { BotContext } from '../../context'
-import { ResourceType } from '../../endpoint/Resource'
-import { get } from '../../helpers/get'
 import { argument } from '../../middlewares/command/argument'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
@@ -18,7 +17,23 @@ class CameraSnapshotCommand extends SpotterCommand {
     }
 
     const cameraName = context.match.trim().toLowerCase()
-    const cameraLabel = get(context.config.cameraLabels, cameraName, cameraName)
+    const source = context.config.source
+
+    const cameras = context.catalog.cameras(source)
+
+    // If the catalog is loaded, reject unknown cameras early; if it is not
+    // available yet, optimistically forward the request to the adapter.
+    if (
+      cameras.length > 0 &&
+      !cameras.some((entry) => entry.code === cameraName)
+    ) {
+      await context.replyWithHTML(
+        `\u{26a0}\u{fe0f} <b>Камера <code>${cameraName}</code> не найдена</b>`,
+      )
+      return
+    }
+
+    const cameraLabel = context.catalog.cameraLabel(source, cameraName)
 
     const message = await context.replyWithHTML(
       `🖼 <b>Получаем снимок с камеры ${cameraLabel}...</b>`,
@@ -27,37 +42,16 @@ class CameraSnapshotCommand extends SpotterCommand {
     await context.replyWithChatAction('upload_photo')
 
     try {
-      const request = context.nvr.composeResourceRequest(
-        ResourceType.latestFrame,
-        { camera: cameraName },
-      )
-
-      const response = await context.nvr.fetchRequest(request)
-
-      if (!response.ok) {
-        context.logger.warn('Snapshot response is not ok, skipping...')
-
-        await message.editText(
-          '\u{26a0}\u{fe0f} <b>Ошибка при получении снимка...</b>',
-          { parse_mode: 'HTML' },
-        )
-
-        return
-      }
-
-      const { producer } = context
-
-      await producer.publish('spotter.camera.frame_requested', {
-        cameraCode: cameraName,
+      const request: CameraRequest = {
+        source,
+        camera: cameraName,
         chatId: context.chatId,
         messageId: message?.message_id,
-        frameUrl: response.url,
-        endpointAuthorization: request.headers.get('Authorization'),
-      })
+      }
 
-      await message.editText(
-        `🖼 <b>Обрабатываем снимок с камеры ${cameraLabel}...</b>`,
-        { parse_mode: 'HTML' },
+      await context.producer.publish(
+        mediaStreams.cameraRequest(source),
+        request,
       )
     } catch (error) {
       await message.editText(

@@ -15,24 +15,34 @@ Spotter подхватывает событие, отправляет уведо
 ## Архитектура
 
 ```
- Frigate NVR ──MQTT──▶  sink  ──Redis──▶  bot  ──▶ Telegram
-                                  │  ▲
-                                  ▼  │
-                                 depot ──▶ S3
+ Frigate ─MQTT─▶  frigate  ─Redis Streams─▶  bot  ─▶ Telegram
+   (NVR)         (адаптер)        ▲           │
+                    │             └─ request ─┘
+                    │ stage raw                ▲
+                    ▼                          │ presign processed
+                   S3  ◀── transcode by key ── depot
 ```
+
+Вся специфика NVR изолирована в адаптере (`apps/frigate`): только он знает URL-схемы
+и держит креды Frigate. Адаптер стейджит сырое медиа в S3 — по сети ходят **ключи
+S3, не байты и не токены**. `bot`/`depot` работают через абстрактные контракты
+(`spotter.media.request.<source>` → `*.staged` → `*_processed`); каталог камер/объектов
+адаптер публикует в `spotter.catalog.<source>`, бот его кэширует.
 
 | Сервис             | Назначение                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
-| **`apps/sink`**    | Мост NVR → Redis Streams. Подключаемый `Source` (Frigate/MQTT) ингестит события, нормализует в `SpotterEvent`, публикует в `spotter.event`. |
-| **`apps/bot`**     | Telegram-бот (grammY). Реагирует на события, шлёт уведомления, обрабатывает команды операторов.   |
-| **`apps/depot`**   | Медиа-процессор. Скачивает клипы/снимки с NVR, обрабатывает (ffmpeg/sharp), кладёт в S3.          |
+| **`apps/frigate`** | NVR-адаптер. `Source` (Frigate/MQTT) ингестит события в `spotter.event`; `MediaProvider` стейджит клип/снимок/кадр в S3 по запросу; `Catalog` публикует таксономию. Единственный держатель кредов Frigate. |
+| **`apps/test`**    | Синтетический адаптер для офлайн-разработки: REPL эмитит события, медиа берётся из локальных фикстур. NVR/MQTT не нужны. |
+| **`apps/bot`**     | Telegram-бот (grammY). Реагирует на события, шлёт уведомления, обрабатывает команды операторов; пресайнит обработанные S3-ключи для Telegram. |
+| **`apps/depot`**   | Медиа-процессор. Берёт сырое медиа из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат обратно в S3. NVR не знает. |
 | **`apps/forwarder`** | Двунаправленный мост Redis Streams local↔remote (store-and-forward). Нужен только в распределённом деплое — см. [Развёртывание](#развёртывание-docker). |
-| **`packages/transport`** | Общие абстракции транспорта: `RedisRegulator`, `StreamProducer`, `env`, `resolveRedisConfig`, `bufferToJson`, контракт `SpotterEvent`. |
+| **`packages/sink`** | Фреймворк адаптера: порты `Source`/`MediaProvider`/`Catalog`, рантайм `runSink` (стейджинг в S3, публикация событий/каталога). |
+| **`packages/transport`** | Общие абстракции транспорта: `RedisRegulator`, `StreamProducer`, `env`, `resolveRedisConfig`, `bufferToJson`, контракты `SpotterEvent` / медиа-пайплайна / каталога. |
 | **`packages/stenograph`** | Структурированный логгер с контекстными саб-логгерами.                                     |
 
 **Топология деплоя.** Архитектура рассчитана на два сценария. Простой — **всё на
 одной машине** с единым Redis (dev, небольшие инсталляции). Надёжный —
-**распределённый**: сервисы разносятся на два узла, **ingest** (`sink`/`depot` +
+**распределённый**: сервисы разносятся на два узла, **ingest** (`frigate`/`depot` +
 локальный durable-Redis + `forwarder`) и **облачный** (главный Redis + `bot`),
 связанные VPN-туннелем. `forwarder` — единственный компонент, держащий хрупкий
 межсайтовый канал, и буферизует события при обрывах (`XACK`-после-успеха).
@@ -70,12 +80,15 @@ bun install
 
 ```bash
 cp .env.bot.example      .env.bot
-cp .env.sink.example     .env.sink
+cp .env.frigate.example  .env.frigate
 cp .env.depot-1.example  .env.depot-1
 ```
 
-Минимум для бота: `TELEGRAM_TOKEN`, `REDIS_URL`, `FRIGATE_REMOTE_URL` (БД — локальный
-SQLite-файл по пути `DATABASE_PATH`, по умолчанию `./data/bot.sqlite`).
+Минимум для бота: `TELEGRAM_TOKEN`, `REDIS_URL`, `S3_*` (для пресайна обработанного
+медиа; бот **не** держит креды NVR). БД — локальный SQLite-файл по пути
+`DATABASE_PATH` (по умолчанию `./data/bot.sqlite`). Креды Frigate и S3-стейджинг —
+в `.env.frigate`. Для офлайн-разработки без Frigate: `cp .env.test.example .env.test`
+и адаптер `apps/test`.
 
 ### 3. Инфраструктура (Docker)
 
@@ -115,8 +128,8 @@ cd apps/bot && bun start
 | `bun run sign:token`        | Создать код доступа (см. ниже)                         |
 | `bunx biome check --write`  | Линт + автоформат                                      |
 | `bun run docker:dev`        | Поднять dev-инфру (redis + mosquitto)                  |
-| `bun run docker:single`     | Поднять весь прод-стек на одной машине (redis, mosquitto, sink, depot, bot) |
-| `bun run docker:ingest`     | Поднять прод-узел ingest (local-redis, mosquitto, sink, depot×N, forwarder) |
+| `bun run docker:single`     | Поднять весь прод-стек на одной машине (redis, mosquitto, frigate, depot, bot) |
+| `bun run docker:ingest`     | Поднять прод-узел ingest (local-redis, mosquitto, frigate, depot×N, forwarder) |
 | `bun run docker:cloud`      | Поднять прод-узел cloud (redis + bot)                  |
 
 ## Авторизация
@@ -140,19 +153,25 @@ bun apps/bot/src/cli.ts sign admin -b <bot_username>
 
 ## Redis Streams
 
-Каждый стрим читается своей consumer-группой (`spotter-bot` / `spotter-depot` / `spotter-sink`).
+Каждый стрим читается своей consumer-группой (`spotter-bot` / `spotter-depot` / `spotter-frigate`).
 Доставка — at-least-once: `XACK` после успешной обработки, зависшие записи перезабираются
 `XAUTOCLAIM` (reaper). Группы создаются с позиции `$` — на рестарте старое не пересылается.
 
-| Стрим                            | Кто пишет | Кто читает | Назначение                          |
-| -------------------------------- | --------- | ---------- | ----------------------------------- |
-| `spotter.event`                  | sink      | bot        | Событие камеры (start/update/end)   |
-| `spotter.event.test_seed`        | bot       | sink       | Посев тестовых событий (`/test_publish`) |
-| `spotter.event.media_requested`  | bot       | depot      | Запрос на обработку клипа/снимка     |
-| `spotter.event.media_processed`  | depot     | bot        | URL обработанного медиа              |
-| `spotter.camera.frame_requested` | bot       | depot      | Запрос актуального кадра камеры       |
-| `spotter.camera.frame_processed` | depot     | bot        | URL обработанного кадра               |
-| `frigate/events` *(MQTT)*        | Frigate   | sink       | Сырые события Frigate                 |
+Медиа-пайплайн абстрактен: бот шлёт запрос в per-source стрим, адаптер стейджит
+сырьё в S3, depot транскодит по ключу. По сети ходят только S3-ключи.
+
+| Стрим                              | Кто пишет | Кто читает | Назначение                          |
+| ---------------------------------- | --------- | ---------- | ----------------------------------- |
+| `spotter.event`                    | frigate   | bot        | Событие камеры (start/update/end)   |
+| `spotter.event.test_seed`          | bot       | frigate    | Посев тестовых событий (`/test_publish`) |
+| `spotter.catalog.updated`          | frigate   | bot        | Снимок каталога камер/объектов       |
+| `spotter.media.request.<source>`   | bot       | frigate    | Запрос на стейджинг клипа/снимка события |
+| `spotter.media.staged`             | frigate   | depot      | Сырьё события застейджено в S3 (ключи) |
+| `spotter.event.media_processed`    | depot     | bot        | Ключи обработанного медиа в S3       |
+| `spotter.camera.request.<source>`  | bot       | frigate    | Запрос на стейджинг кадра камеры      |
+| `spotter.camera.staged`            | frigate   | depot      | Кадр застейджен в S3 (ключ)          |
+| `spotter.camera.frame_processed`   | depot     | bot        | Ключ обработанного кадра в S3         |
+| `frigate/events` *(MQTT)*          | Frigate   | frigate    | Сырые события Frigate                 |
 
 В распределённом деплое эти стримы зеркалируются между локальным и удалённым Redis
 сервисом `forwarder` — направление см. в [apps/forwarder/src/streams.ts](apps/forwarder/src/streams.ts).
@@ -165,8 +184,8 @@ Compose-файлы лежат в [.deployment/compose/](.deployment/compose/) и
 | Профиль | Команда | Что поднимает | Узлы |
 | --- | --- | --- | --- |
 | **development** | `bun run docker:dev` | `redis` + `mosquitto` (инфра; приложения — на хосте через `bun start`) | одна машина |
-| **production · single** | `bun run docker:single` | весь стек в контейнерах: `redis`, `mosquitto`, `sink`, `depot`, `bot` (без `forwarder`) | одна машина |
-| **production · ingest** | `bun run docker:ingest` | `local-redis` (durable), `mosquitto`, `sink`, `depot×N` (опц. GPU), `forwarder` | ingest-узел |
+| **production · single** | `bun run docker:single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `bot` (без `forwarder`) | одна машина |
+| **production · ingest** | `bun run docker:ingest` | `local-redis` (durable), `mosquitto`, `frigate`, `depot×N` (опц. GPU), `forwarder` | ingest-узел |
 | **production · cloud** | `bun run docker:cloud` | `redis` (главный durable-буфер) + `bot` | облачный узел |
 
 **Один узел (`single`)** — простейший прод: одна машина и ингестит с NVR, и ходит
@@ -185,12 +204,14 @@ S3 задаётся через `.env` (любой S3-совместимый бэ
 
 ```
 apps/
+  frigate/    NVR-адаптер: Frigate Source + MediaProvider + Catalog (на @spotter/sink)
+  test/       Синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка)
   bot/        Telegram-бот (grammY)
-  depot/      Медиа-процессор (ffmpeg/sharp → S3)
-  sink/       MQTT → Redis Streams мост
+  depot/      Медиа-процессор (ffmpeg/sharp; S3 по ключу)
   forwarder/  Двунаправленный мост Redis Streams local↔remote (распределённый деплой)
 packages/
-  transport/   Абстракции транспорта (RedisRegulator) + контракт SpotterEvent + helpers
+  sink/        Фреймворк адаптера: Source/MediaProvider/Catalog + runSink (стейджинг в S3)
+  transport/   Абстракции транспорта (RedisRegulator) + контракты (event/медиа/каталог) + helpers
   stenograph/  Логгер
 apps/bot/src/db/      SQLite-схема и репозиторий (Drizzle): chats, users, events
 apps/bot/drizzle/     Сгенерированные миграции Drizzle

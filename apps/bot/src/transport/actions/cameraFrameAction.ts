@@ -1,6 +1,5 @@
 import type { TransportContext } from '../../context'
 import { InnoxiousMediaGroup } from '../../extension/innoxious/InnoxiousMedia'
-import { get } from '../../helpers/get'
 
 export type CameraFramePayload = {
   cameraCode: string
@@ -18,7 +17,7 @@ export const cameraFrameAction = async (
 
   logger.debug('Received camera frame')
 
-  const cameraLabel = get(config.cameraLabels, cameraCode, cameraCode)
+  const cameraLabel = context.catalog.cameraLabel(config.source, cameraCode)
 
   const formattedDate = new Intl.DateTimeFormat('ru-RU', {
     dateStyle: 'short',

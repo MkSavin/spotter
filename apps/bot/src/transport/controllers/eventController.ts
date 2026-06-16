@@ -1,12 +1,15 @@
 import {
+  type MediaRequest,
+  type MediaWant,
   type StreamMessageController,
   bufferToJson,
+  mediaStreams,
+  resolveSource,
   safeParseSpotterEvent,
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { actualizeEventAction } from '../actions/actualizeEventAction'
 import { eventCode } from '../helpers/eventCode'
-import { resolveNvrMedia } from '../helpers/resolveNvrMedia'
 
 export const eventController: StreamMessageController<
   TransportContext
@@ -38,28 +41,38 @@ export const eventController: StreamMessageController<
 
   const nextContext = { ...context, logger }
 
+  await actualizeEventAction(event, nextContext)
+
   if (event.type !== 'end') {
-    await actualizeEventAction(event, nextContext)
     return
   }
 
-  const mediaTuple = await resolveNvrMedia(event, context)
+  // Lazy staging: ask the owning source's adapter to stage whatever media the
+  // event advertises. No NVR pre-flight, no URLs — the adapter resolves and
+  // stages, depot transcodes, and media_processed comes back with S3 keys.
+  const want: MediaWant[] = []
 
-  await actualizeEventAction(event, nextContext, mediaTuple)
+  if (event.hasClip) {
+    want.push('clip')
+  }
+  if (event.hasSnapshot) {
+    want.push('snapshot')
+  }
 
-  if (!mediaTuple.hasClip && !mediaTuple.hasSnapshot) {
-    logger.debug(
-      'Media is not available for event. Skipping media request step...',
-    )
+  if (want.length === 0) {
+    logger.debug('Event advertises no media. Skipping media request step...')
     return
   }
+
+  const source = resolveSource(event)
 
   logger.debug('Requesting media for an event...')
 
-  await producer.publish('spotter.event.media_requested', {
+  const request: MediaRequest = {
     eventId: event.id,
-    clipUrl: mediaTuple.clip?.url,
-    snapshotUrl: mediaTuple.snapshot?.url,
-    endpointAuthorization: mediaTuple.endpointAuthorization,
-  })
+    source,
+    want,
+  }
+
+  await producer.publish(mediaStreams.mediaRequest(source), request)
 }

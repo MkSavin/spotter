@@ -3,7 +3,7 @@ import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
 import type { StreamProducer } from '@spotter/transport'
 import type { AbortSignal } from 'abort-controller'
-import type { RedisClient } from 'bun'
+import type { RedisClient, S3Client } from 'bun'
 import type {
   Api,
   Bot,
@@ -13,9 +13,9 @@ import type {
 } from 'grammy'
 import type { Message } from 'grammy/types'
 import type { Stenograph } from 'stenograph'
+import type { CatalogCache } from './catalog/CatalogCache'
 import type { Config } from './config'
 import type { BotDatabase } from './db/client'
-import type { NvrEndpoint } from './endpoint/NvrEndpoint'
 import type {
   InnoxiousMedia,
   InnoxiousMediaGroup,
@@ -43,7 +43,8 @@ export type CoreContext = {
   logger: Stenograph
 
   db: BotDatabase
-  nvr: NvrEndpoint
+  catalog: CatalogCache
+  s3: S3Client
   subscriber: RedisClient
   producer: StreamProducer
 

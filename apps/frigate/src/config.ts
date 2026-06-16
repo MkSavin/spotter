@@ -1,0 +1,105 @@
+import type { SinkConfig } from '@spotter/sink'
+import { type CatalogEntry, env, resolveRedisConfig } from '@spotter/transport'
+import information from '../package.json'
+import { applicationLogger } from './log'
+import type { SourceCode } from './source/constructSource'
+
+/** Frigate media-access credentials — live only in this adapter. */
+export type FrigateMediaConfig = {
+  remoteUrl: string
+  authSecret: string
+  authUser: string
+}
+
+/** Display labels for the catalog, keyed by Frigate code. */
+export type FrigateLabels = {
+  cameras: Record<string, string>
+  objects: Record<string, string>
+}
+
+export type CoreConfig = SinkConfig & {
+  /** Routing id of this instance — the `<source>` in stream/key names. */
+  sourceId: string
+
+  source: {
+    type: SourceCode
+    frigate: {
+      broker: string
+    }
+  }
+
+  /** Frigate REST/media credentials (clip/snapshot/frame + catalog). */
+  frigate: FrigateMediaConfig
+
+  labels: FrigateLabels
+}
+
+const defaultLabels: FrigateLabels = {
+  objects: {
+    person: '🧍 человек',
+    car: '🚗 машина',
+    dog: '🐶 собака',
+    cat: '😺 кот',
+    horse: '🐎 лошадь',
+    bear: '🐻 медведь',
+  },
+  cameras: {
+    front: '🎥 передняя',
+    side: '🎥 боковая',
+  },
+}
+
+export const toCatalogEntries = (
+  codes: string[],
+  labels: Record<string, string>,
+): CatalogEntry[] =>
+  codes.map((code) => ({ code, label: labels[code] ?? code }))
+
+export const resolveConfig = (): CoreConfig => {
+  const result: CoreConfig = {
+    sourceId: env.string('SOURCE_ID', 'frigate'),
+    redis: resolveRedisConfig({
+      group: 'spotter-frigate',
+      clientId: information.name,
+    }),
+    s3: {
+      host: env.string('S3_HOST', ''),
+      accessKey: env.string('S3_ACCESS', ''),
+      secretKey: env.string('S3_SECRET', ''),
+      bucket: env.string('S3_BUCKET', 'spotter'),
+      stagingPrefix: env.string('S3_STAGING_PREFIX', 'staging'),
+    },
+    source: {
+      type: env.string('SOURCE_TYPE', 'frigate') as SourceCode,
+      frigate: {
+        broker: env.string('MQTT_BROKER', ''),
+      },
+    },
+    frigate: {
+      remoteUrl: env.string('FRIGATE_REMOTE_URL', ''),
+      authSecret: env.string('FRIGATE_AUTH_SECRET', ''),
+      authUser: env.string('FRIGATE_AUTH_USER', ''),
+    },
+    labels: defaultLabels,
+  }
+
+  if (!result.redis.url) {
+    throw new Error('No redis url found.')
+  }
+
+  if (result.source.type === 'frigate' && !result.source.frigate.broker) {
+    throw new Error('No mqtt broker found for the frigate source.')
+  }
+
+  if (!result.s3?.host) {
+    throw new Error('No s3 host found for media staging.')
+  }
+
+  if (!result.frigate.remoteUrl) {
+    throw new Error('No frigate remote url found for media access.')
+  }
+
+  applicationLogger.verbose('Using core configuration:', result)
+
+  return result
+}

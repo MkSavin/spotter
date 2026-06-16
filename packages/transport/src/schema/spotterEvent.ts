@@ -10,6 +10,7 @@ import { z } from 'zod'
  */
 export const spotterEventSchema = z.object({
   id: z.string().min(1),
+  source: z.string().min(1).optional(),
   camera: z.string().min(1),
   label: z.string().nullable(),
   startTime: z.number(),
@@ -22,6 +23,16 @@ export const spotterEventSchema = z.object({
 })
 
 export type SpotterEvent = z.infer<typeof spotterEventSchema>
+
+/**
+ * Fallback `source` for events produced before adapters stamp it. Used by
+ * consumers to route media/camera requests during the migration window.
+ */
+export const DEFAULT_SOURCE = 'frigate'
+
+/** Resolve an event's routing source, applying the migration default. */
+export const resolveSource = (event: Pick<SpotterEvent, 'source'>): string =>
+  event.source ?? DEFAULT_SOURCE
 
 /** Throws `ZodError` on invalid input. Use when producing the contract (sink). */
 export const parseSpotterEvent = (value: unknown): SpotterEvent =>

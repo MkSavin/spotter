@@ -8,6 +8,9 @@ export type ForwarderConfig = {
   /** Remote-side Redis, reached over the fragile WAN hop (inside a VPN tunnel). */
   remoteUrl: string
 
+  /** Source ids whose per-source request streams are mirrored remote → local. */
+  sources: string[]
+
   /** Consumer-group names, one per mirroring direction. */
   group: { up: string; down: string }
   /** Consumer name, unique per running instance. */
@@ -32,9 +35,16 @@ export const resolveConfig = (): ForwarderConfig => {
     clientId: information.name,
   })
 
+  const sources = env
+    .string('FORWARDER_SOURCES', 'frigate')
+    .split(',')
+    .map((source) => source.trim())
+    .filter(Boolean)
+
   const result: ForwarderConfig = {
     localUrl: env.string('REDIS_LOCAL_URL', base.url),
     remoteUrl: env.string('REDIS_REMOTE_URL', ''),
+    sources,
     group: { up: 'spotter-forwarder-up', down: 'spotter-forwarder-down' },
     consumer: base.consumer,
     blockMs: base.blockMs,

@@ -22,6 +22,9 @@
 *.db-shm
 /apps/*/data
 /apps/*/.data
+# Committed test fixtures served by the @spotter/test source for offline dev.
+!/apps/test/data
+!/apps/test/data/**
 
 # Environment
 .env
@@ -31,6 +34,9 @@
 # Production-based configuration
 /config.ts
 bot.config.ts
+
+# Planning artifacts
+/.agents/plans
 
 # Environment compose
 docker-compose.yml

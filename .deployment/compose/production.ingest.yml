@@ -34,8 +34,8 @@ services:
       - ./.deployment/mosquitto/config:/mosquitto/config
       - ./.docker/mosquitto/data:/mosquitto/data
 
-  spotter-sink:
-    image: ghcr.io/mksavin/spotter-sink:latest
+  spotter-frigate:
+    image: ghcr.io/mksavin/spotter-frigate:latest
     restart: unless-stopped
     networks:
       - spotter
@@ -43,8 +43,10 @@ services:
       REDIS_URL: redis://local-redis:6379
       SOURCE_TYPE: frigate
       MQTT_BROKER: mqtt://mosquitto:1883
+    # .env.frigate carries the Frigate credentials (held ONLY here) and the S3
+    # staging target — raw media is staged to S3, only keys travel downstream.
     volumes:
-      - ./.env.sink:/app/.env
+      - ./.env.frigate:/app/.env
     depends_on:
       - local-redis
       - mosquitto

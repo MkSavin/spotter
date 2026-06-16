@@ -6,7 +6,7 @@
 ## TL;DR
 
 - **Рантайм — только Bun.** Никаких `npm`/`node`/`ts-node`. Запуск: `bun start`, тесты: `bun test`.
-- **Монорепо** Turborepo: 4 сервиса (`apps/*`) + 2 пакета (`packages/*`).
+- **Монорепо** Turborepo: 5 сервисов (`apps/*`) + 3 пакета (`packages/*`).
 - **Связь между сервисами — через Redis Streams** (и MQTT на входе). Прямых вызовов между сервисами нет.
 - **Стиль:** Biome — одинарные кавычки, без `;`, отступ 2 пробела. Запускай `bunx biome check --write` перед завершением.
 - **Open-source self-hosting:** проект рассчитан на развёртывание сторонними людьми у себя.
@@ -14,18 +14,24 @@
 ## Архитектура потока данных
 
 ```
-Frigate ──MQTT(frigate/events)──▶ sink ──Redis(spotter.event)──▶ bot ──▶ Telegram
-                                                                  │ ▲
-                                            spotter.*.requested   ▼ │  spotter.*.processed
-                                                                 depot ──▶ S3
+Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ bot ──▶ Telegram
+  (NVR)        (адаптер)        ▲                 │ ▲
+                  │ stage raw   └ request.<source>┘ │ presign
+                  ▼                                 │
+                 S3 ◀── transcode by key ── depot ──┘ (*_processed = S3-ключи)
 ```
 
-1. Frigate шлёт MQTT-событие → **sink** парсит (`parseFrigateEvent`) → публикует в стрим `spotter.event`.
-2. **bot** слушает `spotter.event`, обновляет БД (SQLite), шлёт уведомление. На `end`-событиях запрашивает медиа.
-3. **depot** ловит `*.media_requested` / `*.frame_requested`, качает с NVR, обрабатывает, кладёт в S3, отвечает `*_processed`.
-4. **bot** ловит `*_processed` и отправляет медиа в Telegram-чат.
-5. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между
+1. Frigate шлёт MQTT-событие → **frigate** (адаптер) парсит (`parseFrigateEvent`) → публикует в `spotter.event`; каталог камер/объектов — в `spotter.catalog.<source>`.
+2. **bot** слушает `spotter.event`, обновляет БД (SQLite), шлёт уведомление. На `end` публикует `spotter.media.request.<source>` (`{eventId, source, want}`) — без обращения к NVR.
+3. **frigate** ловит `*.request.<source>`, резолвит медиа (URL-схема + JWT живут **только** тут), стейджит сырьё в S3 и публикует `*.staged` (ключи S3).
+4. **depot** ловит `*.staged`, берёт сырьё из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат в S3, отвечает `*_processed` (ключи S3). NVR не знает.
+5. **bot** ловит `*_processed`, пресайнит S3-ключи в короткоживущие URL и отправляет медиа в Telegram. Креды NVR по сети не ходят — только ключи S3.
+6. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между
    локальным и удалённым Redis (store-and-forward, `XACK`-после-успеха). Сам бизнес-логику не трогает.
+
+Абстракция NVR: вся специфика конкретного NVR изолирована в адаптере (`apps/frigate` на
+`@spotter/sink`). `bot`/`depot` работают через контракты медиа-пайплайна и каталога из
+`@spotter/transport`. Для офлайн-разработки есть синтетический адаптер `apps/test` (REPL + фикстуры).
 
 Стримы (= имена топиков) целиком — в [README.md](README.md#redis-streams). Деплой-профили
 (dev / single / ingest / cloud) — в [README.md](README.md#развёртывание-docker).
@@ -68,12 +74,12 @@ const redis = resolveRedisConfig({ group: 'spotter-bot', clientId: 'spotter-bot'
 
 ```ts
 const handle = await new RedisRegulator<Context>()
-  .message('spotter.event.media_requested', eventMediaController)
+  .message('spotter.media.staged', mediaStagedController)
   .run(context, { group: config.redis.group, consumer: config.redis.consumer })
 // context должен содержать { subscriber, producer, logger }; run() НЕ блокирует —
 // возвращает { stop() }. Подключения держат процесс живым.
 ```
-Аналогично `MqttRegulator` в sink (`.on('frigate/events', controller)`).
+Аналогично `MqttRegulator` в адаптере (`.on('frigate/events', controller)`).
 
 **Модель доставки:** `RedisRegulator` читает группой через `XREADGROUP` и делает `XACK`
 **после** успешной обработки. Упавшее/зависшее сообщение остаётся в PEL; reaper (стартовый +
@@ -139,10 +145,13 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - **Только Bun.** Скрипты, S3-клиент (`Bun.S3Client`), тест-раннер — всё на Bun API.
 - **БД — локальный SQLite-файл** (`DATABASE_PATH`, cwd-относительно). Отдельного сервиса БД нет; миграции применяются на старте бота. Папка `apps/bot/drizzle/` обязана ехать рядом с приложением (см. [apps/bot/Dockerfile](apps/bot/Dockerfile)).
 - **Frigate шлёт «грязные» события** — контроллеры/парсеры делают ранний `return`/`throw`; сохраняй эту защиту.
-- `MEDIA_STRATEGY=link` (bot) и `DIRECTORY_CLEANUP` (depot) меняют поведение медиа — см. AGENTS.md сервисов.
+- **Креды NVR — только в адаптере** (`apps/frigate`). По сети ходят S3-ключи, не байты и не токены. В `bot`/`depot` не должно быть `frigate`/`jwt`/`clipUrl`/`cameraLabels`.
+- `DIRECTORY_CLEANUP` (depot) меняет очистку temp-файлов; `S3_PRESIGN_EXPIRY` (bot) — срок жизни пресайн-URL — см. AGENTS.md сервисов.
 
 ## Карта сервисов
 
-- [apps/bot/AGENTS.md](apps/bot/AGENTS.md) — Telegram-бот, команды, сессии, Innoxious-медиа.
-- [apps/depot/AGENTS.md](apps/depot/AGENTS.md) — обработка медиа, S3, ffmpeg/sharp.
-- [apps/sink/AGENTS.md](apps/sink/AGENTS.md) — NVR→Redis Streams мост, подключаемый `Source` (Frigate/MQTT).
+- [apps/bot/AGENTS.md](apps/bot/AGENTS.md) — Telegram-бот, команды, сессии, Innoxious-медиа, кэш каталога, пресайн S3.
+- [apps/depot/AGENTS.md](apps/depot/AGENTS.md) — транскод медиа из S3 по ключу, ffmpeg/sharp.
+- [apps/frigate/AGENTS.md](apps/frigate/AGENTS.md) — NVR-адаптер: `Source`/`MediaProvider`/`Catalog` на `@spotter/sink`.
+- [apps/test/AGENTS.md](apps/test/AGENTS.md) — синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка).
+- [packages/sink](packages/sink) — фреймворк адаптера (`runSink`, порты, стейджинг в S3).

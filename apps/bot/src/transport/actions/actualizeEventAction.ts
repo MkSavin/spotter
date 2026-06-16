@@ -1,14 +1,12 @@
 import type { SpotterEvent } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { eventsRepo } from '../../db/repository'
-import type { MediaTuple } from '../helpers/resolveNvrMedia'
 import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
 import { renderEvent } from '../view/renderEvent'
 
 export const actualizeEventAction = async (
   event: SpotterEvent,
   context: TransportContext,
-  mediaTuple: MediaTuple | undefined = undefined,
 ): Promise<void> => {
   const { logger, db } = context
   const { id } = event
@@ -24,7 +22,7 @@ export const actualizeEventAction = async (
 
   storedEvent = eventsRepo.upsert(db, event)
 
-  const contents = renderEvent(storedEvent, context, mediaTuple)
+  const contents = renderEvent(storedEvent, context)
 
   await actualizeSentMessages(id, storedEvent.messages, contents, context)
 

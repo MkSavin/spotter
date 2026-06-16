@@ -2,12 +2,14 @@ import { describe, expect, test } from 'bun:test'
 import {
   type SpotterEvent,
   parseSpotterEvent,
+  resolveSource,
   safeParseSpotterEvent,
   spotterEventSchema,
 } from './spotterEvent'
 
 const valid: SpotterEvent = {
   id: 'cam-1700000000.1-abc',
+  source: 'frigate-home',
   camera: 'front',
   label: 'person',
   startTime: 1700000000,
@@ -29,6 +31,18 @@ describe('spotterEvent contract', () => {
     expect(
       safeParseSpotterEvent({ ...valid, label: null, endTime: 1700000050 }),
     ).not.toBeNull()
+  })
+
+  test('source is optional during migration', () => {
+    const { source, ...withoutSource } = valid
+    const parsed = safeParseSpotterEvent(withoutSource)
+    expect(parsed).not.toBeNull()
+    expect(parsed?.source).toBeUndefined()
+    expect(resolveSource({ source: parsed?.source })).toBe('frigate')
+  })
+
+  test('rejects empty source', () => {
+    expect(safeParseSpotterEvent({ ...valid, source: '' })).toBeNull()
   })
 
   test('strips unknown keys', () => {

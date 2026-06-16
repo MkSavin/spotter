@@ -1,4 +1,8 @@
-import { RedisRegulator, type RegulatorHandle } from '@spotter/transport'
+import {
+  RedisRegulator,
+  type RegulatorHandle,
+  catalogUpdatedStream,
+} from '@spotter/transport'
 import type { Bot } from 'grammy'
 import type {
   BotApi,
@@ -7,6 +11,7 @@ import type {
   TransportContext,
 } from '../context'
 import { cameraFrameController } from './controllers/cameraFrameController'
+import { catalogController } from './controllers/catalogController'
 import { eventController } from './controllers/eventController'
 import { eventMediaController } from './controllers/eventMediaController'
 
@@ -20,6 +25,7 @@ export const eventTransport = async (
     .message('spotter.event', eventController)
     .message('spotter.event.media_processed', eventMediaController)
     .message('spotter.camera.frame_processed', cameraFrameController)
+    .message(catalogUpdatedStream, catalogController)
     .run(
       {
         ...context,

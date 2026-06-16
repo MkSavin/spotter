@@ -8,8 +8,8 @@ import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
-import { cameraFrameController } from './controllers/cameraFrameController'
-import { eventMediaController } from './controllers/eventMediaController'
+import { cameraStagedController } from './controllers/cameraStagedController'
+import { mediaStagedController } from './controllers/mediaStagedController'
 import { temp } from './fs/temp'
 import { applicationLogger } from './log'
 
@@ -57,8 +57,8 @@ const run = async (): Promise<void> => {
   await connectRedis(subscriber, { url: config.redis.url })
 
   transport = await new RedisRegulator<CoreContext>()
-    .message('spotter.event.media_requested', eventMediaController)
-    .message('spotter.camera.frame_requested', cameraFrameController)
+    .message('spotter.media.staged', mediaStagedController)
+    .message('spotter.camera.staged', cameraStagedController)
     .run(
       {
         directory: {

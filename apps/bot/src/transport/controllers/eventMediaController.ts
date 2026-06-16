@@ -1,4 +1,8 @@
-import { type StreamMessageController, bufferToJson } from '@spotter/transport'
+import {
+  type StreamMessageController,
+  bufferToJson,
+  safeParseMediaProcessed,
+} from '@spotter/transport'
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
 import type { TransportContext } from '../../context'
 import { eventMediaAction } from '../actions/eventMediaAction'
@@ -8,7 +12,7 @@ export const eventMediaController: StreamMessageController<
   TransportContext
 > = async (payload, context): Promise<void> => {
   const { topic, message } = payload
-  const { logger: baseLogger } = context
+  const { logger: baseLogger, s3, config } = context
 
   const value = bufferToJson(message.value)
 
@@ -16,33 +20,38 @@ export const eventMediaController: StreamMessageController<
     return
   }
 
-  const media: (InputMediaPhoto | InputMediaVideo)[] = []
+  const processed = safeParseMediaProcessed(value)
 
-  if (value.clipUrl) {
-    media.push({
-      type: 'video',
-      media: value.clipUrl,
-    })
-  }
-  if (value.snapshotUrl) {
-    media.push({
-      type: 'photo',
-      media: value.snapshotUrl,
-    })
-  }
-
-  const actionPayload = {
-    eventId: value.eventId,
-    media,
-  }
-
-  if (!actionPayload.eventId || actionPayload.media.length === 0) {
+  if (!processed) {
     return
   }
 
-  const logger = baseLogger.sub(topic, eventCode(actionPayload.eventId))
+  // Depot hands back S3 keys; presign them into short-lived URLs for Telegram.
+  // Credentials never leave the bot — only the signed URL is sent.
+  const media: (InputMediaPhoto | InputMediaVideo)[] = []
+
+  if (processed.clipKey) {
+    media.push({
+      type: 'video',
+      media: s3.presign(processed.clipKey, { expiresIn: config.presignExpiry }),
+    })
+  }
+  if (processed.snapshotKey) {
+    media.push({
+      type: 'photo',
+      media: s3.presign(processed.snapshotKey, {
+        expiresIn: config.presignExpiry,
+      }),
+    })
+  }
+
+  if (media.length === 0) {
+    return
+  }
+
+  const logger = baseLogger.sub(topic, eventCode(processed.eventId))
 
   const nextContext = { ...context, logger }
 
-  await eventMediaAction(actionPayload, nextContext)
+  await eventMediaAction({ eventId: processed.eventId, media }, nextContext)
 }

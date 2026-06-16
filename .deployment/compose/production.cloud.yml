@@ -36,7 +36,6 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - ./.env.bot:/app/.env
-      - ./bot.config.ts:/app/config.ts
       # Persist the SQLite database across container restarts.
       - ./.docker/bot:/app/data
     depends_on:

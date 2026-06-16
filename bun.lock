@@ -56,12 +56,31 @@
         "stenograph": "*",
       },
     },
-    "apps/sink": {
-      "name": "@spotter/sink",
+    "apps/frigate": {
+      "name": "@spotter/frigate",
       "version": "1.0.3",
       "dependencies": {
+        "@spotter/sink": "*",
         "@spotter/transport": "*",
         "mqtt": "^5.10.3",
+        "stenograph": "*",
+      },
+    },
+    "apps/test": {
+      "name": "@spotter/test",
+      "version": "1.0.0",
+      "dependencies": {
+        "@spotter/sink": "*",
+        "@spotter/transport": "*",
+        "commander": "^13.1.0",
+        "stenograph": "*",
+      },
+    },
+    "packages/sink": {
+      "name": "@spotter/sink",
+      "version": "1.0.0",
+      "dependencies": {
+        "@spotter/transport": "*",
         "stenograph": "*",
       },
     },
@@ -269,7 +288,11 @@
 
     "@spotter/forwarder": ["@spotter/forwarder@workspace:apps/forwarder"],
 
-    "@spotter/sink": ["@spotter/sink@workspace:apps/sink"],
+    "@spotter/frigate": ["@spotter/frigate@workspace:apps/frigate"],
+
+    "@spotter/sink": ["@spotter/sink@workspace:packages/sink"],
+
+    "@spotter/test": ["@spotter/test@workspace:apps/test"],
 
     "@spotter/transport": ["@spotter/transport@workspace:packages/transport"],
 

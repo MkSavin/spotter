@@ -10,7 +10,7 @@ import information from '../package.json'
 import { resolveConfig } from './config'
 import { forward } from './forward'
 import { applicationLogger } from './log'
-import { DOWN_STREAMS, UP_STREAMS } from './streams'
+import { UP_STREAMS, downStreams } from './streams'
 
 type BridgeContext = {
   subscriber: RedisClient
@@ -62,7 +62,7 @@ const run = async (): Promise<void> => {
 
   // DOWN: read on remote, mirror to local. XACK/admin run on remote (source).
   const down = new RedisRegulator<BridgeContext>()
-  for (const stream of DOWN_STREAMS) {
+  for (const stream of downStreams(config.sources)) {
     down.message(stream, forward(localProducer, config.maxLen))
   }
 

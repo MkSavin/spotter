@@ -1,40 +1,32 @@
 import type { CoreContext } from '../../context'
 import type { Event } from '../../db/schema'
-import { get } from '../../helpers/get'
-import type { MediaTuple } from '../helpers/resolveNvrMedia'
+import { eventCode } from '../helpers/eventCode'
 import { renderEventTiming } from './renderEventTiming'
 
-export const renderEvent = (
-  event: Event,
-  context: CoreContext,
-  mediaTuple?: MediaTuple,
-): string => {
-  const label = get(
-    context.config.objectLabels,
+export const renderEvent = (event: Event, context: CoreContext): string => {
+  const source = context.config.source
+
+  const label = context.catalog.objectLabel(
+    source,
     event.label ?? '',
     'неизв. объект',
   )
 
-  const camera = get(context.config.cameraLabels, event.camera, 'неизв. камера')
+  const camera = context.catalog.cameraLabel(
+    source,
+    event.camera,
+    'неизв. камера',
+  )
 
   const score = Math.round(event.score * 1000) / 10
 
-  const clip =
-    mediaTuple?.hasClip && mediaTuple.clip
-      ? `<a href="${mediaTuple.clip.url}">📼</a>`
-      : ''
-  const snapshot =
-    mediaTuple?.hasSnapshot && mediaTuple.snapshot
-      ? `<a href="${mediaTuple.snapshot.url}">📸</a>`
-      : ''
-
   const title = event.type === 'start' ? 'Движение!' : 'Произошло событие!'
 
-  const code = context.nvr.resolveEventCode(event.id)
+  const code = eventCode(event.id)
 
   const timing = renderEventTiming(event, context.config.timezone)
 
   return `<b>${title}</b> <code>${code}</code>
-<b>${label}</b> ${score} | <b>${camera}</b>${clip || snapshot ? ` | ${clip}${snapshot}` : ''}
+<b>${label}</b> ${score} | <b>${camera}</b>
 📅 ${timing}`
 }

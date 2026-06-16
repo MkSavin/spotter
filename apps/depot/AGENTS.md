@@ -1,8 +1,8 @@
 # AGENTS.md — `@spotter/depot`
 
-Медиа-процессор. Ловит из Redis Streams запросы на медиа, качает клипы/снимки/кадры с NVR,
-обрабатывает (ffmpeg / sharp), загружает в S3 и отвечает URL'ами. Общие конвенции —
-в корневом [AGENTS.md](../../AGENTS.md).
+Медиа-процессор. Ловит из Redis Streams застейдженное сырьё (S3-ключи), берёт байты из S3
+по ключу, транскодит (ffmpeg / sharp), кладёт результат обратно в S3 и отвечает ключами.
+NVR не знает — ходит только в S3. Общие конвенции — в корневом [AGENTS.md](../../AGENTS.md).
 
 ## Запуск
 
@@ -25,22 +25,25 @@ bun test
 temp-каталог через `temp('spotter-depot-media-')`, регистрирует контроллеры в `RedisRegulator`
 (группа `spotter-depot`):
 
-- `spotter.event.media_requested` → `eventMediaController`
-- `spotter.camera.frame_requested` → `cameraFrameController`
+- `spotter.media.staged` → `mediaStagedController`
+- `spotter.camera.staged` → `cameraStagedController`
 
 ## Поток обработки
 
 `controllers/*Controller.ts` (парсинг payload + ответ в `*_processed` через `producer.publish`)
-→ `actions/*Action.ts` (оркестрация) → `processing/*` (реальная конвертация).
+→ `actions/*Action.ts` (оркестрация) → `processing/*` (реальная конвертация по S3-ключу).
 
 ```
-eventMediaController ──▶ eventMediaAction ──▶ processVideo / processImage ──▶ processFile ──▶ S3
+mediaStagedController ──▶ mediaStagedAction ──▶ processStaged(video/image) ──▶ S3
+                                                       │
+                                       transcode.ts (ffmpeg/sharp)
 ```
 
-- `processVideo` / `processImage` запускаются параллельно (`Promise.all`) и **независимо ловят ошибки**
+- Клип и снимок обрабатываются параллельно (`Promise.all`) и **независимо ловят ошибки**
   (одна упавшая ветка не валит всю обработку — возвращает `undefined`).
-- `processFile` ([src/processing/processFile.ts](src/processing/processFile.ts)) — общая логика:
-  скачать → сконвертировать → положить в S3 (`s3Path`, `filePrefix`).
+- `processStaged` ([src/processing/processStaged.ts](src/processing/processStaged.ts)) — общая логика:
+  скачать из S3 по `rawKey` → транскодировать (`transcode.ts`) → положить результат в S3,
+  вернуть **ключ** (`processedPath`, `filePrefix`). URL/токены NVR не фигурируют.
 
 ## Файловая система (`src/fs/`)
 
@@ -64,7 +67,7 @@ eventMediaController ──▶ eventMediaAction ──▶ processVideo / process
 ## Особенности
 
 - У depot **нет доступа к БД** — он stateless, общается только через Redis Streams и S3.
-- Скачивание с NVR может требовать авторизации — она приходит в payload как `endpointAuthorization`.
+- depot **не знает NVR**: на вход приходят только S3-ключи застейдженного сырья (никаких URL/токенов).
 - Долгие конвертации безопасны: сообщение остаётся pending до `XACK`, никто не вытесняет consumer.
   Держи `REDIS_RECLAIM_MIN_IDLE_MS` (по умолчанию 5 мин) выше самой долгой конвертации, иначе
   reaper перехватит ещё обрабатываемую запись и начнётся дубль.

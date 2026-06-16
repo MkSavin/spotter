@@ -1,0 +1,19 @@
+{
+  "name": "@spotter/sink",
+  "version": "1.0.0",
+  "description": "Framework for NVR adapters: Source + MediaProvider + Catalog + runtime",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "bun test",
+    "test:coverage": "bun test --coverage"
+  },
+  "private": "true",
+  "sideEffects": "false",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "dependencies": {
+    "@spotter/transport": "*",
+    "stenograph": "*"
+  }
+}

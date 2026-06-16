@@ -1,6 +1,7 @@
 import type { BotContext } from '../../context'
 import { eventsRepo } from '../../db/repository'
 import { argument } from '../../middlewares/command/argument'
+import { eventCode } from '../../transport/helpers/eventCode'
 import { renderEvent } from '../../transport/view/renderEvent'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
@@ -19,11 +20,7 @@ class EventInfoCommand extends SpotterCommand {
 
     const code = context.match.trim()
 
-    const event = eventsRepo.findByCode(
-      context.db,
-      code,
-      context.nvr.resolveEventCode.bind(context.nvr),
-    )
+    const event = eventsRepo.findByCode(context.db, code, eventCode)
 
     if (!event) {
       await context.replyWithHTML(
