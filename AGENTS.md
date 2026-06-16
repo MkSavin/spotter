@@ -65,7 +65,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 читая переменные через хелперы из `@spotter/transport`:
 
 ```ts
-import { env, resolveRedisConfig } from '@spotter/transport'
+import { env, requireConfig, resolveRedisConfig } from '@spotter/transport'
 
 env.string('REDIS_URL', 'redis://localhost:6379')
 env.number('REDIS_BLOCK_MS', 5000)
@@ -74,9 +74,21 @@ env.boolean('FLAG', false)
 
 // Общий REDIS_*-блок собирается одним хелпером из transport:
 const redis = resolveRedisConfig({ group: 'spotter-server', clientId: 'spotter-server' })
+
+// Fail-fast: один агрегирующий guard в конце resolveConfig вместо россыпи if-throw.
+requireConfig({ REDIS_URL: redis.url, S3_HOST: s3.host, S3_SECRET: s3.secretKey })
 ```
-`resolveConfig` сам бросает ошибку при отсутствии обязательных значений (`REDIS_URL`, токен, БД).
+`requireConfig` падает на старте с перечнем ВСЕХ недостающих переменных сразу.
 **Не** читай `process.env` напрямую в бизнес-логике — только в `config.ts`.
+
+### Слоёные `.env`
+Окружение двухслойное: общий `.env` (Redis, S3, TZ — на хост, объявляются ОДИН
+раз) + тонкий `.env.<сервис>` поверх. И dev (`bun --env-file=../../.env
+--env-file=../../.env.<сервис>`), и compose (`env_file: [./.env, ./.env.<сервис>]`)
+грузят оба, последний побеждает; в compose сетевые адреса (`REDIS_URL: redis://redis`)
+дополнительно переопределяются через `environment:`. Шаблоны: `.env.example` (общий)
++ `.env.<сервис>.example` (тонкие). Креды NVR (`FRIGATE_*`) — ТОЛЬКО в `.env.frigate`,
+в общий слой не выносить. Forwarder — standalone (мостит два Redis, без общего слоя).
 
 ### Паттерн Regulator
 Подписка на сообщения декларативна, через builder:

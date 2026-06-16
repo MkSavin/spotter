@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { env } from './env'
+import { env, requireConfig } from './env'
 
 process.env = {
   ...process.env,
@@ -45,5 +45,26 @@ describe('env helper', () => {
     expect(env.stringArray('TEST_STRING', ['foo'])).toStrictEqual(['test'])
     expect(env.stringArray('TEST_STRING', ['foo'], '|')).toStrictEqual(['test'])
     expect(env.stringArray('TEST_NOT_FOUND', ['foo'])).toStrictEqual(['foo'])
+  })
+})
+
+describe('requireConfig guard', () => {
+  test('Passes when every required value is present', () => {
+    expect(() => requireConfig({ A: 'value', B: 10, C: false })).not.toThrow()
+  })
+
+  test('Throws naming every empty value at once', () => {
+    expect(() =>
+      requireConfig({
+        REDIS_URL: '',
+        S3_HOST: undefined,
+        S3_PRESIGN_EXPIRY: Number.NaN,
+        OK: 'present',
+      }),
+    ).toThrow('Missing required env: REDIS_URL, S3_HOST, S3_PRESIGN_EXPIRY')
+  })
+
+  test('Treats zero and false as present', () => {
+    expect(() => requireConfig({ COUNT: 0, FLAG: false })).not.toThrow()
   })
 })

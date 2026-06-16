@@ -13,9 +13,10 @@ bun start            # или bun start:watch
 bun test
 bun run sign:token   # CLI: выпустить access-код (src/cli.ts)
 ```
-Нужен `.env.server` (см. [.env.server.example](../../.env.server.example)): `REDIS_URL`,
-`REDIS_GROUP_ID` (`spotter-server`), `REDIS_CLIENT_ID`, `DATABASE_PATH`, `SOURCE_ID`,
-`S3_HOST/ACCESS/SECRET/BUCKET`. NVR-кредов **нет** — сервер ходит только в Redis и S3.
+Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`) +
+тонкий `.env.server` (см. [.env.server.example](../../.env.server.example)) поверх:
+`REDIS_GROUP_ID` (`spotter-server`), `DATABASE_PATH`, `SOURCE_ID`. NVR-кредов **нет** —
+сервер ходит только в Redis и S3. `requireConfig` валидирует обязательное на старте.
 
 ## Точка входа
 

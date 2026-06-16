@@ -30,8 +30,10 @@ services:
       - spotter
     environment:
       REDIS_URL: redis://redis:6379
+    env_file:
+      - ./.env
+      - ./.env.server
     volumes:
-      - ./.env.server:/app/.env
       # Persist the domain SQLite database across container restarts.
       - ./.docker/server:/app/data
     depends_on:
@@ -46,8 +48,10 @@ services:
       - spotter
     environment:
       REDIS_URL: redis://redis:6379
+    env_file:
+      - ./.env
+      - ./.env.telegram
     volumes:
-      - ./.env.telegram:/app/.env
       # Persist the Telegram-local SQLite database across container restarts.
       - ./.docker/telegram:/app/data
     depends_on:

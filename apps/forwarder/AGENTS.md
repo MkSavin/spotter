@@ -13,7 +13,8 @@ cd apps/forwarder
 bun start            # или bun start:watch
 bun test
 ```
-Нужен `.env.forwarder` (см. [.env.forwarder.example](../../.env.forwarder.example)):
+Standalone-сервис: мостит **два** Redis, поэтому общий слой `.env` не подключает.
+Нужен только `.env.forwarder` (см. [.env.forwarder.example](../../.env.forwarder.example)):
 `REDIS_LOCAL_URL`, `REDIS_REMOTE_URL` (+ общий `REDIS_*`-тюнинг), `FORWARDER_SOURCES`
 (per-source стримы запросов, по умолч. `frigate`). Локальный URL по умолчанию падает
 на `REDIS_URL`.

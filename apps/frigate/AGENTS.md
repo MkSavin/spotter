@@ -12,9 +12,11 @@ cd apps/frigate
 bun start            # или bun start:watch
 bun test
 ```
-Нужен `.env.frigate` (см. `.env.frigate.example`): `REDIS_URL`, `SOURCE_ID`, `SOURCE_TYPE`
-(по умолч. `frigate`), `MQTT_BROKER`, `FRIGATE_REMOTE_URL` / `FRIGATE_AUTH_USER` /
-`FRIGATE_AUTH_SECRET`, `S3_*` (стейджинг сырья).
+Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_*` стейджинг сырья, `TZ`) + тонкий
+`.env.frigate` (см. [.env.frigate.example](../../.env.frigate.example)) поверх:
+`REDIS_GROUP_ID`, `SOURCE_ID`, `SOURCE_TYPE` (по умолч. `frigate`), `S3_STAGING_PREFIX`,
+`MQTT_BROKER`, `FRIGATE_REMOTE_URL` / `FRIGATE_AUTH_USER` / `FRIGATE_AUTH_SECRET`.
+**Креды NVR (`FRIGATE_*`) живут ТОЛЬКО здесь** — в общий `.env` их выносить нельзя.
 
 ## Точка входа
 

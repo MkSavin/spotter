@@ -11,12 +11,15 @@ cd apps/depot
 bun start            # или bun start:watch
 bun test
 ```
-Нужен `.env.depot-*` (см. `.env.depot-1.example`): `REDIS_URL`, `S3_HOST`,
-`S3_ACCESS`, `S3_SECRET`, `S3_BUCKET`, `DIRECTORY_CLEANUP`.
+Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`) +
+тонкий `.env.depot` (см. [.env.depot.example](../../.env.depot.example)) поверх:
+`REDIS_GROUP_ID` (`spotter-depot`), `DIRECTORY_CLEANUP`, `VIDEO_*`, `IMAGE_QUALITY`.
 
 > Сервис горизонтально масштабируется: запускают несколько инстансов (`depot-1`, `depot-2`)
 > с **общим** `REDIS_GROUP_ID` (`spotter-depot`) и **разными** `REDIS_CLIENT_ID` — Redis раскидывает
 > сообщения стрима между консьюмерами одной группы (по одному получателю на сообщение).
+> В compose `REDIS_CLIENT_ID` каждой реплики задаётся inline через `environment:`,
+> а общий `.env` + `.env.depot` подключаются через `env_file`.
 
 ## Точка входа
 

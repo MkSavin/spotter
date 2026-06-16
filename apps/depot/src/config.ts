@@ -1,4 +1,9 @@
-import { type RedisConfig, env, resolveRedisConfig } from '@spotter/transport'
+import {
+  type RedisConfig,
+  env,
+  requireConfig,
+  resolveRedisConfig,
+} from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
 
@@ -40,13 +45,12 @@ export const resolveConfig = (): CoreConfig => {
     },
   }
 
-  if (!result.redis.url) {
-    throw new Error('Bad configuration. No redis url found.')
-  }
-
-  if (!result.s3.host) {
-    throw new Error('Bad configuration. No s3 host found.')
-  }
+  requireConfig({
+    REDIS_URL: result.redis.url,
+    S3_HOST: result.s3.host,
+    S3_ACCESS: result.s3.accessKey,
+    S3_SECRET: result.s3.secretKey,
+  })
 
   applicationLogger.verbose('Using core configuration:', result)
 

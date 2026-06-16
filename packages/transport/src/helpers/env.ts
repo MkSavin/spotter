@@ -54,3 +54,27 @@ export const env = {
     return value === 'true'
   },
 }
+
+/**
+ * Fail-fast configuration guard. Pass a map of env-var name → already-resolved
+ * value; every entry that resolved empty (`undefined` / `''` / `NaN`) is
+ * aggregated into a single thrown error naming each missing variable, so boot
+ * surfaces all the gaps at once instead of one `throw` per call site.
+ */
+export const requireConfig = (required: Record<string, unknown>): void => {
+  const missing = Object.entries(required)
+    .filter(
+      ([, value]) =>
+        value === undefined ||
+        value === null ||
+        value === '' ||
+        (typeof value === 'number' && Number.isNaN(value)),
+    )
+    .map(([variable]) => variable)
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Invalid configuration. Missing required env: ${missing.join(', ')}`,
+    )
+  }
+}

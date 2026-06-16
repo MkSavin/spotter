@@ -1,5 +1,10 @@
 import type { SinkConfig } from '@spotter/sink'
-import { type CatalogEntry, env, resolveRedisConfig } from '@spotter/transport'
+import {
+  type CatalogEntry,
+  env,
+  requireConfig,
+  resolveRedisConfig,
+} from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
 import type { SourceCode } from './source/constructSource'
@@ -83,20 +88,16 @@ export const resolveConfig = (): CoreConfig => {
     labels: defaultLabels,
   }
 
-  if (!result.redis.url) {
-    throw new Error('No redis url found.')
-  }
+  requireConfig({
+    REDIS_URL: result.redis.url,
+    S3_HOST: result.s3?.host,
+    S3_ACCESS: result.s3?.accessKey,
+    S3_SECRET: result.s3?.secretKey,
+    FRIGATE_REMOTE_URL: result.frigate.remoteUrl,
+  })
 
   if (result.source.type === 'frigate' && !result.source.frigate.broker) {
     throw new Error('No mqtt broker found for the frigate source.')
-  }
-
-  if (!result.s3?.host) {
-    throw new Error('No s3 host found for media staging.')
-  }
-
-  if (!result.frigate.remoteUrl) {
-    throw new Error('No frigate remote url found for media access.')
   }
 
   applicationLogger.verbose('Using core configuration:', result)

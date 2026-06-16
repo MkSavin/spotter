@@ -5,8 +5,8 @@
 > Внутреннее имя пакетов — `spotter` / `@spotter/*`.
 >
 > **Open-source self-hosting:** проект рассчитан на развёртывание у себя — любой может
-> поднять Spotter на своём сервере. Конфигурация — через `.env` по сервисам и
-> compose-профили (см. [Развёртывание](#развёртывание-docker)).
+> поднять Spotter на своём сервере. Конфигурация — слоёные `.env` (общий + по
+> сервисам) и compose-профили (см. [Развёртывание](#развёртывание-docker)).
 
 Когда камера фиксирует событие (человек, машина, животное), Frigate публикует его в MQTT.
 Spotter подхватывает событие, отправляет уведомление в Telegram, по запросу обрабатывает
@@ -83,20 +83,23 @@ bun install
 
 ### 2. Окружение
 
-Для каждого сервиса заведите свой `.env`. Шаблоны лежат в корне:
+Окружение **слоёное**: общий `.env` (Redis, S3, TZ — объявляются ОДИН раз) плюс
+тонкий `.env.<сервис>` с тем, что специфично сервису. Каждый сервис при старте
+грузит общий слой, затем свой (последний побеждает):
 
 ```bash
-cp .env.server.example   .env.server
-cp .env.telegram.example .env.telegram
-cp .env.frigate.example  .env.frigate
-cp .env.depot-1.example  .env.depot-1
+cp .env.example          .env            # общий слой: REDIS_URL, S3_*, TZ
+cp .env.server.example   .env.server     # REDIS_GROUP_ID, DATABASE_PATH, SOURCE_ID
+cp .env.telegram.example .env.telegram   # + TELEGRAM_TOKEN, S3_PRESIGN_EXPIRY
+cp .env.frigate.example  .env.frigate    # + FRIGATE_* (креды NVR), MQTT_BROKER
 ```
 
-Минимум для домена (`server`): `REDIS_URL`, `S3_*`, `DATABASE_PATH` (по умолч.
-`./data/server.sqlite`). Минимум для фронтенда (`telegram`): `TELEGRAM_TOKEN`, `REDIS_URL`,
-`S3_*` (для пресайна обработанного медиа), `DATABASE_PATH` (по умолч. `./data/telegram.sqlite`).
-Ни server, ни telegram **не** держат креды NVR. Креды Frigate и S3-стейджинг — в `.env.frigate`.
-Для офлайн-разработки без Frigate: `cp .env.test.example .env.test` и адаптер `apps/test`.
+Поменять Redis-endpoint или S3-креды — правится только общий `.env`. Тонкие файлы
+несут лишь `REDIS_GROUP_ID`, пути БД, `SOURCE_ID` и т.п. Ни server, ни telegram
+**не** держат креды NVR — `FRIGATE_*` живут ТОЛЬКО в `.env.frigate` и в общий слой
+не попадают. Конфиг валидируется на старте: если обязательной переменной нет,
+сервис падает с перечнем всех недостающих (`requireConfig`). Для офлайн-разработки
+без Frigate: `cp .env.test.example .env.test` и адаптер `apps/test`.
 
 ### 3. Инфраструктура (Docker)
 
@@ -233,7 +236,8 @@ apps/telegram/src/db/  SQLite-схема и репозиторий (Drizzle): tg
 apps/{server,telegram}/drizzle/  Сгенерированные миграции Drizzle
 .deployment/compose/  Compose-профили: development, production.single, production.ingest, production.cloud
 .deployment/          Конфиги инфраструктуры (mosquitto, …)
-.env.*.example        Шаблоны окружения по сервисам
+.env.example          Общий слой окружения (Redis, S3, TZ) — один на хост
+.env.*.example        Тонкие слои по сервисам (накладываются поверх .env)
 .github/workflows/    CI: lint.yml (ветки) + release.yml (master)
 .integration/         zx-скрипты релиза: conventional.mjs, imperative.mjs
 .changeset/           Changesets: конфиг + pending-changeset'ы

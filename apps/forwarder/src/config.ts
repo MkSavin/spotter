@@ -1,4 +1,4 @@
-import { env, resolveRedisConfig } from '@spotter/transport'
+import { env, requireConfig, resolveRedisConfig } from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
 
@@ -55,12 +55,10 @@ export const resolveConfig = (): ForwarderConfig => {
     maxLen: base.maxLen,
   }
 
-  if (!result.localUrl) {
-    throw new Error('Bad configuration. No local redis url found.')
-  }
-  if (!result.remoteUrl) {
-    throw new Error('Bad configuration. No remote redis url found.')
-  }
+  requireConfig({
+    REDIS_LOCAL_URL: result.localUrl,
+    REDIS_REMOTE_URL: result.remoteUrl,
+  })
 
   applicationLogger.verbose('Using core configuration:', result)
 

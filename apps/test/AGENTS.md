@@ -12,9 +12,10 @@ cd apps/test
 bun start            # или bun start:watch
 bun test
 ```
-Нужен `.env.test` (см. `.env.test.example`): `REDIS_URL`, `SOURCE_ID` (по умолч. `test`),
-`S3_*`. NVR/MQTT/креды не нужны. Для локального S3 подними MinIO из dev-compose
-(`bun run docker:dev`).
+Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_*`, `TZ`) + тонкий `.env.test`
+(см. [.env.test.example](../../.env.test.example)) поверх: `REDIS_GROUP_ID`, `SOURCE_ID`
+(по умолч. `test`), `S3_STAGING_PREFIX`. NVR/MQTT/креды не нужны. Для локального S3
+подними MinIO из dev-compose (`bun run docker:dev`).
 
 ## REPL-команды
 

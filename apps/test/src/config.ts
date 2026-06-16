@@ -1,6 +1,11 @@
 import path from 'node:path'
 import type { SinkConfig } from '@spotter/sink'
-import { type CatalogEntry, env, resolveRedisConfig } from '@spotter/transport'
+import {
+  type CatalogEntry,
+  env,
+  requireConfig,
+  resolveRedisConfig,
+} from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
 
@@ -72,13 +77,12 @@ export const resolveConfig = (): TestConfig => {
     },
   }
 
-  if (!config.redis.url) {
-    throw new Error('No redis url found.')
-  }
-
-  if (!config.s3?.host) {
-    throw new Error('No s3 host found for media staging.')
-  }
+  requireConfig({
+    REDIS_URL: config.redis.url,
+    S3_HOST: config.s3?.host,
+    S3_ACCESS: config.s3?.accessKey,
+    S3_SECRET: config.s3?.secretKey,
+  })
 
   applicationLogger.verbose('Using core configuration:', config)
 
