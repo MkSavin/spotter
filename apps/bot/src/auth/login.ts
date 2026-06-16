@@ -2,8 +2,10 @@ import type { BotContext } from '../context'
 import { roleTitle } from '../helpers/role'
 import { redeemToken } from './token'
 
-// Shared login flow for /login and the /start deep-link: redeems a code, updates
-// the session, greets the user and removes the message carrying the code.
+/**
+ * Shared flow for `/login` and the `/start` deep-link: redeems a code, updates
+ * the session, greets the user and hides the message carrying the code.
+ */
 export const loginWithCode = async (
   context: BotContext,
   code: string,
@@ -46,6 +48,5 @@ export const loginWithCode = async (
 Чат и пользователь были успешно авторизованы!`,
   )
 
-  // Best-effort: hide the code the user just sent.
   await context.deleteMessage().catch(() => undefined)
 }

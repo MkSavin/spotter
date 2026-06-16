@@ -11,8 +11,7 @@ import { type Access, accessDenial, canAccess } from './access'
 
 type Handler = CommandContext<BotContext>
 
-// Middleware that enforces a command's access requirement using the role cached
-// in the session. Replaces the old per-command `guard(...)`.
+/** Enforces a command's access requirement using the role cached in the session. */
 export const accessGuard = (access: Access): CommandMiddleware<BotContext> => {
   return async (context, next) => {
     if (!canAccess(access, context.session.user.authorizedRole)) {
@@ -22,21 +21,21 @@ export const accessGuard = (access: Access): CommandMiddleware<BotContext> => {
   }
 }
 
-// A bot command expressed as a class. Subclasses declare metadata + a handler;
-// the framework composes the middleware chain (access → arguments → sender →
-// handler) and exposes a BotCommand for the dynamic menu.
+/**
+ * A bot command as a class. Subclasses declare metadata + a handler; the
+ * framework composes the chain (access → arguments → sender → handler) and
+ * exposes a {@link BotCommand} for the dynamic menu.
+ */
 export abstract class SpotterCommand {
   abstract readonly name: string
   abstract readonly description: string
   abstract readonly access: Access
 
-  // Optional argument validation. When set, an `argument(...)` middleware runs
-  // before the handler and replies with `signature` on a bad argument list.
+  /** Argument validator; when set, runs before the handler with `signature` help. */
   protected readonly matcher?: ArgumentMatcher
   protected readonly signature?: string
 
-  // Most commands act on behalf of a Telegram user; set to false for the rare
-  // command that may run without `ctx.from`.
+  /** Require `ctx.from`; false only for commands that may run without a sender. */
   protected readonly requireSender: boolean = true
 
   abstract handle(context: Handler): unknown

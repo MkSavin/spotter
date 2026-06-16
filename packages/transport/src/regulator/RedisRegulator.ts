@@ -1,5 +1,6 @@
 import type { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
+import { connectRedis } from '../helpers/connectRedis'
 import {
   type StreamMessage,
   type StreamRecord,
@@ -63,7 +64,7 @@ export class StreamProducer {
       this.connected = true
       return
     }
-    await this.client.connect()
+    await connectRedis(this.client)
     this.connected = true
   }
 

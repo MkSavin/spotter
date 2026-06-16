@@ -1,11 +1,9 @@
-import type { Bot } from 'grammy'
-import type { Middleware } from 'grammy'
+import type { Bot, Middleware } from 'grammy'
 import type { BotApi, BotContext } from '../../context'
 import type { SpotterCommand } from './SpotterCommand'
 import { isVisible } from './access'
 
-// Registers every command's handler on the bot. Commands only fire in private
-// chats (operator commands), matching the previous `addToScope(private)` setup.
+/** Registers every command's handler on the bot, scoped to private chats. */
 export const registerCommands = (
   bot: Bot<BotContext, BotApi>,
   registry: SpotterCommand[],
@@ -17,9 +15,10 @@ export const registerCommands = (
   }
 }
 
-// Rebuilds the per-chat command menu on the fly whenever the cached role changes
-// (`needUpdateCommands`). Replaces the old switchCommandList middleware: the
-// visible set is derived from the registry by access, not hardcoded packs.
+/**
+ * Rebuilds the per-chat command menu whenever the cached role changes
+ * (`needUpdateCommands`); the visible set is derived from the registry by access.
+ */
 export const syncCommandMenu =
   (registry: SpotterCommand[]): Middleware<BotContext> =>
   async (context, next) => {

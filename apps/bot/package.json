@@ -4,12 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "bun src/index.ts",
-    "start:watch": "bun --watch src/index.ts",
+    "start": "bun --env-file=../../.env.bot src/index.ts",
+    "start:watch": "bun --watch --env-file=../../.env.bot src/index.ts",
     "build:bot": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
     "build:cli": "bun build --entrypoints src/cli.ts --outfile ./dist/spotter --target bun --env disable",
     "build": "bun run build:bot && bun run build:cli",
-    "sign:token": "bun src/cli.ts sign",
+    "sign:token": "bun --env-file=../../.env.bot src/cli.ts sign",
     "test": "bun test",
     "test:coverage": "bun test --coverage"
   },

@@ -21,6 +21,7 @@
 *.db-wal
 *.db-shm
 /apps/*/data
+/apps/*/.data
 
 # Environment
 .env

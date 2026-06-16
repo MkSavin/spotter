@@ -1,5 +1,9 @@
 import process from 'node:process'
-import { RedisRegulator, StreamProducer } from '@spotter/transport'
+import {
+  RedisRegulator,
+  StreamProducer,
+  connectRedis,
+} from '@spotter/transport'
 import { RedisClient } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
@@ -26,7 +30,7 @@ const run = async (): Promise<void> => {
   )
 
   await producer.connect()
-  await subscriber.connect()
+  await connectRedis(subscriber, { url: config.redis.url })
 
   // Pluggable NVR ingestion: one source per sink instance. The source emits
   // canonical SpotterEvents; we publish them onto the stream.

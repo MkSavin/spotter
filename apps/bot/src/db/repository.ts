@@ -44,8 +44,7 @@ export const usersRepo = {
       .where(and(eq(users.id, id), eq(users.chatId, chatId)))
       .get(),
 
-  // Resolves a user by an admin-supplied reference: numeric Telegram id or
-  // @username. Returns the first matching row (in private chats a user has one).
+  /** Resolves a user by numeric id or @username (first matching row). */
   findByRef: (db: BotDatabase, ref: string): User | undefined =>
     db
       .select()
@@ -81,7 +80,7 @@ export const usersRepo = {
       .returning()
       .get(),
 
-  // Changes a user's role across every chat they belong to.
+  /** Changes a user's role across every chat they belong to. */
   setRoleById: (db: BotDatabase, id: string, role: Role): User[] =>
     db.update(users).set({ role }).where(eq(users.id, id)).returning().all(),
 
@@ -92,7 +91,7 @@ export const usersRepo = {
       .returning()
       .get(),
 
-  // Removes a user from every chat (used by /user_revoke).
+  /** Removes a user from every chat (used by `/user_revoke`). */
   removeById: (db: BotDatabase, id: string): User[] =>
     db.delete(users).where(eq(users.id, id)).returning().all(),
 
@@ -108,7 +107,7 @@ export const tokensRepo = {
   find: (db: BotDatabase, id: string): AccessToken | undefined =>
     db.select().from(accessTokens).where(eq(accessTokens.id, id)).get(),
 
-  // Single-use: deletes the token and returns it if it existed.
+  /** Single-use: deletes the token and returns it if it existed. */
   consume: (db: BotDatabase, id: string): AccessToken | undefined =>
     db.delete(accessTokens).where(eq(accessTokens.id, id)).returning().get(),
 }
@@ -146,10 +145,10 @@ export const eventsRepo = {
     return event ? withMessages(db, event) : undefined
   },
 
-  // Looks up an event by the short code shown to users. How a code maps to an id
-  // is endpoint-specific (`nvr.resolveEventCode`), so we narrow candidates with a
-  // LIKE and disambiguate with the supplied resolver — keeping this repo
-  // NVR-agnostic.
+  /**
+   * Looks up an event by the user-facing short code. The id→code mapping is
+   * endpoint-specific, so we narrow with LIKE and disambiguate via `resolveCode`.
+   */
   findByCode: (
     db: BotDatabase,
     code: string,
@@ -178,8 +177,7 @@ export const eventsRepo = {
     return withMessages(db, stored)
   },
 
-  // Replaces the full set of sent messages for an event (mirrors the old
-  // `event.update({ data: { messages } })` on the embedded array).
+  /** Replaces the full set of sent messages for an event. */
   setMessages: (
     db: BotDatabase,
     id: string,

@@ -14,34 +14,28 @@ import { userPromoteCommand } from './user/userPromoteCommand'
 import { userRevokeCommand } from './user/userRevokeCommand'
 import { userSignCommand } from './user/userSignCommand'
 
-// Single source of truth: every command, ordered as it should appear in the
-// menu. Access (and thus visibility) lives on each command via its `access`
-// field — see commands/framework. Registration and the per-role menu are derived
-// from this list (registerCommands / syncCommandMenu), nothing is duplicated.
+/**
+ * Single source of truth: every command in menu order. Access lives on each
+ * command; registration and the per-role menu are derived from this list.
+ */
 export const commandRegistry: SpotterCommand[] = [
-  // Base
   startCommand,
 
-  // Auth
   loginCommand,
   logoutCommand,
   meCommand,
 
-  // Cameras (user+)
   cameraListCommand,
   cameraSnapshotCommand,
 
-  // Users (admin)
   userSignCommand,
   userRevokeCommand,
   userPromoteCommand,
   userDemoteCommand,
 
-  // Events (admin)
   eventInfoCommand,
   eventClearCommand,
 
-  // Deployment / testing (admin)
   deploymentVersionCommand,
   testPublishCommand,
 ]

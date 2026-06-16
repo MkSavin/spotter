@@ -1,5 +1,9 @@
 import process from 'node:process'
-import { RedisRegulator, StreamProducer } from '@spotter/transport'
+import {
+  RedisRegulator,
+  StreamProducer,
+  connectRedis,
+} from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
@@ -50,7 +54,7 @@ const run = async (): Promise<void> => {
   process.on('SIGTERM', shutdown)
 
   await producer.connect()
-  await subscriber.connect()
+  await connectRedis(subscriber, { url: config.redis.url })
 
   transport = await new RedisRegulator<CoreContext>()
     .message('spotter.event.media_requested', eventMediaController)

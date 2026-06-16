@@ -1,8 +1,7 @@
-// Telegram usernames are case-insensitive; we store and compare them normalized
-// (lowercased, without the leading @).
+/** Normalizes a Telegram @username for storage/comparison (lowercase, no `@`). */
 export const normalizeUsername = (value: string): string =>
   value.trim().replace(/^@/, '').toLowerCase()
 
-// A user reference is either a numeric Telegram id (#12345) or an @username.
+/** Whether a user reference is a numeric Telegram id rather than an @username. */
 export const isNumericId = (value: string): boolean =>
   /^\d+$/.test(value.trim())

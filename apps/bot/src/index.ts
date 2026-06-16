@@ -2,7 +2,11 @@ import process from 'node:process'
 import { hydrateApi, hydrateContext } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
-import { type RegulatorHandle, StreamProducer } from '@spotter/transport'
+import {
+  type RegulatorHandle,
+  StreamProducer,
+  connectRedis,
+} from '@spotter/transport'
 import { RedisClient } from 'bun'
 import { Bot, session } from 'grammy'
 import information from '../../../package.json'
@@ -125,7 +129,7 @@ const polling = async (): Promise<void> => {
   )
 
   await producer.connect()
-  await subscriber.connect()
+  await connectRedis(subscriber, { url: config.redis.url })
 
   let transport: RegulatorHandle | null = null
 
@@ -156,8 +160,6 @@ const polling = async (): Promise<void> => {
 
   const bot = await initialize(coreContext)
 
-  // Rebuild the per-chat menu on role changes, then register all command handlers
-  // (both derived from the single command registry — no hardcoded role packs).
   bot.use(syncCommandMenu(commandRegistry))
   registerCommands(bot, commandRegistry)
 

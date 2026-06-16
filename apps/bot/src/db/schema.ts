@@ -7,20 +7,19 @@ import {
   text,
 } from 'drizzle-orm/sqlite-core'
 
-// Ordered from least to most privileged: anonymous (no row) < VIEWER < USER < ADMIN.
+/** Roles, least to most privileged (anonymous = no row). */
 export const ROLES = ['VIEWER', 'USER', 'ADMIN'] as const
 
 export type Role = (typeof ROLES)[number]
 
-// Value object mirroring the old Prisma enum, so `Role.ADMIN` keeps working
-// alongside `Role` used as a type.
+/** Value object so `Role.ADMIN` works alongside `Role` as a type. */
 export const Role = {
   VIEWER: 'VIEWER',
   USER: 'USER',
   ADMIN: 'ADMIN',
 } as const satisfies Record<Role, Role>
 
-// Privilege rank used by the command access system (anonymous = 0).
+/** Privilege rank for the command access system (anonymous = 0). */
 export const ROLE_RANK: Record<Role, number> = {
   VIEWER: 1,
   USER: 2,
@@ -42,8 +41,7 @@ export const users = sqliteTable(
   {
     id: text('id').notNull(),
     chatId: text('chat_id').notNull(),
-    // Telegram @username (normalized, lowercase, no leading @). Nullable: not
-    // every Telegram account has one. Used to address users in admin commands.
+    /** Normalized @username (nullable); used to address users in admin commands. */
     username: text('username'),
     role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
     token: text('token').notNull(),
@@ -53,13 +51,14 @@ export const users = sqliteTable(
   (table) => [primaryKey({ columns: [table.id, table.chatId] })],
 )
 
-// Single-use access tokens minted by /user_sign (or the CLI bootstrap). Redeemed
-// via /login or the /start deep-link, then deleted. The granted role is always
-// VIEWER from the bot; the CLI may mint higher roles to bootstrap the first admin.
+/**
+ * Single-use access codes (redeemed via `/login` or the `/start` deep-link, then
+ * deleted). `/user_sign` mints VIEWER codes; the CLI may mint higher roles.
+ */
 export const accessTokens = sqliteTable('access_tokens', {
   id: text('id').primaryKey(),
   role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
-  // Optional binding: only a user with this normalized @username may redeem it.
+  /** Optional binding: only this normalized @username may redeem the code. */
   username: text('username'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
@@ -83,7 +82,7 @@ export const events = sqliteTable('events', {
   type: text('type').notNull().default('start'),
 })
 
-// Replaces the embedded `Event.messages` array from the Mongo schema.
+/** Telegram messages sent per event (one row per chat). */
 export const eventMessages = sqliteTable(
   'event_messages',
   {
@@ -101,8 +100,7 @@ export type User = InferSelectModel<typeof users>
 export type AccessToken = InferSelectModel<typeof accessTokens>
 export type Event = InferSelectModel<typeof events>
 
-// In-memory shape used across the bot (Telegram message id + chat id). Maps to
-// an `event_messages` row, but keeps the field names the rest of the code uses.
+/** In-memory shape of an `event_messages` row (Telegram message id + chat id). */
 export type EventMessage = {
   id: number
   chatId: string

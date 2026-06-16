@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "turbo run start --parallel",
-    "start:watch": "turbo run start:watch --parallel",
+    "start": "turbo run start --parallel --filter=!@spotter/forwarder",
+    "start:watch": "turbo run start:watch --parallel --filter=!@spotter/forwarder",
+    "start:all": "turbo run start --parallel",
+    "start:all:watch": "turbo run start:watch --parallel",
     "test": "turbo run test --parallel",
     "test:coverage": "turbo run test:coverage --parallel",
     "build": "turbo run build --parallel",

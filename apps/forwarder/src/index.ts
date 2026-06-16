@@ -1,5 +1,9 @@
 import process from 'node:process'
-import { RedisRegulator, StreamProducer } from '@spotter/transport'
+import {
+  RedisRegulator,
+  StreamProducer,
+  connectRedis,
+} from '@spotter/transport'
 import { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
 import information from '../package.json'
@@ -35,8 +39,8 @@ const run = async (): Promise<void> => {
   )
 
   await Promise.all([
-    localSubscriber.connect(),
-    remoteSubscriber.connect(),
+    connectRedis(localSubscriber, { url: config.localUrl }),
+    connectRedis(remoteSubscriber, { url: config.remoteUrl }),
     localProducer.connect(),
     remoteProducer.connect(),
   ])

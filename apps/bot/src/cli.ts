@@ -1,3 +1,4 @@
+import path from 'node:path'
 import process from 'node:process'
 import { program } from 'commander'
 import information from '../package.json'
@@ -6,6 +7,10 @@ import { createDatabase } from './db/client'
 import { tokensRepo } from './db/repository'
 import { parseRole } from './helpers/role'
 import { normalizeUsername } from './helpers/username'
+
+const defaultDatabase =
+  process.env.DATABASE_PATH ??
+  path.join(import.meta.dir, '..', 'data', 'bot.sqlite')
 
 program
   .name('spotter-cli')
@@ -18,11 +23,7 @@ program
   .argument('<role>', 'viewer | user | admin')
   .option('-u, --user <username>', 'bind the code to a specific @username')
   .option('-b, --bot <username>', 'bot username, to also print a deep-link')
-  .option(
-    '-d, --database <path>',
-    'database path',
-    process.env.DATABASE_PATH || './data/bot.sqlite',
-  )
+  .option('-d, --database <path>', 'database path', defaultDatabase)
   .option('-r, --raw', 'print only the code', false)
   .action((roleArg, options) => {
     const role = parseRole(roleArg)
