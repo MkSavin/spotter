@@ -10,6 +10,7 @@
     "build:cli": "bun build --entrypoints src/cli.ts --outfile ./dist/spotter --target bun --env disable",
     "build": "bun run build:bot && bun run build:cli",
     "sign:token": "bun --env-file=../../.env.bot src/cli.ts sign",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun test",
     "test:coverage": "bun test --coverage"
   },

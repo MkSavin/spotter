@@ -3,6 +3,9 @@
   "version": "1.0.2",
   "description": "",
   "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "private": "true",
   "keywords": [],
   "author": "me@mksav.in",

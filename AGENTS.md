@@ -42,10 +42,11 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ bot ──▶ Telegr
 | ----------------- | ------------------------------------------ |
 | Запуск всего      | `bun start` / `bun start:watch`            |
 | Запуск сервиса    | `cd apps/<svc> && bun start`               |
+| **Зелёный чек**   | `/green` или `bun run green` — scoped typecheck+тесты затронутых пакетов (turbo `--affected` + кэш) + biome |
 | Тесты             | `bun test` (или `cd apps/<svc> && bun test`) |
 | Покрытие          | `bun test:coverage`                        |
 | Линт + формат     | `bunx biome check --write`                 |
-| Проверка типов    | `bun run typecheck` (`tsc --noEmit`)       |
+| Проверка типов    | `bun run typecheck` (turbo per-package; `typecheck:full` — весь репо одним `tsc`) |
 | Миграции БД       | `cd apps/bot && bunx drizzle-kit generate` |
 | Токен авторизации | `bun run sign:token <role>`                |
 
@@ -138,7 +139,9 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - **Комментарии — только когда они действительно нужны** (объясняют «почему», не дублируют код).
   Над функциями/методами/переменными — компактный JSDoc (`/** ... */`), а не строчные `//`.
   Лишние комментарии — это техдолг на их поддержку.
-- Перед завершением задачи прогоняй `bunx biome check --write` и `bun test`.
+- Перед завершением задачи прогоняй `/green` (или `bun run green`) — он скоупит typecheck+тесты
+  на затронутые пакеты и добивает biome. Полный прогон по всему репо нужен редко (`bun run test`,
+  `bun run typecheck:full`).
 
 ## Подводные камни
 

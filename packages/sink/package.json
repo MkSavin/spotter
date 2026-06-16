@@ -4,6 +4,7 @@
   "description": "Framework for NVR adapters: Source + MediaProvider + Catalog + runtime",
   "main": "src/index.ts",
   "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun test",
     "test:coverage": "bun test --coverage"
   },

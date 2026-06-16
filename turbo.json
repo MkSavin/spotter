@@ -6,6 +6,10 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "../../tsconfig.json"]
+    },
     "start": {
       "cache": false,
       "persistent": true
@@ -18,7 +22,8 @@
       "cache": false
     },
     "test": {
-      "cache": false
+      "dependsOn": ["^typecheck"],
+      "inputs": ["$TURBO_DEFAULT$", "../../tsconfig.json"]
     },
     "test:coverage": {
       "cache": false
