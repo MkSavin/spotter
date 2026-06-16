@@ -1,5 +1,11 @@
 # stenograph
 
+## 1.2.0
+
+### Minor Changes
+
+- 6fcfb86: Architectural refactoring
+
 ## 1.1.0
 
 ### Minor Changes
