@@ -1,8 +1,4 @@
-# Development — single box. Infra only (one Redis + MQTT); the apps run on the
-# host via `turbo` (`bun run start`). No forwarder is needed with a single Redis.
-#
-# Run from the repo root so relative paths (./.docker, ./.deployment) resolve:
-#   docker compose --project-directory . -f .deployment/compose/development.yml up -d
+# Development infra. Run apps separately via turbo
 services:
   redis:
     image: redis:7-alpine
@@ -36,7 +32,7 @@ services:
       - ./.docker/mosquitto/data:/mosquitto/data
 
   # S3-compatible blob store: the pipeline stages raw media and stores processed
-  # results here (adapter → depot → bot presign). Console at http://localhost:9090.
+  # results here (adapter → depot → telegram presign). Console at http://localhost:9090.
   minio:
     image: minio/minio
     restart: unless-stopped

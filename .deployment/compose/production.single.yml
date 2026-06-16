@@ -1,13 +1,4 @@
-# Production — single machine. The whole stack (Redis, MQTT, sink, depot, bot)
-# runs in containers on one host. No forwarder is needed: with a single Redis
-# there is no cross-node hop to bridge.
-#
-# This is the simplest production layout — pick it when one box can both ingest
-# from the NVR and reach Telegram. Split into ingest/cloud profiles only when the
-# uplink is unreliable or restricted (see production.ingest.yml / production.cloud.yml).
-#
-# Run from the repo root:
-#   docker compose --project-directory . -f .deployment/compose/production.single.yml up -d
+# Single machine deployment - all services run on the same host
 services:
   redis:
     image: redis:7-alpine
@@ -66,18 +57,35 @@ services:
     # To use an NVIDIA GPU for transcoding, add the `deploy.resources` /
     # `devices` blocks from production.ingest.yml here.
 
-  spotter-bot:
-    image: ghcr.io/mksavin/spotter-bot:latest
-    container_name: spotter-bot
+  # Headless domain: event persistence, media orchestration, command RPC.
+  spotter-server:
+    image: ghcr.io/mksavin/spotter-server:latest
+    container_name: spotter-server
     restart: unless-stopped
     networks:
       - spotter
     environment:
       REDIS_URL: redis://redis:6379
     volumes:
-      - ./.env.bot:/app/.env
-      # Persist the SQLite database across container restarts.
-      - ./.docker/bot:/app/data
+      - ./.env.server:/app/.env
+      # Persist the domain SQLite database across container restarts.
+      - ./.docker/server:/app/data
+    depends_on:
+      - redis
+
+  # Telegram frontend: delivery consumer, grammy bot, commands, presigning.
+  spotter-telegram:
+    image: ghcr.io/mksavin/spotter-telegram:latest
+    container_name: spotter-telegram
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./.env.telegram:/app/.env
+      # Persist the Telegram-local SQLite database across container restarts.
+      - ./.docker/telegram:/app/data
     depends_on:
       - redis
 

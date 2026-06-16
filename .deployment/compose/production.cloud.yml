@@ -1,9 +1,4 @@
-# Production — cloud node (stable, reachable address). Holds the main durable
-# Redis Streams buffer and the Telegram bot. An ingest node's forwarder
-# pushes/pulls here over a site-to-site VPN tunnel between the two nodes.
-#
-# Run from the repo root:
-#   docker compose --project-directory . -f .deployment/compose/production.cloud.yml up -d
+# Cloud node - the main node running the Redis and Telegram bot services.
 services:
   redis:
     image: redis:7-alpine
@@ -26,18 +21,35 @@ services:
       timeout: 3s
       retries: 5
 
-  spotter-bot:
-    image: ghcr.io/mksavin/spotter-bot:latest
-    container_name: spotter-bot
+  # Headless domain: event persistence, media orchestration, command RPC.
+  spotter-server:
+    image: ghcr.io/mksavin/spotter-server:latest
+    container_name: spotter-server
     restart: unless-stopped
     networks:
       - spotter
     environment:
       REDIS_URL: redis://redis:6379
     volumes:
-      - ./.env.bot:/app/.env
-      # Persist the SQLite database across container restarts.
-      - ./.docker/bot:/app/data
+      - ./.env.server:/app/.env
+      # Persist the domain SQLite database across container restarts.
+      - ./.docker/server:/app/data
+    depends_on:
+      - redis
+
+  # Telegram frontend: delivery consumer, grammy bot, commands, presigning.
+  spotter-telegram:
+    image: ghcr.io/mksavin/spotter-telegram:latest
+    container_name: spotter-telegram
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./.env.telegram:/app/.env
+      # Persist the Telegram-local SQLite database across container restarts.
+      - ./.docker/telegram:/app/data
     depends_on:
       - redis
 

@@ -15,25 +15,32 @@ Spotter подхватывает событие, отправляет уведо
 ## Архитектура
 
 ```
- Frigate ─MQTT─▶  frigate  ─Redis Streams─▶  bot  ─▶ Telegram
-   (NVR)         (адаптер)        ▲           │
-                    │             └─ request ─┘
-                    │ stage raw                ▲
-                    ▼                          │ presign processed
-                   S3  ◀── transcode by key ── depot
+ Frigate ─MQTT─▶  frigate  ─Redis Streams─▶ server ─delivery.event─▶ telegram ─▶ Telegram
+   (NVR)         (адаптер)        ▲           │  ▲                       │
+                    │             └─ request ─┘  │ *_processed           │ presign
+                    │ stage raw                  │ (S3-ключи)            │
+                    ▼                            │                       │
+                   S3  ◀── transcode by key ── depot ◀───────────────────┘
+                           command.request/reply (telegram ⇄ server)
 ```
 
 Вся специфика NVR изолирована в адаптере (`apps/frigate`): только он знает URL-схемы
 и держит креды Frigate. Адаптер стейджит сырое медиа в S3 — по сети ходят **ключи
-S3, не байты и не токены**. `bot`/`depot` работают через абстрактные контракты
+S3, не байты и не токены**. `server`/`telegram`/`depot` работают через абстрактные контракты
 (`spotter.media.request.<source>` → `*.staged` → `*_processed`); каталог камер/объектов
-адаптер публикует в `spotter.catalog.<source>`, бот его кэширует.
+адаптер публикует в `spotter.catalog.<source>`.
+
+Домен и фронтенд разнесены: **server** (headless) персистит события, оркеструет медиа,
+владеет авторизацией и исполняет команды; **telegram** рендерит и шлёт сообщения, держит
+Telegram-локальный стейт и пресайнит медиа. Контракт между ними — `spotter.delivery.*`
+(вниз) и `spotter.command.*` (вверх, RPC).
 
 | Сервис             | Назначение                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | **`apps/frigate`** | NVR-адаптер. `Source` (Frigate/MQTT) ингестит события в `spotter.event`; `MediaProvider` стейджит клип/снимок/кадр в S3 по запросу; `Catalog` публикует таксономию. Единственный держатель кредов Frigate. |
 | **`apps/test`**    | Синтетический адаптер для офлайн-разработки: REPL эмитит события, медиа берётся из локальных фикстур. NVR/MQTT не нужны. |
-| **`apps/bot`**     | Telegram-бот (grammY). Реагирует на события, шлёт уведомления, обрабатывает команды операторов; пресайнит обработанные S3-ключи для Telegram. |
+| **`apps/server`**  | Headless-домен и оркестрация. Персистит события, гоняет медиа-пайплайн, владеет recipients/авторизацией, исполняет домен-команды (RPC). NVR/Telegram не знает. |
+| **`apps/telegram`** | Telegram-фронтенд (grammY). Консьюмит `delivery.*`, рендерит и шлёт/редактирует сообщения, обрабатывает команды операторов; держит Telegram-стейт и пресайнит S3-ключи. |
 | **`apps/depot`**   | Медиа-процессор. Берёт сырое медиа из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат обратно в S3. NVR не знает. |
 | **`apps/forwarder`** | Двунаправленный мост Redis Streams local↔remote (store-and-forward). Нужен только в распределённом деплое — см. [Развёртывание](#развёртывание-docker). |
 | **`packages/sink`** | Фреймворк адаптера: порты `Source`/`MediaProvider`/`Catalog`, рантайм `runSink` (стейджинг в S3, публикация событий/каталога). |
@@ -43,7 +50,7 @@ S3, не байты и не токены**. `bot`/`depot` работают че�
 **Топология деплоя.** Архитектура рассчитана на два сценария. Простой — **всё на
 одной машине** с единым Redis (dev, небольшие инсталляции). Надёжный —
 **распределённый**: сервисы разносятся на два узла, **ingest** (`frigate`/`depot` +
-локальный durable-Redis + `forwarder`) и **облачный** (главный Redis + `bot`),
+локальный durable-Redis + `forwarder`) и **облачный** (главный Redis + `server` + `telegram`),
 связанные VPN-туннелем. `forwarder` — единственный компонент, держащий хрупкий
 межсайтовый канал, и буферизует события при обрывах (`XACK`-после-успеха).
 
@@ -53,7 +60,7 @@ S3, не байты и не токены**. `bot`/`depot` работают че�
 такого деплоя — edge-узел на нестабильном аплинке + облачный узел со стабильным
 адресом (см. [Развёртывание](#развёртывание-docker)).
 
-Подробности по каждому сервису — в его `AGENTS.md` (например, [apps/bot/AGENTS.md](apps/bot/AGENTS.md)).
+Подробности по каждому сервису — в его `AGENTS.md` (например, [apps/server/AGENTS.md](apps/server/AGENTS.md) / [apps/telegram/AGENTS.md](apps/telegram/AGENTS.md)).
 Гайд для AI-ассистентов и общие конвенции — в корневом [AGENTS.md](AGENTS.md).
 
 ## Технический стек
@@ -61,7 +68,7 @@ S3, не байты и не токены**. `bot`/`depot` работают че�
 - **Рантайм:** [Bun](https://bun.sh) 1.3.14 — запуск, тесты, сборка, S3-клиент
 - **Монорепо:** Turborepo + workspaces (`apps/*`, `packages/*`)
 - **Транспорт:** Redis Streams (встроенный `Bun.RedisClient`, consumer groups) + MQTT (Mosquitto)
-- **БД:** SQLite (`bun:sqlite`) + Drizzle ORM (схема в [apps/bot/src/db/schema.ts](apps/bot/src/db/schema.ts))
+- **БД:** SQLite (`bun:sqlite`) + Drizzle ORM (split: [apps/server/src/db/schema.ts](apps/server/src/db/schema.ts) — домен, [apps/telegram/src/db/schema.ts](apps/telegram/src/db/schema.ts) — Telegram-стейт)
 - **Хранилище:** любое S3-совместимое (внешний провайдер или self-hosted MinIO/Garage)
 - **Telegram:** grammY (+ `hydrate`, `parse-mode`, `runner`); своя система команд (классы + роли)
 - **Качество:** Biome (линт + формат), Changesets (версии), commitlint
@@ -79,16 +86,17 @@ bun install
 Для каждого сервиса заведите свой `.env`. Шаблоны лежат в корне:
 
 ```bash
-cp .env.bot.example      .env.bot
+cp .env.server.example   .env.server
+cp .env.telegram.example .env.telegram
 cp .env.frigate.example  .env.frigate
 cp .env.depot-1.example  .env.depot-1
 ```
 
-Минимум для бота: `TELEGRAM_TOKEN`, `REDIS_URL`, `S3_*` (для пресайна обработанного
-медиа; бот **не** держит креды NVR). БД — локальный SQLite-файл по пути
-`DATABASE_PATH` (по умолчанию `./data/bot.sqlite`). Креды Frigate и S3-стейджинг —
-в `.env.frigate`. Для офлайн-разработки без Frigate: `cp .env.test.example .env.test`
-и адаптер `apps/test`.
+Минимум для домена (`server`): `REDIS_URL`, `S3_*`, `DATABASE_PATH` (по умолч.
+`./data/server.sqlite`). Минимум для фронтенда (`telegram`): `TELEGRAM_TOKEN`, `REDIS_URL`,
+`S3_*` (для пресайна обработанного медиа), `DATABASE_PATH` (по умолч. `./data/telegram.sqlite`).
+Ни server, ни telegram **не** держат креды NVR. Креды Frigate и S3-стейджинг — в `.env.frigate`.
+Для офлайн-разработки без Frigate: `cp .env.test.example .env.test` и адаптер `apps/test`.
 
 ### 3. Инфраструктура (Docker)
 
@@ -98,9 +106,9 @@ bun run docker:dev          # redis + mosquitto (development-инфра)
 docker compose up -d
 ```
 
-> БД отдельным сервисом не нужна — это локальный SQLite-файл. Миграции Drizzle
-> применяются автоматически при старте бота. Подробнее о split-деплое — в
-> разделе [Развёртывание](#развёртывание-docker).
+> БД отдельным сервисом не нужна — это локальный SQLite-файл (свой у server и telegram).
+> Миграции Drizzle применяются автоматически при старте сервиса. Подробнее о split-деплое —
+> в разделе [Развёртывание](#развёртывание-docker).
 
 ### 4. Запуск сервисов
 
@@ -112,7 +120,7 @@ bun start:watch             # то же, с авто-перезапуском (-
 Отдельный сервис:
 
 ```bash
-cd apps/bot && bun start
+cd apps/telegram && bun start
 ```
 
 ## Команды
@@ -128,9 +136,9 @@ cd apps/bot && bun start
 | `bun run sign:token`        | Создать код доступа (см. ниже)                         |
 | `bunx biome check --write`  | Линт + автоформат                                      |
 | `bun run docker:dev`        | Поднять dev-инфру (redis + mosquitto)                  |
-| `bun run docker:single`     | Поднять весь прод-стек на одной машине (redis, mosquitto, frigate, depot, bot) |
+| `bun run docker:single`     | Поднять весь прод-стек на одной машине (redis, mosquitto, frigate, depot, server, telegram) |
 | `bun run docker:ingest`     | Поднять прод-узел ingest (local-redis, mosquitto, frigate, depot×N, forwarder) |
-| `bun run docker:cloud`      | Поднять прод-узел cloud (redis + bot)                  |
+| `bun run docker:cloud`      | Поднять прод-узел cloud (redis + server + telegram)    |
 
 ## Авторизация
 
@@ -143,7 +151,7 @@ cd apps/bot && bun start
 ```bash
 bun run sign:token admin                       # код доступа для роли admin
 # опции: -u <username> (привязка к @username), -b <bot> (добавить deep-link), -r (только код)
-bun apps/bot/src/cli.ts sign admin -b <bot_username>
+bun apps/server/src/cli.ts sign admin -b <bot_username>
 ```
 
 Активация: оператор отправляет боту `/login <код>` либо открывает deep-link из QR-кода
@@ -153,25 +161,31 @@ bun apps/bot/src/cli.ts sign admin -b <bot_username>
 
 ## Redis Streams
 
-Каждый стрим читается своей consumer-группой (`spotter-bot` / `spotter-depot` / `spotter-frigate`).
-Доставка — at-least-once: `XACK` после успешной обработки, зависшие записи перезабираются
-`XAUTOCLAIM` (reaper). Группы создаются с позиции `$` — на рестарте старое не пересылается.
+Каждый стрим читается своей consumer-группой (`spotter-server` / `spotter-telegram` /
+`spotter-depot` / `spotter-frigate`). Доставка — at-least-once: `XACK` после успешной
+обработки, зависшие записи перезабираются `XAUTOCLAIM` (reaper). Группы создаются с позиции
+`$` — на рестарте старое не пересылается.
 
-Медиа-пайплайн абстрактен: бот шлёт запрос в per-source стрим, адаптер стейджит
-сырьё в S3, depot транскодит по ключу. По сети ходят только S3-ключи.
+Медиа-пайплайн абстрактен: server шлёт запрос в per-source стрим, адаптер стейджит
+сырьё в S3, depot транскодит по ключу. По сети ходят только S3-ключи. Домен (server)
+и фронтенд (telegram) общаются контрактами `spotter.delivery.*` и `spotter.command.*`.
 
-| Стрим                              | Кто пишет | Кто читает | Назначение                          |
-| ---------------------------------- | --------- | ---------- | ----------------------------------- |
-| `spotter.event`                    | frigate   | bot        | Событие камеры (start/update/end)   |
-| `spotter.event.test_seed`          | bot       | frigate    | Посев тестовых событий (`/test_publish`) |
-| `spotter.catalog.updated`          | frigate   | bot        | Снимок каталога камер/объектов       |
-| `spotter.media.request.<source>`   | bot       | frigate    | Запрос на стейджинг клипа/снимка события |
-| `spotter.media.staged`             | frigate   | depot      | Сырьё события застейджено в S3 (ключи) |
-| `spotter.event.media_processed`    | depot     | bot        | Ключи обработанного медиа в S3       |
-| `spotter.camera.request.<source>`  | bot       | frigate    | Запрос на стейджинг кадра камеры      |
-| `spotter.camera.staged`            | frigate   | depot      | Кадр застейджен в S3 (ключ)          |
-| `spotter.camera.frame_processed`   | depot     | bot        | Ключ обработанного кадра в S3         |
-| `frigate/events` *(MQTT)*          | Frigate   | frigate    | Сырые события Frigate                 |
+| Стрим                              | Кто пишет | Кто читает      | Назначение                          |
+| ---------------------------------- | --------- | --------------- | ----------------------------------- |
+| `spotter.event`                    | frigate   | server          | Событие камеры (start/update/end)   |
+| `spotter.event.test_seed`          | telegram  | frigate         | Посев тестовых событий (`/test_publish`) |
+| `spotter.catalog.updated`          | frigate   | server, telegram | Снимок каталога камер/объектов       |
+| `spotter.media.request.<source>`   | server    | frigate         | Запрос на стейджинг клипа/снимка события |
+| `spotter.media.staged`             | frigate   | depot           | Сырьё события застейджено в S3 (ключи) |
+| `spotter.event.media_processed`    | depot     | server          | Ключи обработанного медиа в S3       |
+| `spotter.camera.request.<source>`  | telegram  | frigate         | Запрос на стейджинг кадра камеры      |
+| `spotter.camera.staged`            | frigate   | depot           | Кадр застейджен в S3 (ключ)          |
+| `spotter.camera.frame_processed`   | depot     | telegram        | Ключ обработанного кадра в S3         |
+| `spotter.delivery.event`           | server    | telegram        | Команда доставки события (create/update/media) |
+| `spotter.delivery.recipient`       | server    | telegram        | Изменение роли/отзыв получателя       |
+| `spotter.command.request`          | telegram  | server          | Домен-мутирующая команда (RPC)        |
+| `spotter.command.reply`            | server    | telegram        | Ответ на команду (корреляция по requestId) |
+| `frigate/events` *(MQTT)*          | Frigate   | frigate         | Сырые события Frigate                 |
 
 В распределённом деплое эти стримы зеркалируются между локальным и удалённым Redis
 сервисом `forwarder` — направление см. в [apps/forwarder/src/streams.ts](apps/forwarder/src/streams.ts).
@@ -184,9 +198,9 @@ Compose-файлы лежат в [.deployment/compose/](.deployment/compose/) и
 | Профиль | Команда | Что поднимает | Узлы |
 | --- | --- | --- | --- |
 | **development** | `bun run docker:dev` | `redis` + `mosquitto` (инфра; приложения — на хосте через `bun start`) | одна машина |
-| **production · single** | `bun run docker:single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `bot` (без `forwarder`) | одна машина |
+| **production · single** | `bun run docker:single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `server`, `telegram` (без `forwarder`) | одна машина |
 | **production · ingest** | `bun run docker:ingest` | `local-redis` (durable), `mosquitto`, `frigate`, `depot×N` (опц. GPU), `forwarder` | ingest-узел |
-| **production · cloud** | `bun run docker:cloud` | `redis` (главный durable-буфер) + `bot` | облачный узел |
+| **production · cloud** | `bun run docker:cloud` | `redis` (главный durable-буфер) + `server` + `telegram` | облачный узел |
 
 **Один узел (`single`)** — простейший прод: одна машина и ингестит с NVR, и ходит
 в Telegram, единый Redis, `forwarder` не нужен.
@@ -206,15 +220,17 @@ S3 задаётся через `.env` (любой S3-совместимый бэ
 apps/
   frigate/    NVR-адаптер: Frigate Source + MediaProvider + Catalog (на @spotter/sink)
   test/       Синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка)
-  bot/        Telegram-бот (grammY)
+  server/     Headless-домен: события, медиа-оркестрация, recipients/авторизация, command-RPC
+  telegram/   Telegram-фронтенд (grammY): delivery-консьюмер, рендер, команды, presign
   depot/      Медиа-процессор (ffmpeg/sharp; S3 по ключу)
   forwarder/  Двунаправленный мост Redis Streams local↔remote (распределённый деплой)
 packages/
   sink/        Фреймворк адаптера: Source/MediaProvider/Catalog + runSink (стейджинг в S3)
-  transport/   Абстракции транспорта (RedisRegulator) + контракты (event/медиа/каталог) + helpers
+  transport/   Абстракции транспорта (RedisRegulator) + контракты (event/медиа/каталог/delivery) + helpers
   stenograph/  Логгер
-apps/bot/src/db/      SQLite-схема и репозиторий (Drizzle): chats, users, events
-apps/bot/drizzle/     Сгенерированные миграции Drizzle
+apps/server/src/db/    SQLite-схема и репозиторий (Drizzle): recipients, access_tokens, events
+apps/telegram/src/db/  SQLite-схема и репозиторий (Drizzle): tg_chats, tg_bindings, event_messages
+apps/{server,telegram}/drizzle/  Сгенерированные миграции Drizzle
 .deployment/compose/  Compose-профили: development, production.single, production.ingest, production.cloud
 .deployment/          Конфиги инфраструктуры (mosquitto, …)
 .env.*.example        Шаблоны окружения по сервисам
@@ -279,8 +295,8 @@ apps/bot/drizzle/     Сгенерированные миграции Drizzle
 - [x] ~~Kafka~~ → Redis Streams (встроенный `Bun.RedisClient`, consumer groups)
 - [x] Локальный durable-буфер + `forwarder` (store-and-forward между узлами)
 - [x] Разнос compose на профили dev / single / ingest / cloud
-- [ ] VPN-туннель между узлами (XRAY-VLESS / AmneziaWG 2 для ограниченных сетей); устойчивый канал bot↔Telegram
+- [ ] VPN-туннель между узлами (XRAY-VLESS / AmneziaWG 2 для ограниченных сетей); устойчивый канал telegram↔Telegram
 - [ ] `frigate/events` → `frigate/reviews` (нативный батчинг уведомлений)
 - [ ] Видео по кнопке (генерация по таймкодам / папка-отстойник)
-- [ ] Разделение `spotter/server` (бизнес-логика) + канал-адаптеры (`telegram`/`vk`/`max`/`ntfy`)
+- [x] Разделение `spotter/server` (домен) + `telegram`-фронтенд (`spotter.delivery.*` / `spotter.command.*`); канал-адаптеры `vk`/`max`/`ntfy` — на будущее
 - [ ] Интеграция LGTM-стека (Loki / Grafana / Tempo / Mimir)

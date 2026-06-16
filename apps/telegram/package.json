@@ -1,0 +1,33 @@
+{
+  "name": "@spotter/telegram",
+  "version": "1.0.0",
+  "description": "Telegram frontend: delivery consumer, grammy bot, commands, auth",
+  "main": "index.js",
+  "scripts": {
+    "start": "bun --env-file=../../.env.telegram src/index.ts",
+    "start:watch": "bun --watch --env-file=../../.env.telegram src/index.ts",
+    "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "if [ -n \"$(find src -name '*.test.ts' 2>/dev/null)\" ]; then bun test; fi",
+    "test:coverage": "if [ -n \"$(find src -name '*.test.ts' 2>/dev/null)\" ]; then bun test --coverage; fi"
+  },
+  "private": "true",
+  "sideEffects": "false",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "drizzle-kit": "^0.31.10"
+  },
+  "dependencies": {
+    "@grammyjs/hydrate": "^1.4.1",
+    "@grammyjs/parse-mode": "^1.11.1",
+    "@grammyjs/runner": "^2.0.3",
+    "@spotter/transport": "*",
+    "drizzle-orm": "^0.45.2",
+    "grammy": "^1.35.0",
+    "qrcode": "^1.5.4",
+    "stenograph": "*"
+  }
+}

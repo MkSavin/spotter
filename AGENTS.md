@@ -6,7 +6,7 @@
 ## TL;DR
 
 - **Рантайм — только Bun.** Никаких `npm`/`node`/`ts-node`. Запуск: `bun start`, тесты: `bun test`.
-- **Монорепо** Turborepo: 5 сервисов (`apps/*`) + 3 пакета (`packages/*`).
+- **Монорепо** Turborepo: 6 сервисов (`apps/*`) + 3 пакета (`packages/*`).
 - **Связь между сервисами — через Redis Streams** (и MQTT на входе). Прямых вызовов между сервисами нет.
 - **Стиль:** Biome — одинарные кавычки, без `;`, отступ 2 пробела. Запускай `bunx biome check --write` перед завершением.
 - **Open-source self-hosting:** проект рассчитан на развёртывание сторонними людьми у себя.
@@ -14,24 +14,32 @@
 ## Архитектура потока данных
 
 ```
-Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ bot ──▶ Telegram
-  (NVR)        (адаптер)        ▲                 │ ▲
-                  │ stage raw   └ request.<source>┘ │ presign
-                  ▼                                 │
-                 S3 ◀── transcode by key ── depot ──┘ (*_processed = S3-ключи)
+Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.event─▶ telegram ──▶ Telegram
+  (NVR)        (адаптер)        ▲                 │ ▲                       │ ▲
+                  │ stage raw   └ request.<source>┘ │ *_processed           │ presign
+                  ▼                                 │ (S3-ключи)            │
+                 S3 ◀── transcode by key ── depot ──┘ ◀─────────────────────┘
+                                          command.request/reply (telegram ⇄ server)
 ```
 
 1. Frigate шлёт MQTT-событие → **frigate** (адаптер) парсит (`parseFrigateEvent`) → публикует в `spotter.event`; каталог камер/объектов — в `spotter.catalog.<source>`.
-2. **bot** слушает `spotter.event`, обновляет БД (SQLite), шлёт уведомление. На `end` публикует `spotter.media.request.<source>` (`{eventId, source, want}`) — без обращения к NVR.
+2. **server** (headless-домен) слушает `spotter.event`, персистит в БД (SQLite), публикует `spotter.delivery.event` (create/update). На `end` публикует `spotter.media.request.<source>` (`{eventId, source, want}`) — без обращения к NVR.
 3. **frigate** ловит `*.request.<source>`, резолвит медиа (URL-схема + JWT живут **только** тут), стейджит сырьё в S3 и публикует `*.staged` (ключи S3).
 4. **depot** ловит `*.staged`, берёт сырьё из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат в S3, отвечает `*_processed` (ключи S3). NVR не знает.
-5. **bot** ловит `*_processed`, пресайнит S3-ключи в короткоживущие URL и отправляет медиа в Telegram. Креды NVR по сети не ходят — только ключи S3.
-6. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между
+5. **server** ловит `*_processed` и публикует `spotter.delivery.event` (action `media`, +S3-ключи). **telegram** консьюмит delivery-стрим, пресайнит ключи в короткоживущие URL и шлёт медиа в Telegram. Креды NVR по сети не ходят — только ключи S3.
+6. **telegram** домен не мутирует напрямую — шлёт `spotter.command.request` в server и ждёт коррелированный `spotter.command.reply` (login/роли/event-команды).
+7. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между
    локальным и удалённым Redis (store-and-forward, `XACK`-после-успеха). Сам бизнес-логику не трогает.
 
 Абстракция NVR: вся специфика конкретного NVR изолирована в адаптере (`apps/frigate` на
-`@spotter/sink`). `bot`/`depot` работают через контракты медиа-пайплайна и каталога из
-`@spotter/transport`. Для офлайн-разработки есть синтетический адаптер `apps/test` (REPL + фикстуры).
+`@spotter/sink`). `server`/`telegram`/`depot` работают через контракты медиа-пайплайна,
+каталога и delivery из `@spotter/transport`. Для офлайн-разработки есть синтетический адаптер
+`apps/test` (REPL + фикстуры).
+
+Разделение домен/фронтенд (Part B): **server** — headless-домен и оркестрация
+(события, медиа-пайплайн, recipients/авторизация, command-RPC); **telegram** — фронтенд
+доставки (рендер, отправка/редактирование сообщений, Telegram-локальный стейт, presign).
+Контракт между ними — `spotter.delivery.*` (downstream) и `spotter.command.*` (upstream).
 
 Стримы (= имена топиков) целиком — в [README.md](README.md#redis-streams). Деплой-профили
 (dev / single / ingest / cloud) — в [README.md](README.md#развёртывание-docker).
@@ -47,7 +55,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ bot ──▶ Telegr
 | Покрытие          | `bun test:coverage`                        |
 | Линт + формат     | `bunx biome check --write`                 |
 | Проверка типов    | `bun run typecheck` (turbo per-package; `typecheck:full` — весь репо одним `tsc`) |
-| Миграции БД       | `cd apps/bot && bunx drizzle-kit generate` |
+| Миграции БД       | `cd apps/<server\|telegram> && bunx drizzle-kit generate` |
 | Токен авторизации | `bun run sign:token <role>`                |
 
 ## Ключевые конвенции
@@ -65,7 +73,7 @@ env.enum('DIRECTORY_CLEANUP', strategies, 'file-processed')
 env.boolean('FLAG', false)
 
 // Общий REDIS_*-блок собирается одним хелпером из transport:
-const redis = resolveRedisConfig({ group: 'spotter-bot', clientId: 'spotter-bot' })
+const redis = resolveRedisConfig({ group: 'spotter-server', clientId: 'spotter-server' })
 ```
 `resolveConfig` сам бросает ошибку при отсутствии обязательных значений (`REDIS_URL`, токен, БД).
 **Не** читай `process.env` напрямую в бизнес-логике — только в `config.ts`.
@@ -120,16 +128,19 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 
 ## Данные (SQLite + Drizzle)
 
-БД живёт только в **bot** ([apps/bot/src/db/](apps/bot/src/db/)): `schema.ts` (таблицы +
-`Role` + типы), `client.ts` (`createDatabase` + WAL + миграции на старте), `repository.ts`
-(сгруппированные `usersRepo` / `chatsRepo` / `eventsRepo`, принимают `db` первым аргументом).
-Таблицы: `chats`, `users` (составной PK `(id, chat_id)`, роли `USER`/`ADMIN`), `events`,
-`event_messages` (заменяет встроенный массив `Event.messages` из Mongo).
+БД **разделена** между server и telegram (каждая со своим `schema.ts` / `client.ts`
+(`createDatabase` + WAL + миграции на старте) / `repository.ts`, принимающим `db` первым аргументом):
+
+- **server** ([apps/server/src/db/](apps/server/src/db/)) — домен: `recipients` (uuid PK, роль,
+  `tg_user_id?`/`username?`), `access_tokens` (одноразовые коды), `events` (снапшот NVR без message-id).
+- **telegram** ([apps/telegram/src/db/](apps/telegram/src/db/)) — Telegram-локальный стейт:
+  `tg_chats`, `tg_bindings` (составной PK `(tg_user_id, tg_chat_id)`, `recipient_uuid` + кэш роли),
+  `event_messages` (составной PK `(event_id, tg_chat_id)`, `message_id`).
 
 - Доступ к БД — **только через repository**, не дёргай drizzle из бизнес-логики/команд.
 - `bun:sqlite` синхронный → функции репозитория возвращают значения, не промисы (`await` над ними безопасен).
-- После правок `schema.ts` — `bunx drizzle-kit generate` (миграции в `apps/bot/drizzle/`, применяются при старте бота).
-- БД-файл задаётся `DATABASE_PATH` (по умолчанию `./data/bot.sqlite`, относительно cwd).
+- После правок `schema.ts` — `bunx drizzle-kit generate` в нужном сервисе (миграции в его `drizzle/`, применяются на старте).
+- БД-файл задаётся `DATABASE_PATH` (по умолчанию `./data/server.sqlite` / `./data/telegram.sqlite`, относительно cwd).
 
 ## Стиль кода (Biome)
 
@@ -146,14 +157,16 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 ## Подводные камни
 
 - **Только Bun.** Скрипты, S3-клиент (`Bun.S3Client`), тест-раннер — всё на Bun API.
-- **БД — локальный SQLite-файл** (`DATABASE_PATH`, cwd-относительно). Отдельного сервиса БД нет; миграции применяются на старте бота. Папка `apps/bot/drizzle/` обязана ехать рядом с приложением (см. [apps/bot/Dockerfile](apps/bot/Dockerfile)).
+- **БД — локальный SQLite-файл** (`DATABASE_PATH`, cwd-относительно). Отдельного сервиса БД нет; миграции применяются на старте. Папка `drizzle/` каждого сервиса обязана ехать рядом с приложением (см. [apps/server/Dockerfile](apps/server/Dockerfile) / [apps/telegram/Dockerfile](apps/telegram/Dockerfile)).
 - **Frigate шлёт «грязные» события** — контроллеры/парсеры делают ранний `return`/`throw`; сохраняй эту защиту.
-- **Креды NVR — только в адаптере** (`apps/frigate`). По сети ходят S3-ключи, не байты и не токены. В `bot`/`depot` не должно быть `frigate`/`jwt`/`clipUrl`/`cameraLabels`.
-- `DIRECTORY_CLEANUP` (depot) меняет очистку temp-файлов; `S3_PRESIGN_EXPIRY` (bot) — срок жизни пресайн-URL — см. AGENTS.md сервисов.
+- **Креды NVR — только в адаптере** (`apps/frigate`). По сети ходят S3-ключи, не байты и не токены. В `server`/`telegram`/`depot` не должно быть `frigate`/`jwt`/`clipUrl`/`cameraLabels`.
+- **Домен/фронтенд не смешивать**: в `server` не должно быть grammy/рендера/Telegram-стейта; в `telegram` — доменной истины (роли/события как источник). Мутации домена из telegram — только через `command.request`.
+- `DIRECTORY_CLEANUP` (depot) меняет очистку temp-файлов; `S3_PRESIGN_EXPIRY` (telegram) — срок жизни пресайн-URL — см. AGENTS.md сервисов.
 
 ## Карта сервисов
 
-- [apps/bot/AGENTS.md](apps/bot/AGENTS.md) — Telegram-бот, команды, сессии, Innoxious-медиа, кэш каталога, пресайн S3.
+- [apps/server/AGENTS.md](apps/server/AGENTS.md) — headless-домен: события, медиа-оркестрация, recipients/авторизация, command-RPC.
+- [apps/telegram/AGENTS.md](apps/telegram/AGENTS.md) — Telegram-фронтенд: delivery-консьюмер, команды, сессии, Innoxious-медиа, кэш каталога, пресайн S3.
 - [apps/depot/AGENTS.md](apps/depot/AGENTS.md) — транскод медиа из S3 по ключу, ffmpeg/sharp.
 - [apps/frigate/AGENTS.md](apps/frigate/AGENTS.md) — NVR-адаптер: `Source`/`MediaProvider`/`Catalog` на `@spotter/sink`.
 - [apps/test/AGENTS.md](apps/test/AGENTS.md) — синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка).

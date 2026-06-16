@@ -1,13 +1,4 @@
-# Production — ingest node. Holds the local durable buffer + ingestion +
-# transcoding; the bot and main Redis live on the cloud node. The forwarder is
-# the only component that reaches the cloud node, over a site-to-site VPN tunnel.
-#
-# Example deployment: an edge box on an unreliable or restricted uplink. The
-# local durable Redis lets ingestion and transcoding keep running through link
-# outages, and the forwarder drains the backlog once connectivity recovers.
-#
-# Run from the repo root:
-#   docker compose --project-directory . -f .deployment/compose/production.ingest.yml up -d
+# Ingest node - the local node that handles the durable buffer, ingestion, and transcoding.
 services:
   local-redis:
     image: redis:7-alpine
