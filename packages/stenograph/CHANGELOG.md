@@ -1,5 +1,11 @@
 # stenograph
 
+## 1.1.0
+
+### Minor Changes
+
+- 538fb94: Full project architecture rework
+
 ## 1.0.2
 
 ### Patch Changes
