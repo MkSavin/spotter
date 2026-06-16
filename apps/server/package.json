@@ -6,7 +6,9 @@
   "scripts": {
     "start": "bun --env-file=../../.env --env-file=../../.env.server src/index.ts",
     "start:watch": "bun --watch --env-file=../../.env --env-file=../../.env.server src/index.ts",
-    "build": "bun build --entrypoints src/index.ts src/cli.ts --outdir ./dist --target bun --env disable",
+    "build": "bun run build:server && bun run build:cli",
+    "build:server": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
+    "build:cli": "bun build --entrypoints src/cli.ts --outfile ./dist/spotter --target bun --env disable",
     "sign:token": "bun --env-file=../../.env --env-file=../../.env.server src/cli.ts sign",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "if [ -n \"$(find src -name '*.test.ts' 2>/dev/null)\" ]; then bun test; fi",

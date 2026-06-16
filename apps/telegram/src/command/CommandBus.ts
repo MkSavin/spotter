@@ -91,6 +91,7 @@ export class CommandBus {
   private async pollLoop(): Promise<void> {
     while (this.running) {
       try {
+        // Bun's RedisClient speaks RESP3
         const result = (await this.subscriber.send('XREAD', [
           'COUNT',
           '100',
@@ -99,11 +100,11 @@ export class CommandBus {
           'STREAMS',
           deliveryStreams.commandReply,
           this.replyOffset,
-        ])) as [string, [string, string[]][]][] | null
+        ])) as Record<string, [string, string[]][]> | null
 
         if (!result) continue
 
-        for (const [, entries] of result) {
+        for (const entries of Object.values(result)) {
           for (const [id, fields] of entries) {
             this.replyOffset = id
 
