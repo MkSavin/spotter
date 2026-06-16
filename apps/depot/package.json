@@ -1,6 +1,6 @@
 {
   "name": "@spotter/depot",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -18,7 +18,8 @@
   "license": "MIT",
   "dependencies": {
     "@spotter/transport": "*",
-    "stenograph": "*",    "fluent-ffmpeg": "^2.1.3",
+    "stenograph": "*",
+    "fluent-ffmpeg": "^2.1.3",
     "sharp": "^0.33.5"
   }
 }
