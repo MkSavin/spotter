@@ -160,8 +160,8 @@ const polling = async (): Promise<void> => {
 
   const bot = await initialize(coreContext)
 
-  bot.use(syncCommandMenu(commandRegistry))
   registerCommands(bot, commandRegistry)
+  bot.use(syncCommandMenu(commandRegistry))
 
   applicationLogger.debug('Starting up...')
 
