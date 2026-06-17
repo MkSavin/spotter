@@ -9,6 +9,7 @@ import {
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import { Bot, session } from 'grammy'
+import { registerClipCallback } from './callback/clipCallback'
 import { CatalogCache } from './catalog/CatalogCache'
 import { CommandBus } from './command/CommandBus'
 import { commandRegistry } from './commands/commandList'
@@ -177,6 +178,7 @@ const polling = async (): Promise<void> => {
   const bot = await initialize(coreContext)
 
   registerCommands(bot, commandRegistry)
+  registerClipCallback(bot)
   bot.use(syncCommandMenu(commandRegistry))
 
   applicationLogger.debug('Starting up...')

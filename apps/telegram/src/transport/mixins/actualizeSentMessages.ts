@@ -1,3 +1,4 @@
+import type { InlineKeyboard } from 'grammy'
 import type { TransportContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
 import type { EventMessage } from '../../db/schema'
@@ -8,10 +9,14 @@ export const actualizeSentMessages = async (
   messages: EventMessage[],
   contents: string,
   context: TransportContext,
+  keyboard?: InlineKeyboard,
 ) => {
   const { bot, db, logger } = context
 
-  const options = { parse_mode: 'HTML' as const }
+  const options = {
+    parse_mode: 'HTML' as const,
+    ...(keyboard ? { reply_markup: keyboard } : {}),
+  }
 
   try {
     const supplied = await supplySubscribers(messages, context, {

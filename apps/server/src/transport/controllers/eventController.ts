@@ -58,12 +58,15 @@ export const eventController: StreamMessageController<ServerContext> = async (
 
   if (event.type !== 'end') return
 
+  // Only the snapshot is transcoded eagerly; the clip is requested on demand
+  // when a recipient taps the "Видео" button (see the event.clip command).
   const want: MediaWant[] = []
-  if (event.hasClip) want.push('clip')
   if (event.hasSnapshot) want.push('snapshot')
 
   if (want.length === 0) {
-    logger.debug('Event advertises no media. Skipping media request...')
+    logger.debug(
+      'Event advertises no snapshot. Skipping eager media request...',
+    )
     return
   }
 
@@ -72,5 +75,5 @@ export const eventController: StreamMessageController<ServerContext> = async (
   const request: MediaRequest = { eventId: event.id, source, want }
   await producer.publish(mediaStreams.mediaRequest(source), request)
 
-  logger.debug('Published media request')
+  logger.debug('Published eager media request (snapshot)')
 }

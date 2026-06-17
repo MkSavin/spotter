@@ -23,10 +23,11 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 ```
 
 1. Frigate шлёт MQTT-событие → **frigate** (адаптер) парсит (`parseFrigateEvent`) → публикует в `spotter.event`; каталог камер/объектов — в `spotter.catalog.<source>`.
-2. **server** (headless-домен) слушает `spotter.event`, персистит в БД (SQLite), публикует `spotter.delivery.event` (create/update). На `end` публикует `spotter.media.request.<source>` (`{eventId, source, want}`) — без обращения к NVR.
+2. **server** (headless-домен) слушает `spotter.event`, персистит в БД (SQLite), публикует `spotter.delivery.event` (create/update). На `end` публикует `spotter.media.request.<source>` (`{eventId, source, want:[snapshot]}`) — **только фото eager, клип по запросу** — без обращения к NVR.
 3. **frigate** ловит `*.request.<source>`, резолвит медиа (URL-схема + JWT живут **только** тут), стейджит сырьё в S3 и публикует `*.staged` (ключи S3).
 4. **depot** ловит `*.staged`, берёт сырьё из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат в S3, отвечает `*_processed` (ключи S3). NVR не знает.
-5. **server** ловит `*_processed` и публикует `spotter.delivery.event` (action `media`, +S3-ключи). **telegram** консьюмит delivery-стрим, пресайнит ключи в короткоживущие URL и шлёт медиа в Telegram. Креды NVR по сети не ходят — только ключи S3.
+5. **server** ловит `*_processed` и публикует `spotter.delivery.event` (action `media`, +S3-ключи). **telegram** консьюмит delivery-стрим, пресайнит ключи в короткоживущие URL и крепит медиа **на исходное сообщение** через `editMessageMedia` (текст → фото → видео). Креды NVR по сети не ходят — только ключи S3.
+6. **Видео по кнопке:** под фото-сообщением — кнопка «Видео». Нажатие → telegram шлёт RPC `event.clip` → **server** запрашивает транскод клипа (`want:[clip]`) → готовый клип тем же путём проставляется видео всем подписчикам события (fan-out по `eventId`).
 6. **telegram** домен не мутирует напрямую — шлёт `spotter.command.request` в server и ждёт коррелированный `spotter.command.reply` (login/роли/event-команды).
 7. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между
    локальным и удалённым Redis (store-and-forward, `XACK`-после-успеха). Сам бизнес-логику не трогает.

@@ -9,19 +9,102 @@
 > сервисам) и compose-профили (см. [Развёртывание](#развёртывание-docker)).
 
 Когда камера фиксирует событие (человек, машина, животное), Frigate публикует его в MQTT.
-Spotter подхватывает событие, отправляет уведомление в Telegram, по запросу обрабатывает
-снимок/клип и присылает медиа прямо в чат.
+Spotter подхватывает событие, отправляет уведомление в Telegram, обрабатывает снимок и
+крепит его прямо к сообщению. Под фото — кнопка «Видео»: по нажатию обрабатывается клип
+и тем же сообщением заменяет фото.
 
 ## Архитектура
 
+Spotter поддерживает две топологии. Пунктиром обведена **область нашего приложения**
+(`apps/*` + `packages/*`); снаружи — внешние системы (Frigate NVR, Telegram) и инфраструктура
+(S3, Redis, MQTT-брокер). Протоколы подписаны на рёбрах: **MQTT** (ингест из Frigate),
+**Redis Streams** (весь межсервисный транспорт), **S3 API** (медиа по ключам) и
+**HTTPS** (Telegram Bot API).
+
+### Топология «единый узел» (простой режим)
+
+```mermaid
+---
+title: "Spotter — единый узел (всё на одной машине, один Redis)"
+---
+flowchart LR
+    Frigate["Frigate NVR"]
+    TG(["Telegram"])
+    S3[("S3-хранилище")]
+
+    subgraph app["Spotter — наши сервисы"]
+        direction LR
+        frigate["frigate<br/>(адаптер)"]
+        server["server<br/>(домен)"]
+        telegram["telegram<br/>(фронтенд)"]
+        depot["depot<br/>(транскод)"]
+        redis[("redis<br/>(Streams-шина)")]
+    end
+
+    Frigate -- "MQTT" --> frigate
+    frigate <-. "spotter.event / *.staged" .-> redis
+    server <-. "media.request / delivery / command" .-> redis
+    depot <-. "*_processed / frame_processed" .-> redis
+    telegram <-. "delivery / command / camera" .-> redis
+
+    frigate -- "stage raw" --> S3
+    depot -- "transcode by key" --> S3
+    telegram -- "presign" --> S3
+    telegram -- "sendMessage · HTTPS (Bot API)" --> TG
+
+    classDef ext fill:#eceff1,stroke:#90a4ae,color:#37474f
+    class Frigate,TG,S3 ext
+    style app fill:#eef6ff,stroke:#3b82f6,stroke-width:2px,stroke-dasharray:6 4
 ```
- Frigate ─MQTT─▶  frigate  ─Redis Streams─▶ server ─delivery.event─▶ telegram ─▶ Telegram
-   (NVR)         (адаптер)        ▲           │  ▲                       │
-                    │             └─ request ─┘  │ *_processed           │ presign
-                    │ stage raw                  │ (S3-ключи)            │
-                    ▼                            │                       │
-                   S3  ◀── transcode by key ── depot ◀───────────────────┘
-                           command.request/reply (telegram ⇄ server)
+
+### Топология «ingest + cloud» (надёжный режим, распределённо)
+
+Сервисы разнесены на два узла, связанных VPN-туннелем. `forwarder` — единственный держатель
+межсайтового канала: зеркалит стримы между `local-redis` (durable-буфер на ingest) и главным
+Redis в облаке и буферизует события при обрывах (`XACK`-после-успеха).
+
+```mermaid
+---
+title: "Spotter — распределённый деплой (надёжный режим: ingest + cloud)"
+---
+flowchart LR
+    Frigate["Frigate NVR"]
+    TG(["Telegram"])
+    S3[("S3-хранилище")]
+
+    subgraph app["Spotter — наши сервисы (два узла)"]
+        direction LR
+        subgraph ingest["ingest-узел · edge"]
+            frigate["frigate<br/>(адаптер)"]
+            depot["depot ×N<br/>(транскод)"]
+            lredis[("local-redis<br/>durable-буфер")]
+            forwarder["forwarder<br/>(мост)"]
+        end
+        subgraph cloud["cloud-узел"]
+            rredis[("redis<br/>(главный)")]
+            server["server<br/>(домен)"]
+            telegram["telegram<br/>(фронтенд)"]
+        end
+    end
+
+    Frigate -- "MQTT" --> frigate
+    frigate -- "Redis Streams" --> lredis
+    depot -- "Redis Streams" --> lredis
+    lredis <-. "XADD / XACK" .-> forwarder
+    forwarder <== "Redis Streams через VPN-туннель<br/>(store-and-forward)" ==> rredis
+    rredis <-. "Redis Streams" .-> server
+    rredis <-. "Redis Streams" .-> telegram
+
+    frigate -- "S3 API" --> S3
+    depot -- "S3 API" --> S3
+    telegram -- "presign · S3 API" --> S3
+    telegram -- "sendMessage · HTTPS (Bot API)" --> TG
+
+    classDef ext fill:#eceff1,stroke:#90a4ae,color:#37474f
+    class Frigate,TG,S3 ext
+    style app fill:#eef6ff,stroke:#3b82f6,stroke-width:2px,stroke-dasharray:6 4
+    style ingest fill:#fff7ed,stroke:#fb923c
+    style cloud fill:#f0fdf4,stroke:#34d399
 ```
 
 Вся специфика NVR изолирована в адаптере (`apps/frigate`): только он знает URL-схемы
@@ -178,7 +261,7 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 | `spotter.event`                    | frigate   | server          | Событие камеры (start/update/end)   |
 | `spotter.event.test_seed`          | telegram  | frigate         | Посев тестовых событий (`/test_publish`) |
 | `spotter.catalog.updated`          | frigate   | server, telegram | Снимок каталога камер/объектов       |
-| `spotter.media.request.<source>`   | server    | frigate         | Запрос на стейджинг клипа/снимка события |
+| `spotter.media.request.<source>`   | server    | frigate         | Стейджинг медиа события: снимок (eager на `end`) / клип (по кнопке «Видео», `event.clip`) |
 | `spotter.media.staged`             | frigate   | depot           | Сырьё события застейджено в S3 (ключи) |
 | `spotter.event.media_processed`    | depot     | server          | Ключи обработанного медиа в S3       |
 | `spotter.camera.request.<source>`  | telegram  | frigate         | Запрос на стейджинг кадра камеры      |
@@ -301,6 +384,6 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
 - [x] Разнос compose на профили dev / single / ingest / cloud
 - [ ] VPN-туннель между узлами (XRAY-VLESS / AmneziaWG 2 для ограниченных сетей); устойчивый канал telegram↔Telegram
 - [ ] `frigate/events` → `frigate/reviews` (нативный батчинг уведомлений)
-- [ ] Видео по кнопке (генерация по таймкодам / папка-отстойник)
+- [x] Видео по кнопке (on-demand транскод клипа, edit-in-place на сообщении события)
 - [x] Разделение `spotter/server` (домен) + `telegram`-фронтенд (`spotter.delivery.*` / `spotter.command.*`); канал-адаптеры `vk`/`max`/`ntfy` — на будущее
 - [ ] Интеграция LGTM-стека (Loki / Grafana / Tempo / Mimir)

@@ -2,69 +2,60 @@ import type { DeliveryEvent } from '@spotter/transport'
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
 import type { TransportContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
-import type { EventMessage } from '../../db/schema'
-import { InnoxiousMediaGroup } from '../../extension/innoxious/InnoxiousMedia'
-import { supplySubscribers } from '../helpers/supplySubscribers'
+import { actualizeEventMedia } from '../mixins/actualizeEventMedia'
 import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
+import { shouldOfferClip, videoButtonKeyboard } from '../view/eventKeyboard'
 import { renderEvent } from '../view/renderEvent'
 
 export const deliveryEventAction = async (
   delivery: DeliveryEvent,
   context: TransportContext,
 ): Promise<void> => {
-  const { logger, db, bot, s3, config } = context
+  const { logger, db, s3, config } = context
   const { eventId, event, action, clipKey, snapshotKey } = delivery
+
+  const caption = renderEvent(event, context)
 
   if (action === 'create' || action === 'update') {
     const messages = eventMessagesRepo.find(db, eventId)
-    const contents = renderEvent(event, context)
+    // Offer the clip once the event has ended and advertises a clip.
+    const keyboard = shouldOfferClip(event)
+      ? videoButtonKeyboard(eventId)
+      : undefined
 
-    await actualizeSentMessages(eventId, messages, contents, context)
+    await actualizeSentMessages(eventId, messages, caption, context, keyboard)
 
     logger.debug(`deliveryEvent (${action}) processed for ${eventId}`)
     return
   }
 
-  // action === 'media'
-  const media: (InputMediaPhoto | InputMediaVideo)[] = []
-
-  if (clipKey) {
-    media.push({
-      type: 'video',
-      media: s3.presign(clipKey, { expiresIn: config.presignExpiry }),
-    })
-  }
-  if (snapshotKey) {
-    media.push({
-      type: 'photo',
-      media: s3.presign(snapshotKey, { expiresIn: config.presignExpiry }),
-    })
-  }
-
-  if (media.length === 0) return
-
-  const innoxeus = new InnoxiousMediaGroup(media)
-  const contents = renderEvent(event, context)
-  const options = { parse_mode: 'HTML' as const }
-
+  // action === 'media' — attach transcoded media to the existing messages.
   const messages = eventMessagesRepo.find(db, eventId)
 
-  const sendMedia = async (message: EventMessage): Promise<void> => {
-    await bot.api.innoxious.sendMediaGroup(message.chatId, innoxeus, {
-      reply_to_message_id: message.id,
-      disable_notification: true,
-    })
+  if (clipKey) {
+    // The clip supersedes the snapshot: video replaces the photo, button gone.
+    const video: InputMediaVideo = {
+      type: 'video',
+      media: s3.presign(clipKey, { expiresIn: config.presignExpiry }),
+      caption,
+      parse_mode: 'HTML',
+    }
+    await actualizeEventMedia(eventId, messages, video, undefined, context)
+    logger.debug(`deliveryEvent (media/clip) processed for ${eventId}`)
+    return
   }
 
-  await supplySubscribers(messages, context, {
-    create: async (chatId) => {
-      const msg = await bot.api.sendMessage(chatId, contents, options)
-      await sendMedia({ id: msg.message_id, chatId })
-    },
-    update: async (message) => {
-      await sendMedia(message)
-    },
-  })
-
-  logger.debug(`deliveryEvent (media) processed for ${eventId}`)
+  if (snapshotKey) {
+    const photo: InputMediaPhoto = {
+      type: 'photo',
+      media: s3.presign(snapshotKey, { expiresIn: config.presignExpiry }),
+      caption,
+      parse_mode: 'HTML',
+    }
+    const keyboard = shouldOfferClip(event)
+      ? videoButtonKeyboard(eventId)
+      : undefined
+    await actualizeEventMedia(eventId, messages, photo, keyboard, context)
+    logger.debug(`deliveryEvent (media/snapshot) processed for ${eventId}`)
+  }
 }

@@ -35,17 +35,23 @@ bun run sign:token   # CLI: выпустить access-код (src/cli.ts)
 ```
 spotter.event ──▶ eventController ──┬─▶ persist (eventsRepo.upsert)
                                     ├─▶ publish spotter.delivery.event (create|update)
-                                    └─▶ (на end + hasClip/Snapshot)
-                                          publish spotter.media.request.<source>
+                                    └─▶ (на end + hasSnapshot) publish
+                                          spotter.media.request.<source> (want: [snapshot])
+event.clip (RPC по кнопке) ──────▶ eventClipHandler
+                                    └─▶ publish spotter.media.request.<source> (want: [clip])
 spotter.event.media_processed ──▶ eventMediaController
                                     └─▶ publish spotter.delivery.event (action: media, +clip/snapshotKey)
 ```
 
+- **Snapshot — eager, clip — по запросу.** На `end` запрашивается только `snapshot`;
+  клип транскодится лениво, когда получатель жмёт кнопку «Видео» (команда `event.clip`,
+  см. ниже). Так не транскодим клипы, которые никто не смотрит.
 - [eventController.ts](src/transport/controllers/eventController.ts): идемпотентен —
   событие в статусе `end` повторно не обрабатывается. Медиа-запрос роутится **на источник
   события** (`mediaStreams.mediaRequest(source)`), а не на дефолтный `SOURCE_ID`.
 - Сервер **не пресайнит и не качает байты** — он отдаёт `clipKey`/`snapshotKey` в
-  `delivery.event`; presign делает telegram.
+  `delivery.event`; presign делает telegram. И snapshot, и clip приходят отдельными
+  `media_processed` → отдельными `delivery.event (media)`.
 
 ## Команды (RPC)
 
@@ -55,8 +61,12 @@ spotter.event.media_processed ──▶ eventMediaController
 (корреляция по `requestId`; неизвестный `kind` и исключения → `ok:false`).
 
 Хендлеры: `login.redeem`, `user.setRole`, `user.revoke`, `user.sign`, `event.info`,
-`event.clear`. Мутации ролей/доступа дополнительно публикуют `spotter.delivery.recipient`,
-чтобы telegram синхронизировал свой кэш биндингов.
+`event.clear`, `event.clip`. Мутации ролей/доступа дополнительно публикуют
+`spotter.delivery.recipient`, чтобы telegram синхронизировал свой кэш биндингов.
+
+`event.clip` (`{eventId}`) — on-demand клип по кнопке «Видео»: резолвит источник
+сохранённого события и публикует `spotter.media.request.<source>` с `want:[clip]`.
+Готовый клип возвращается обычным `media_processed` → `delivery.event (media)` путём.
 
 ## БД (`src/db/`, drizzle/sqlite)
 

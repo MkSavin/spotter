@@ -36,16 +36,28 @@ NVR-кредов нет — S3 только для presign-байтов. `requir
 
 ```
 spotter.delivery.event ──▶ deliveryEventController ──▶ deliveryEventAction
-   action create|update  → renderEvent → actualizeSentMessages (send/edit/удалить по чатам)
-   action media          → presign clip/snapshotKey → InnoxiousMediaGroup → media group
+   action create|update  → renderEvent → actualizeSentMessages (send/edit + кнопка «Видео»)
+   action media (snapshot)→ editMessageMedia(текст→фото) + кнопка «Видео» (если есть клип)
+   action media (clip)    → editMessageMedia(→видео), кнопка убирается
 ```
 
+- **Медиа крепится «на оригинальное сообщение» edit-in-place**, а не отдельным media group.
+  `editMessageMedia` (Bot API ≥ 7.11) добавляет медиа к текстовому сообщению и меняет
+  фото→видео — один `message_id` морфится текст → фото → видео.
+  ([actualizeEventMedia.ts](src/transport/mixins/actualizeEventMedia.ts)).
+- **Кнопка «Видео»** ([eventKeyboard.ts](src/transport/view/eventKeyboard.ts)): появляется на
+  фото/тексте, когда событие завершилось и имеет клип (`shouldOfferClip`). Нажатие →
+  [clipCallback.ts](src/callback/clipCallback.ts): ack, кнопка → «⏳ обрабатывается»
+  (защита от повторов), RPC `event.clip`. Готовый клип прилетает `delivery.event (media)`
+  и через **fan-out по `eventId`** проставляется видео всем подписчикам этого события.
+  Жать может любой в авторизованном чате (роль не проверяется).
 - [deliveryEventAction.ts](src/transport/actions/deliveryEventAction.ts): сопоставляет
   подписанные чаты с уже отправленными `event_messages` через
   [supplySubscribers.ts](src/transport/helpers/supplySubscribers.ts) (create/update/remove),
   message-id хранит **локально** (server присылает только intent + recipients).
 - `media`-экшен пресайнит S3-ключи (`s3.presign`, `S3_PRESIGN_EXPIRY`) — server байты не
-  отдаёт. `InnoxiousMedia` доставляет с fallback (naive URL → accurate buffer).
+  отдаёт. `InnoxiousMedia` доставляет с fallback (naive URL → accurate buffer). Видео
+  **заменяет** фото (Telegram не держит фото+видео в одном сообщении).
 - [deliveryRecipientController.ts](src/transport/controllers/deliveryRecipientController.ts)
   держит кэш `tg_bindings.role` в синхроне: `update` меняет роль, `revoke` сносит биндинги
   и осиротевшие чаты.

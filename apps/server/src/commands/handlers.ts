@@ -2,7 +2,10 @@ import { randomBytes } from 'node:crypto'
 import {
   type CommandReply,
   type DeliveryRecipient,
+  type MediaRequest,
   deliveryStreams,
+  mediaStreams,
+  resolveSource,
 } from '@spotter/transport'
 import type { ServerContext } from '../context'
 import { eventsRepo, recipientsRepo, tokensRepo } from '../db/repository'
@@ -190,6 +193,38 @@ export const eventClearHandler: CommandHandler = async (_args, context) => {
   return ok({ count })
 }
 
+/**
+ * On-demand clip transcode: requested when a recipient taps the "Видео" button.
+ * Resolves the event's source and publishes a clip-only media request; the
+ * transcoded result flows back through the normal media → delivery path.
+ */
+export const eventClipHandler: CommandHandler = async (args, context) => {
+  const { db, producer } = context
+  const eventId = String(args.eventId ?? '').trim()
+
+  if (!eventId) {
+    return fail('Missing required arg: eventId')
+  }
+
+  const event = eventsRepo.find(db, eventId)
+  if (!event) {
+    return fail('not-found')
+  }
+  if (!event.hasClip) {
+    return fail('no-clip')
+  }
+
+  const source = resolveSource({ source: event.source ?? undefined })
+  const request: MediaRequest = { eventId, source, want: ['clip'] }
+  await producer.publish(mediaStreams.mediaRequest(source), request)
+
+  context.logger
+    .sub('media')
+    .info(`Requested on-demand clip transcode for ${eventCode(eventId)}`)
+
+  return ok()
+}
+
 /** Registry mapping command kind → handler. */
 export const commandHandlers: Record<string, CommandHandler> = {
   'login.redeem': loginRedeemHandler,
@@ -198,4 +233,5 @@ export const commandHandlers: Record<string, CommandHandler> = {
   'user.sign': userSignHandler,
   'event.info': eventInfoHandler,
   'event.clear': eventClearHandler,
+  'event.clip': eventClipHandler,
 }
