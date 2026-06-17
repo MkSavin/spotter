@@ -27,34 +27,33 @@ Spotter поддерживает две топологии. Пунктиром �
 ---
 title: "Spotter — единый узел (всё на одной машине, один Redis)"
 ---
-flowchart LR
+flowchart TB
     Frigate["Frigate NVR"]
-    TG(["Telegram"])
     S3[("S3-хранилище")]
-
-    subgraph app["Spotter — наши сервисы"]
-        direction LR
-        frigate["frigate<br/>(адаптер)"]
+    TG(["Telegram"])
+    
+    subgraph app["Spotter"]
+        frigate["frigate<br/>(sink-адаптер)"]
         server["server<br/>(домен)"]
         telegram["telegram<br/>(фронтенд)"]
-        depot["depot<br/>(транскод)"]
-        redis[("redis<br/>(Streams-шина)")]
+        depot["depot ×N<br/>(транскод)"]
+        redis[("redis<br/>(шина)")]
     end
 
     Frigate -- "MQTT" --> frigate
-    frigate <-. "spotter.event / *.staged" .-> redis
-    server <-. "media.request / delivery / command" .-> redis
-    depot <-. "*_processed / frame_processed" .-> redis
-    telegram <-. "delivery / command / camera" .-> redis
+    TG <-- "Bot API" --> telegram
+    
+    frigate <-. "Redis Streams" .-> redis
+    server <-. "Redis Streams" .-> redis
+    depot <-. "Redis Streams" .-> redis
+    telegram <-. "Redis Streams" .-> redis
 
-    frigate -- "stage raw" --> S3
-    depot -- "transcode by key" --> S3
-    telegram -- "presign" --> S3
-    telegram -- "sendMessage · HTTPS (Bot API)" --> TG
+    frigate -- "S3 API" --> S3
+    depot <-- "S3 API" --> S3
+    telegram <-- "presign · S3 API" --> S3
+    S3 -- "presigned · S3 API" --> TG
 
-    classDef ext fill:#eceff1,stroke:#90a4ae,color:#37474f
     class Frigate,TG,S3 ext
-    style app fill:#eef6ff,stroke:#3b82f6,stroke-width:2px,stroke-dasharray:6 4
 ```
 
 ### Топология «ingest + cloud» (надёжный режим, распределённо)
@@ -72,15 +71,17 @@ flowchart LR
     TG(["Telegram"])
     S3[("S3-хранилище")]
 
-    subgraph app["Spotter — наши сервисы (два узла)"]
+    subgraph app["Spotter"]
         direction LR
         subgraph ingest["ingest-узел · edge"]
+            direction TB
             frigate["frigate<br/>(адаптер)"]
             depot["depot ×N<br/>(транскод)"]
             lredis[("local-redis<br/>durable-буфер")]
             forwarder["forwarder<br/>(мост)"]
         end
         subgraph cloud["cloud-узел"]
+            direction TB
             rredis[("redis<br/>(главный)")]
             server["server<br/>(домен)"]
             telegram["telegram<br/>(фронтенд)"]
@@ -88,23 +89,21 @@ flowchart LR
     end
 
     Frigate -- "MQTT" --> frigate
+    TG <-- "Bot API" --> telegram
+
     frigate -- "Redis Streams" --> lredis
-    depot -- "Redis Streams" --> lredis
+    server <-. "Redis Streams" .-> rredis
+    depot <-- "Redis Streams" --> lredis
     lredis <-. "XADD / XACK" .-> forwarder
-    forwarder <== "Redis Streams через VPN-туннель<br/>(store-and-forward)" ==> rredis
-    rredis <-. "Redis Streams" .-> server
-    rredis <-. "Redis Streams" .-> telegram
+    forwarder <== "Redis Streams + VPN<br/>(store-and-forward)" ==> rredis
+    telegram <-. "Redis Streams" .-> rredis
 
     frigate -- "S3 API" --> S3
     depot -- "S3 API" --> S3
-    telegram -- "presign · S3 API" --> S3
-    telegram -- "sendMessage · HTTPS (Bot API)" --> TG
+    telegram <-- "presign · S3 API" --> S3
+    S3 -- "presigned · S3 API" --> TG
 
-    classDef ext fill:#eceff1,stroke:#90a4ae,color:#37474f
     class Frigate,TG,S3 ext
-    style app fill:#eef6ff,stroke:#3b82f6,stroke-width:2px,stroke-dasharray:6 4
-    style ingest fill:#fff7ed,stroke:#fb923c
-    style cloud fill:#f0fdf4,stroke:#34d399
 ```
 
 Вся специфика NVR изолирована в адаптере (`apps/frigate`): только он знает URL-схемы
