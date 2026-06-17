@@ -66,7 +66,7 @@ Redis в облаке и буферизует события при обрыва
 ---
 title: "Spotter — распределённый деплой (надёжный режим: ingest + cloud)"
 ---
-flowchart LR
+flowchart TB
     Frigate["Frigate NVR"]
     TG(["Telegram"])
     S3[("S3-хранилище")]
