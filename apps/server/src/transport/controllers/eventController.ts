@@ -4,6 +4,7 @@ import {
   type StreamMessageController,
   bufferToJson,
   deliveryStreams,
+  eventCode,
   mediaStreams,
   resolveSource,
   safeParseSpotterEvent,
@@ -11,7 +12,6 @@ import {
 import type { DeliveryEvent } from '@spotter/transport'
 import type { ServerContext } from '../../context'
 import { eventsRepo } from '../../db/repository'
-import { eventCode } from '../helpers/eventCode'
 
 export const eventController: StreamMessageController<ServerContext> = async (
   payload,

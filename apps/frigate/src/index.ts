@@ -1,4 +1,5 @@
 import { runSink } from '@spotter/sink'
+import { eventStreams } from '@spotter/transport'
 import information from '../package.json'
 import { FrigateCatalog } from './catalog/FrigateCatalog'
 import { resolveConfig } from './config'
@@ -27,7 +28,7 @@ runSink({
   mediaProvider,
   catalog,
   controllers: [
-    { stream: 'spotter.event.test_seed', controller: eventTestController },
+    { stream: eventStreams.testSeed, controller: eventTestController },
   ],
 }).catch((error) => {
   applicationLogger.error(error)

@@ -38,6 +38,9 @@ bot.config.ts
 # Planning artifacts
 /.agents/plans
 
+# Code audit reports
+/.audits
+
 # Environment compose
 docker-compose.yml
 

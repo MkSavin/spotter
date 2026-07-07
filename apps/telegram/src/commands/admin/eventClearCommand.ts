@@ -9,7 +9,11 @@ class EventClearCommand extends SpotterCommand {
   async handle(context: BotContext): Promise<void> {
     let reply: Awaited<ReturnType<typeof context.commandBus.send>>
     try {
-      reply = await context.commandBus.send('event.clear', {})
+      reply = await context.commandBus.send(
+        'event.clear',
+        {},
+        context.session.user.recipientUuid,
+      )
     } catch {
       await context.reply('Сервис временно недоступен.')
       return

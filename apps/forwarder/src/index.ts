@@ -92,7 +92,7 @@ const run = async (): Promise<void> => {
     remoteSubscriber.close()
     localProducer.disconnect()
     remoteProducer.disconnect()
-    process.exit(1)
+    process.exit(0)
   }
 
   process.on('SIGINT', shutdown)

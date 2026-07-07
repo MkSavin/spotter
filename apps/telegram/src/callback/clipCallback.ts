@@ -37,7 +37,11 @@ export const registerClipCallback = (bot: Bot<BotContext, BotApi>): void => {
     }
 
     try {
-      const reply = await context.commandBus.send('event.clip', { eventId })
+      const reply = await context.commandBus.send(
+        'event.clip',
+        { eventId },
+        context.session.user.recipientUuid,
+      )
       if (!reply.ok) {
         context.logger
           .sub('clip')

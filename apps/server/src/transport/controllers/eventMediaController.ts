@@ -3,11 +3,11 @@ import {
   type StreamMessageController,
   bufferToJson,
   deliveryStreams,
+  eventCode,
   safeParseMediaProcessed,
 } from '@spotter/transport'
 import type { ServerContext } from '../../context'
 import { eventsRepo } from '../../db/repository'
-import { eventCode } from '../helpers/eventCode'
 
 export const eventMediaController: StreamMessageController<
   ServerContext

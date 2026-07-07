@@ -1,3 +1,4 @@
+import { eventStreams } from '@spotter/transport'
 import type { BotContext } from '../../context'
 import { timeout } from '../../helpers/timeout'
 import { argument } from '../../middlewares/command/argument'
@@ -28,7 +29,7 @@ class TestPublishCommand extends SpotterCommand {
       `🏓 <b>Отправляем стартовое событие...</b> <code>${id}</code>`,
     )
 
-    await producer.publish('spotter.event.test_seed', eventMessage('start'))
+    await producer.publish(eventStreams.testSeed, eventMessage('start'))
     await timeout(700)
 
     await message.editText(
@@ -36,7 +37,7 @@ class TestPublishCommand extends SpotterCommand {
       { parse_mode: 'HTML' },
     )
 
-    await producer.publish('spotter.event.test_seed', eventMessage('update'))
+    await producer.publish(eventStreams.testSeed, eventMessage('update'))
     await timeout(700)
 
     await message.editText(
@@ -44,7 +45,7 @@ class TestPublishCommand extends SpotterCommand {
       { parse_mode: 'HTML' },
     )
 
-    await producer.publish('spotter.event.test_seed', eventMessage('end'))
+    await producer.publish(eventStreams.testSeed, eventMessage('end'))
     await timeout(700)
 
     await message.editText(

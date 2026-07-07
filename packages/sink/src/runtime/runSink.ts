@@ -101,7 +101,7 @@ export const runSink = async <TConfig extends SinkConfig>(
     await sourceHandle?.stop()
     subscriber.close()
     producer.disconnect()
-    process.exit(1)
+    process.exit(0)
   }
 
   process.on('SIGINT', shutdown)

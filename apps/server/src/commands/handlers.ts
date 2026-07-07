@@ -4,6 +4,7 @@ import {
   type DeliveryRecipient,
   type MediaRequest,
   deliveryStreams,
+  eventCode,
   mediaStreams,
   resolveSource,
 } from '@spotter/transport'
@@ -12,12 +13,18 @@ import { eventsRepo, recipientsRepo, tokensRepo } from '../db/repository'
 import { type Role, Role as RoleEnum } from '../db/schema'
 import { parseRole } from '../helpers/role'
 import { normalizeUsername } from '../helpers/username'
-import { eventCode } from '../transport/helpers/eventCode'
 
 export type CommandHandler = (
   args: Record<string, unknown>,
   context: ServerContext,
 ) => Promise<Omit<CommandReply, 'requestId'>>
+
+/**
+ * Minimum access a principal needs to run a command kind.
+ * `anonymous` — no principal required (login has no recipient yet);
+ * `authorized` — any known recipient; a `Role` — that rank or higher.
+ */
+export type CommandAccess = 'anonymous' | 'authorized' | Role
 
 const ok = (data?: unknown): Omit<CommandReply, 'requestId'> => ({
   ok: true,
@@ -234,4 +241,19 @@ export const commandHandlers: Record<string, CommandHandler> = {
   'event.info': eventInfoHandler,
   'event.clear': eventClearHandler,
   'event.clip': eventClipHandler,
+}
+
+/**
+ * Minimum access each command kind requires. The domain enforces this itself
+ * rather than trusting the frontend's own gate — anyone able to write to the
+ * command stream still can't run a mutation above their role.
+ */
+export const commandAccess: Record<string, CommandAccess> = {
+  'login.redeem': 'anonymous',
+  'user.setRole': RoleEnum.ADMIN,
+  'user.revoke': RoleEnum.ADMIN,
+  'user.sign': RoleEnum.ADMIN,
+  'event.info': RoleEnum.ADMIN,
+  'event.clear': RoleEnum.ADMIN,
+  'event.clip': 'authorized',
 }

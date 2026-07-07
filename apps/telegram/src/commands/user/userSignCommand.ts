@@ -26,7 +26,11 @@ class UserSignCommand extends SpotterCommand {
 
     let reply: Awaited<ReturnType<typeof context.commandBus.send>>
     try {
-      reply = await context.commandBus.send('user.sign', { username })
+      reply = await context.commandBus.send(
+        'user.sign',
+        { username },
+        context.session.user.recipientUuid,
+      )
     } catch {
       await context.reply('Сервис временно недоступен.')
       return

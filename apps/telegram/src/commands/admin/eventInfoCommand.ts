@@ -2,7 +2,6 @@ import type { SpotterEvent } from '@spotter/transport'
 import type { BotContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
 import { argument } from '../../middlewares/command/argument'
-import { eventCode } from '../../transport/helpers/eventCode'
 import { renderEvent } from '../../transport/view/renderEvent'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
@@ -21,7 +20,11 @@ class EventInfoCommand extends SpotterCommand {
 
     let reply: Awaited<ReturnType<typeof context.commandBus.send>>
     try {
-      reply = await context.commandBus.send('event.info', { code })
+      reply = await context.commandBus.send(
+        'event.info',
+        { code },
+        context.session.user.recipientUuid,
+      )
     } catch {
       await context.reply('Сервис временно недоступен.')
       return

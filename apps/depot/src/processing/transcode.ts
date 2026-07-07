@@ -135,6 +135,13 @@ const activeVideoPreset = resolveVideoPreset(
 
 const skipVideoConversion = env.boolean('VIDEO_SKIP_CONVERSION', false)
 
+/**
+ * Hard cap on a single ffmpeg run. A stuck encode never releases the message,
+ * and once it idles past REDIS_RECLAIM_MIN_IDLE_MS the reaper would re-dispatch
+ * a duplicate transcode — so keep this comfortably below that idle threshold.
+ */
+const videoTimeoutMs = env.number('VIDEO_TIMEOUT_MS', 120000)
+
 const resolveImageQuality = (quality: PresetQuality | string): number => {
   switch (quality) {
     case 'best':
@@ -182,18 +189,37 @@ export const transcodeVideo = async (
       output: activeVideoPreset.outputParameters,
     })
 
-    ffmpeg(rawPath)
+    const command = ffmpeg(rawPath)
       .inputOption(activeVideoPreset.inputParameters)
       .outputOptions(activeVideoPreset.outputParameters)
       .noAudio()
       .format('mp4')
-      .on('error', reject)
+
+    let settled = false
+    const finish = (fn: () => void): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn()
+    }
+
+    // Kill a stuck/overlong encode so the message can fail and be retried
+    // cleanly instead of pinning a consumer until the reaper duplicates it.
+    const timer = setTimeout(() => {
+      command.kill('SIGKILL')
+      finish(() =>
+        reject(new Error(`ffmpeg timed out after ${videoTimeoutMs}ms`)),
+      )
+    }, videoTimeoutMs)
+
+    command
+      .on('error', (error) => finish(() => reject(error)))
       .on('progress', (progress) => {
         logger.verbose(
           `Progress: ${progress.percent ?? 0}% / 100% (${progress.frames})`,
         )
       })
-      .on('end', () => resolve())
+      .on('end', () => finish(() => resolve()))
       .save(processedPath)
   })
 

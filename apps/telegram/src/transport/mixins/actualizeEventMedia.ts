@@ -62,27 +62,30 @@ export const actualizeEventMedia = async (
     }
   }
 
-  try {
-    const supplied = await supplySubscribers(messages, context, {
-      create: async (chatId): Promise<EventMessage> => {
-        const sent =
-          media.type === 'video'
-            ? await bot.api.innoxious.sendVideo(chatId, innoxious, sendOptions)
-            : await bot.api.innoxious.sendPhoto(chatId, innoxious, sendOptions)
-        return { id: sent.message_id, chatId }
-      },
-      update: async (message): Promise<EventMessage> => {
-        await editInPlace(message.chatId, message.id)
-        return message
-      },
-    })
+  const { supplied, failed } = await supplySubscribers(messages, context, {
+    create: async (chatId): Promise<EventMessage> => {
+      const sent =
+        media.type === 'video'
+          ? await bot.api.innoxious.sendVideo(chatId, innoxious, sendOptions)
+          : await bot.api.innoxious.sendPhoto(chatId, innoxious, sendOptions)
+      return { id: sent.message_id, chatId }
+    },
+    update: async (message): Promise<EventMessage> => {
+      await editInPlace(message.chatId, message.id)
+      return message
+    },
+  })
 
-    const affected = supplied
-      .map((entry) => entry.data)
-      .filter((entry): entry is EventMessage => Boolean(entry))
+  const affected = supplied
+    .map((entry) => entry.data)
+    .filter((entry): entry is EventMessage => Boolean(entry))
 
-    eventMessagesRepo.set(db, eventId, affected)
-  } catch (error) {
-    logger.error('Error when actualizing event media', error)
+  // Persist the chats that succeeded before propagating: on retry they count as
+  // already-supplied, so only the failed chats are re-attempted.
+  eventMessagesRepo.set(db, eventId, affected)
+
+  if (failed) {
+    logger.warn(`Some chats failed for ${eventId}; leaving pending for retry`)
+    throw new Error(`media delivery incomplete for event ${eventId}`)
   }
 }

@@ -2,6 +2,7 @@ import type { SinkConfig } from '@spotter/sink'
 import {
   type CatalogEntry,
   env,
+  redactConfig,
   requireConfig,
   resolveRedisConfig,
 } from '@spotter/transport'
@@ -100,7 +101,7 @@ export const resolveConfig = (): CoreConfig => {
     throw new Error('No mqtt broker found for the frigate source.')
   }
 
-  applicationLogger.verbose('Using core configuration:', result)
+  applicationLogger.verbose('Using core configuration:', redactConfig(result))
 
   return result
 }

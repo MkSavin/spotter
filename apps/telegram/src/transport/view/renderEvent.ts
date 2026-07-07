@@ -1,6 +1,5 @@
-import type { SpotterEvent } from '@spotter/transport'
+import { type SpotterEvent, eventCode } from '@spotter/transport'
 import type { CoreContext } from '../../context'
-import { eventCode } from '../helpers/eventCode'
 import { renderEventTiming } from './renderEventTiming'
 
 export const renderEvent = (

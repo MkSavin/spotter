@@ -3,6 +3,7 @@ import {
   RedisRegulator,
   StreamProducer,
   connectRedis,
+  mediaStreams,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'
@@ -47,7 +48,7 @@ const run = async (): Promise<void> => {
     subscriber.close()
     producer.disconnect()
     await tempDir.remove()
-    process.exit(1)
+    process.exit(0)
   }
 
   process.on('SIGINT', shutdown)
@@ -57,8 +58,8 @@ const run = async (): Promise<void> => {
   await connectRedis(subscriber, { url: config.redis.url })
 
   transport = await new RedisRegulator<CoreContext>()
-    .message('spotter.media.staged', mediaStagedController)
-    .message('spotter.camera.staged', cameraStagedController)
+    .message(mediaStreams.mediaStaged, mediaStagedController)
+    .message(mediaStreams.cameraStaged, cameraStagedController)
     .run(
       {
         directory: {

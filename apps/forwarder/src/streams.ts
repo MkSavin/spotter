@@ -10,11 +10,15 @@
  * mirrored back down to the owning adapter.
  */
 
-import { catalogUpdatedStream, mediaStreams } from '@spotter/transport'
+import {
+  catalogUpdatedStream,
+  eventStreams,
+  mediaStreams,
+} from '@spotter/transport'
 
 /** Produced on the ingest node, consumed on the remote — mirrored local → remote. */
 export const UP_STREAMS = [
-  'spotter.event',
+  eventStreams.event,
   // Full catalog snapshot on the stream so cloud consumers bootstrap (the
   // `spotter.catalog.<source>` key itself does not cross the forwarder).
   catalogUpdatedStream,
@@ -35,5 +39,5 @@ export const downStreams = (sources: string[]): string[] => [
     mediaStreams.mediaRequest(source),
     mediaStreams.cameraRequest(source),
   ]),
-  'spotter.event.test_seed',
+  eventStreams.testSeed,
 ]

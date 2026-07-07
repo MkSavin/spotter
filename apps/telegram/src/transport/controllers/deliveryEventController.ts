@@ -1,11 +1,11 @@
 import {
   type StreamMessageController,
   bufferToJson,
+  eventCode,
   safeParseDeliveryEvent,
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { deliveryEventAction } from '../actions/deliveryEventAction'
-import { eventCode } from '../helpers/eventCode'
 
 export const deliveryEventController: StreamMessageController<
   TransportContext

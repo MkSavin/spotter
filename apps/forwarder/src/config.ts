@@ -1,4 +1,9 @@
-import { env, requireConfig, resolveRedisConfig } from '@spotter/transport'
+import {
+  env,
+  redactConfig,
+  requireConfig,
+  resolveRedisConfig,
+} from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
 
@@ -60,7 +65,7 @@ export const resolveConfig = (): ForwarderConfig => {
     REDIS_REMOTE_URL: result.remoteUrl,
   })
 
-  applicationLogger.verbose('Using core configuration:', result)
+  applicationLogger.verbose('Using core configuration:', redactConfig(result))
 
   return result
 }

@@ -15,6 +15,16 @@ type SupplyContext<Create = void, Update = void, Remove = void> = {
   remove?: (message: EventMessage) => Promise<Remove>
 }
 
+/**
+ * Result of a fan-out: every chat that succeeded (so callers can persist them
+ * even on partial failure) plus whether any chat failed (so callers can rethrow
+ * and let the regulator retry — persisted successes make that retry idempotent).
+ */
+export type SupplyResult<Data> = {
+  supplied: SuppliedMessage<Data>[]
+  failed: boolean
+}
+
 export const supplySubscribedChats = async <
   Create = void,
   Update = void,
@@ -23,7 +33,7 @@ export const supplySubscribedChats = async <
   subscribedChatIds: string[],
   suppliedMessages: EventMessage[],
   supplyContext: SupplyContext<Create, Update, Remove>,
-): Promise<SuppliedMessage<Devoidify<Create | Update | Remove>>[]> => {
+): Promise<SupplyResult<Devoidify<Create | Update | Remove>>> => {
   const actual = subscribedChatIds
   const supplied = suppliedMessages.map((m) => m.chatId)
 
@@ -77,7 +87,20 @@ export const supplySubscribedChats = async <
     )
   }
 
-  return Promise.all(promiseCollection)
+  const settled = await Promise.allSettled(promiseCollection)
+
+  return {
+    supplied: settled
+      .filter(
+        (
+          r,
+        ): r is PromiseFulfilledResult<
+          SuppliedMessage<Devoidify<Create | Update | Remove>>
+        > => r.status === 'fulfilled',
+      )
+      .map((r) => r.value),
+    failed: settled.some((r) => r.status === 'rejected'),
+  }
 }
 
 export const supplySubscribers = async <
@@ -88,7 +111,7 @@ export const supplySubscribers = async <
   suppliedMessages: EventMessage[],
   context: CoreContext,
   supplyContext: SupplyContext<Create, Update, Remove>,
-): Promise<SuppliedMessage<Devoidify<Create | Update | Remove>>[]> => {
+): Promise<SupplyResult<Devoidify<Create | Update | Remove>>> => {
   const chatIds = tgChatsRepo.listIds(context.db).map((c) => c.id)
 
   return supplySubscribedChats<Create, Update, Remove>(

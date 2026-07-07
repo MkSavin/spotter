@@ -1,4 +1,8 @@
-import type { SpotterEvent, StreamProducer } from '@spotter/transport'
+import {
+  type SpotterEvent,
+  type StreamProducer,
+  eventStreams,
+} from '@spotter/transport'
 
 /**
  * Publishes a canonical event onto the `spotter.event` stream. The stream is a
@@ -8,4 +12,4 @@ import type { SpotterEvent, StreamProducer } from '@spotter/transport'
 export const publishEvent = async (
   event: SpotterEvent,
   producer: StreamProducer,
-): Promise<string> => producer.publish('spotter.event', event)
+): Promise<string> => producer.publish(eventStreams.event, event)

@@ -32,8 +32,9 @@ const supply = (
 
 describe('Subscribers branching logic', () => {
   test('To correctly execute branching logic correctly', async () => {
-    const supplied = await supply(chatIds, messages)
+    const { supplied, failed } = await supply(chatIds, messages)
 
+    expect(failed).toBe(false)
     expect(supplied).toBeArrayOfSize(4)
 
     expect(
@@ -53,7 +54,7 @@ describe('Subscribers branching logic', () => {
   })
 
   test('To correctly execute branching logic on empty chats', async () => {
-    const supplied = await supply([], messages)
+    const { supplied } = await supply([], messages)
 
     expect(
       supplied.filter((message) => message.action === 'create'),
@@ -67,7 +68,7 @@ describe('Subscribers branching logic', () => {
   })
 
   test('To correctly execute branching logic on empty messages', async () => {
-    const supplied = await supply(chatIds, [])
+    const { supplied } = await supply(chatIds, [])
 
     expect(
       supplied.filter((message) => message.action === 'create'),
@@ -81,7 +82,7 @@ describe('Subscribers branching logic', () => {
   })
 
   test('To correctly execute branching logic on empty chats and messages', async () => {
-    const supplied = await supply([], [])
+    const { supplied } = await supply([], [])
 
     expect(
       supplied.filter((message) => message.action === 'create'),
@@ -92,5 +93,25 @@ describe('Subscribers branching logic', () => {
     expect(
       supplied.filter((message) => message.action === 'remove'),
     ).toBeArrayOfSize(0)
+  })
+
+  test('A failing chat is reported without dropping the successful ones', async () => {
+    const { supplied, failed } = await supplySubscribedChats(
+      chatIds,
+      messages,
+      {
+        create: (chatId) =>
+          chatId === '101'
+            ? Promise.reject(new Error('boom'))
+            : timeout(50).then(() => ({ chatId, id: -1 })),
+        update: (message) => timeout(50).then(() => message),
+        remove: (message) => timeout(50).then(() => message),
+      },
+    )
+
+    expect(failed).toBe(true)
+    // 4 fan-out actions, one create rejected → 3 fulfilled survive.
+    expect(supplied).toBeArrayOfSize(3)
+    expect(supplied.some((message) => message.chatId === '101')).toBe(false)
   })
 })

@@ -18,24 +18,27 @@ export const actualizeSentMessages = async (
     ...(keyboard ? { reply_markup: keyboard } : {}),
   }
 
-  try {
-    const supplied = await supplySubscribers(messages, context, {
-      create: (chatId) =>
-        bot.api
-          .sendMessage(chatId, contents, options)
-          .then((message) => ({ id: message.message_id, chatId })),
-      update: async (message) =>
-        bot.api
-          .editMessageText(message.chatId, message.id, contents, options)
-          .then(() => message),
-    })
+  const { supplied, failed } = await supplySubscribers(messages, context, {
+    create: (chatId) =>
+      bot.api
+        .sendMessage(chatId, contents, options)
+        .then((message) => ({ id: message.message_id, chatId })),
+    update: async (message) =>
+      bot.api
+        .editMessageText(message.chatId, message.id, contents, options)
+        .then(() => message),
+  })
 
-    const affected = supplied
-      .map((entry) => entry.data)
-      .filter((entry): entry is EventMessage => Boolean(entry))
+  const affected = supplied
+    .map((entry) => entry.data)
+    .filter((entry): entry is EventMessage => Boolean(entry))
 
-    eventMessagesRepo.set(db, eventId, affected)
-  } catch (error) {
-    logger.error('Error when processing messages', error)
+  // Persist what did land before propagating: on retry these chats are seen as
+  // already-supplied and skipped, so only the failed ones are re-attempted.
+  eventMessagesRepo.set(db, eventId, affected)
+
+  if (failed) {
+    logger.warn(`Some chats failed for ${eventId}; leaving pending for retry`)
+    throw new Error(`delivery incomplete for event ${eventId}`)
   }
 }

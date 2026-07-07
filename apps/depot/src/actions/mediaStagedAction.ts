@@ -1,4 +1,8 @@
-import type { MediaProcessed, MediaStaged } from '@spotter/transport'
+import {
+  type MediaProcessed,
+  type MediaStaged,
+  eventCode,
+} from '@spotter/transport'
 import type { CoreContext } from '../context'
 import { processStaged } from '../processing/processStaged'
 
@@ -11,7 +15,6 @@ export const mediaStagedAction = async (
   context: CoreContext,
 ): Promise<MediaProcessed | undefined> => {
   const { eventId, rawClipKey, rawSnapshotKey } = payload
-  const eventCode = eventId.split('-').at(1) ?? 'unknwn'
 
   try {
     context.logger.info('Starting to perform staged event media conversion')
@@ -19,7 +22,7 @@ export const mediaStagedAction = async (
     const processingContext = {
       ...context,
       processedPath: 'event-media',
-      filePrefix: `event-${eventCode}`,
+      filePrefix: `event-${eventCode(eventId)}`,
     }
 
     const [clipKey, snapshotKey] = await Promise.all([

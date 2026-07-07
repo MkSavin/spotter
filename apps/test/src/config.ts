@@ -3,6 +3,7 @@ import type { SinkConfig } from '@spotter/sink'
 import {
   type CatalogEntry,
   env,
+  redactConfig,
   requireConfig,
   resolveRedisConfig,
 } from '@spotter/transport'
@@ -84,7 +85,7 @@ export const resolveConfig = (): TestConfig => {
     S3_SECRET: config.s3?.secretKey,
   })
 
-  applicationLogger.verbose('Using core configuration:', config)
+  applicationLogger.verbose('Using core configuration:', redactConfig(config))
 
   return config
 }

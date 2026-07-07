@@ -1,6 +1,7 @@
 import {
   type RedisConfig,
   env,
+  redactConfig,
   requireConfig,
   resolveRedisConfig,
 } from '@spotter/transport'
@@ -49,7 +50,7 @@ export const resolveConfig = (): Config => {
     S3_SECRET: config.s3.secretKey,
   })
 
-  applicationLogger.verbose('Using core configuration:', config)
+  applicationLogger.verbose('Using core configuration:', redactConfig(config))
 
   return config
 }

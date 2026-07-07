@@ -5,7 +5,8 @@ import {
   deliveryStreams,
   safeParseCommandRequest,
 } from '@spotter/transport'
-import { commandHandlers } from '../../commands/handlers'
+import { authorizeCommand } from '../../commands/authorize'
+import { commandAccess, commandHandlers } from '../../commands/handlers'
 import type { ServerContext } from '../../context'
 
 export const commandController: StreamMessageController<ServerContext> = async (
@@ -21,7 +22,7 @@ export const commandController: StreamMessageController<ServerContext> = async (
   const request = safeParseCommandRequest(value)
   if (!request) return
 
-  const { requestId, kind, args } = request
+  const { requestId, kind, args, principalUuid } = request
 
   const logger = baseLogger.sub('command', kind, requestId.slice(0, 8))
 
@@ -33,6 +34,23 @@ export const commandController: StreamMessageController<ServerContext> = async (
       requestId,
       ok: false,
       error: `Unknown kind: ${kind}`,
+    }
+    await producer.publish(deliveryStreams.commandReply, reply)
+    return
+  }
+
+  const authorized = authorizeCommand(
+    context.db,
+    kind,
+    principalUuid,
+    commandAccess,
+  )
+  if (!authorized.ok) {
+    logger.warn(`Rejected "${kind}": ${authorized.error}`)
+    const reply: CommandReply = {
+      requestId,
+      ok: false,
+      error: authorized.error,
     }
     await producer.publish(deliveryStreams.commandReply, reply)
     return

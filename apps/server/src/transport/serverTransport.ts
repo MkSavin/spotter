@@ -3,6 +3,7 @@ import {
   type RegulatorHandle,
   catalogUpdatedStream,
   deliveryStreams,
+  eventStreams,
   mediaStreams,
 } from '@spotter/transport'
 import type { ServerContext } from '../context'
@@ -17,7 +18,7 @@ export const serverTransport = async (
   const logger = context.logger.sub('transport')
 
   return new RedisRegulator<ServerContext>()
-    .message('spotter.event', eventController)
+    .message(eventStreams.event, eventController)
     .message(mediaStreams.mediaProcessed, eventMediaController)
     .message(catalogUpdatedStream, catalogController)
     .message(deliveryStreams.commandRequest, commandController)

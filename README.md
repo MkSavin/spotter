@@ -99,7 +99,7 @@ flowchart TB
     telegram <-. "Redis Streams" .-> rredis
 
     frigate -- "S3 API" --> S3
-    depot -- "S3 API" --> S3
+    depot <-- "S3 API" --> S3
     telegram <-- "presign · S3 API" --> S3
     S3 -- "presigned · S3 API" --> TG
 
