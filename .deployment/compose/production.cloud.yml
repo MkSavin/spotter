@@ -57,6 +57,27 @@ services:
     depends_on:
       - redis
 
+  # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event. Sends
+  # one notification email per event. Uncomment to enable; needs .env.email
+  # (SMTP creds + EMAIL_RECIPIENTS). Can also run on a separate web host that
+  # reaches this Redis by IP — it doesn't have to be co-located here.
+  # spotter-email:
+  #   image: ghcr.io/mksavin/spotter-email:latest
+  #   container_name: spotter-email
+  #   restart: unless-stopped
+  #   networks:
+  #     - spotter
+  #   environment:
+  #     REDIS_URL: redis://redis:6379
+  #   env_file:
+  #     - ./.env
+  #     - ./.env.email
+  #   volumes:
+  #     # Persist the email dedup ledger across container restarts.
+  #     - ./.docker/email:/app/data
+  #   depends_on:
+  #     - redis
+
 networks:
   spotter:
     driver: bridge

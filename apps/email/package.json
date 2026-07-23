@@ -1,0 +1,29 @@
+{
+  "name": "@spotter/email",
+  "version": "0.0.0",
+  "description": "Email frontend: delivery consumer that sends SMTP notifications",
+  "main": "index.js",
+  "scripts": {
+    "start": "bun --env-file=../../.env --env-file=../../.env.email src/index.ts",
+    "start:watch": "bun --watch --env-file=../../.env --env-file=../../.env.email src/index.ts",
+    "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "if [ -n \"$(find src -name '*.test.ts' 2>/dev/null)\" ]; then bun test; fi",
+    "test:coverage": "if [ -n \"$(find src -name '*.test.ts' 2>/dev/null)\" ]; then bun test --coverage; fi"
+  },
+  "private": "true",
+  "sideEffects": "false",
+  "keywords": [],
+  "author": "me@mksav.in",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17",
+    "drizzle-kit": "^0.31.10"
+  },
+  "dependencies": {
+    "@spotter/transport": "*",
+    "drizzle-orm": "^0.45.2",
+    "nodemailer": "^6.9.16",
+    "stenograph": "*"
+  }
+}
