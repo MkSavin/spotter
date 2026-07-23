@@ -386,3 +386,8 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
 - [x] Видео по кнопке (on-demand транскод клипа, edit-in-place на сообщении события)
 - [x] Разделение `spotter/server` (домен) + `telegram`-фронтенд (`spotter.delivery.*` / `spotter.command.*`); канал-адаптеры `vk`/`max`/`ntfy` — на будущее
 - [ ] Интеграция LGTM-стека (Loki / Grafana / Tempo / Mimir)
+- [ ] Устойчивость доставки под блокировки РФ — [обзор каналов и замены Telegram](.agents/plans/emergency-channels-overview.md) (модель угроз L0–L5; см. «рамку сдержанности» — делаем только PWA+SMS+email, остальное отвергнуто осознанно):
+  - [ ] **PWA-фронтенд + Web Push** (Vite/React/shadcn + тонкий Bun-сервер) — консьюмер `spotter.delivery.*`, пушит на iPhone/Android/Win/macOS без стора и рос-приложений ([план](.agents/plans/pwa-frontend.md))
+  - [ ] Аварийный SMS-канал через API роутера Keenetic — одна честная гарантия «телефон зазвонит», когда IP погашен ([план](.agents/plans/sms-emergency-channel.md))
+  - [ ] email как добавочный канал (SMTP через ящик рос-провайдера, whitelisted-устойчив) ([план](.agents/plans/email-channel.md))
+  - [ ] ~~LoRa/Meshtastic, whitelisted-транспорт, ham/спутник~~ — осознанно отвергнуто, берём только при реальной угрозе соте ([разбор](.agents/plans/lora-emergency-channel.md))
