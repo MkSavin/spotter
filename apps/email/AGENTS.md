@@ -78,7 +78,7 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ sendEmailActi
 провайдером, со стороны проекта DNS трогать не нужно; домен провайдера whitelisted при
 шатдаунах. Путь B (свой домен + SPF/DKIM/DMARC в DNS) — для сторонних деплойеров, кому нужен
 свой домен-отправитель. Подробное объяснение SPF/DKIM — в
-[PWA-плане](../../.agents/plans/pwa-frontend.md).
+[email-плане](../../.agents/plans/email-channel.md#доставляемость-spf--dkim-кратко--как-не-улететь-в-спам).
 
 ## Особенности
 

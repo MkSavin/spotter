@@ -13,3 +13,5 @@ export * from './schema/eventCode'
 export * from './schema/mediaPipeline'
 export * from './schema/catalog'
 export * from './schema/delivery'
+
+export * from './render/renderEvent'

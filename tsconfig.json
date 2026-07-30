@@ -25,5 +25,10 @@
     "types": ["bun"]
   },
   "include": ["apps", "packages", "*.config.ts"],
-  "exclude": ["node_modules", "**/dist", ".prisma-generated"]
+  "exclude": [
+    "node_modules",
+    "**/dist",
+    ".prisma-generated",
+    "apps/pwa/web"
+  ]
 }

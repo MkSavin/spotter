@@ -1,4 +1,5 @@
-const SECRET_KEY_PATTERN = /secret|token|password|access|jwt|credential/i
+const SECRET_KEY_PATTERN =
+  /secret|token|password|access|jwt|credential|private/i
 
 const REDACTED = '***'
 

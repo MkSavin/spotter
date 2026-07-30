@@ -123,6 +123,7 @@ Telegram-локальный стейт и пресайнит медиа. Кон�
 | **`apps/test`**    | Синтетический адаптер для офлайн-разработки: REPL эмитит события, медиа берётся из локальных фикстур. NVR/MQTT не нужны. |
 | **`apps/server`**  | Headless-домен и оркестрация. Персистит события, гоняет медиа-пайплайн, владеет recipients/авторизацией, исполняет домен-команды (RPC). NVR/Telegram не знает. |
 | **`apps/telegram`** | Telegram-фронтенд (grammY). Консьюмит `delivery.*`, рендерит и шлёт/редактирует сообщения, обрабатывает команды операторов; держит Telegram-стейт и пресайнит S3-ключи. |
+| **`apps/pwa`**     | PWA-фронтенд (**опциональный, основной**). Тонкий Bun-сервер: раздаёт установочное веб-приложение (Vite/React/shadcn) и пушит `delivery.event` через Web Push (VAPID) на iPhone/Android/desktop. Дедуп + коалесинг, лента/событие/сетап. Требует HTTPS. |
 | **`apps/email`**   | Email-фронтенд (**опциональный**). Headless SMTP-консьюмер `delivery.event`: одно письмо на событие (`create`), presign кадра, дедуп-леджер. Добавочный канал, whitelisted-устойчив через ящик рос-провайдера. |
 | **`apps/depot`**   | Медиа-процессор. Берёт сырое медиа из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат обратно в S3. NVR не знает. |
 | **`apps/forwarder`** | Двунаправленный мост Redis Streams local↔remote (store-and-forward). Нужен только в распределённом деплое — см. [Развёртывание](#развёртывание-docker). |
@@ -278,6 +279,9 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 
 ## Развёртывание (Docker)
 
+> 📖 **Пошаговая инструкция для всех режимов** (разработка / единый узел /
+> распределённо) + автодеплой новых версий — в [docs/deployment.md](docs/deployment.md).
+
 Compose-файлы лежат в [.deployment/compose/](.deployment/compose/) и запускаются из
 корня репозитория (важно для относительных путей к `.docker`/`.deployment`):
 
@@ -388,7 +392,7 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
 - [x] Разделение `spotter/server` (домен) + `telegram`-фронтенд (`spotter.delivery.*` / `spotter.command.*`); канал-адаптеры `vk`/`max`/`ntfy` — на будущее
 - [ ] Интеграция LGTM-стека (Loki / Grafana / Tempo / Mimir)
 - [ ] Устойчивость доставки под блокировки РФ — [обзор каналов и замены Telegram](.agents/plans/emergency-channels-overview.md) (модель угроз L0–L5; см. «рамку сдержанности» — делаем только PWA+SMS+email, остальное отвергнуто осознанно):
-  - [ ] **PWA-фронтенд + Web Push** (Vite/React/shadcn + тонкий Bun-сервер) — консьюмер `spotter.delivery.*`, пушит на iPhone/Android/Win/macOS без стора и рос-приложений ([план](.agents/plans/pwa-frontend.md))
+  - [x] **PWA-фронтенд + Web Push** (Vite/React/shadcn + тонкий Bun-сервер) — консьюмер `spotter.delivery.*`, пушит на iPhone/Android/Win/macOS без стора и рос-приложений — реализован в [`apps/pwa`](apps/pwa/AGENTS.md) ([план](.agents/plans/pwa-frontend.md))
   - [ ] Аварийный SMS-канал через API роутера Keenetic — одна честная гарантия «телефон зазвонит», когда IP погашен ([план](.agents/plans/sms-emergency-channel.md))
   - [x] email как добавочный канал (SMTP через ящик рос-провайдера, whitelisted-устойчив) — реализован в [`apps/email`](apps/email/AGENTS.md) ([план](.agents/plans/email-channel.md))
   - [ ] ~~LoRa/Meshtastic, whitelisted-транспорт, ham/спутник~~ — осознанно отвергнуто, берём только при реальной угрозе соте ([разбор](.agents/plans/lora-emergency-channel.md))

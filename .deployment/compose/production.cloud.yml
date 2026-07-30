@@ -78,6 +78,30 @@ services:
   #   depends_on:
   #     - redis
 
+  # PWA frontend (OPTIONAL): Web Push consumer that also serves the web app.
+  # The main frontend — installable on iPhone/Android/desktop, pushes via VAPID.
+  # Uncomment to enable; needs .env.pwa (generate your own VAPID keypair with
+  # `bunx web-push generate-vapid-keys`). Put it behind a TLS reverse proxy —
+  # service workers and Web Push require HTTPS.
+  # spotter-pwa:
+  #   image: ghcr.io/mksavin/spotter-pwa:latest
+  #   container_name: spotter-pwa
+  #   restart: unless-stopped
+  #   networks:
+  #     - spotter
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     REDIS_URL: redis://redis:6379
+  #   env_file:
+  #     - ./.env
+  #     - ./.env.pwa
+  #   volumes:
+  #     # Persist push subscriptions + feed cache across container restarts.
+  #     - ./.docker/pwa:/app/data
+  #   depends_on:
+  #     - redis
+
 networks:
   spotter:
     driver: bridge

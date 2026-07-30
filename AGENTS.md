@@ -6,7 +6,7 @@
 ## TL;DR
 
 - **Рантайм — только Bun.** Никаких `npm`/`node`/`ts-node`. Запуск: `bun start`, тесты: `bun test`.
-- **Монорепо** Turborepo: 7 сервисов (`apps/*`, включая опциональный `email`) + 3 пакета (`packages/*`).
+- **Монорепо** Turborepo: 8 сервисов (`apps/*`, включая опциональные `email` и `pwa`) + 3 пакета (`packages/*`).
 - **Связь между сервисами — через Redis Streams** (и MQTT на входе). Прямых вызовов между сервисами нет.
 - **Стиль:** Biome — одинарные кавычки, без `;`, отступ 2 пробела. Запускай `bunx biome check --write` перед завершением.
 - **Open-source self-hosting:** проект рассчитан на развёртывание сторонними людьми у себя.
@@ -180,6 +180,8 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 
 - [apps/server/AGENTS.md](apps/server/AGENTS.md) — headless-домен: события, медиа-оркестрация, recipients/авторизация, command-RPC.
 - [apps/telegram/AGENTS.md](apps/telegram/AGENTS.md) — Telegram-фронтенд: delivery-консьюмер, команды, сессии, Innoxious-медиа, кэш каталога, пресайн S3.
+- [apps/pwa/AGENTS.md](apps/pwa/AGENTS.md) — основной фронтенд: PWA + тонкий Bun-сервер, Web Push (VAPID), дедуп/коалесинг, лента/событие/сетап (опциональный).
+- [apps/email/AGENTS.md](apps/email/AGENTS.md) — email-фронтенд: SMTP-консьюмер, одно письмо на событие, дедуп-леджер (опциональный, добавочный).
 - [apps/depot/AGENTS.md](apps/depot/AGENTS.md) — транскод медиа из S3 по ключу, ffmpeg/sharp.
 - [apps/frigate/AGENTS.md](apps/frigate/AGENTS.md) — NVR-адаптер: `Source`/`MediaProvider`/`Catalog` на `@spotter/sink`.
 - [apps/test/AGENTS.md](apps/test/AGENTS.md) — синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка).

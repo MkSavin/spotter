@@ -1,6 +1,10 @@
-import { type SpotterEvent, eventCode } from '@spotter/transport'
+import {
+  type SpotterEvent,
+  eventCode,
+  renderEventTime,
+  renderEventTiming,
+} from '@spotter/transport'
 import type { CoreContext } from '../../context'
-import { renderEventTime, renderEventTiming } from './renderEventTiming'
 
 export type RenderedEmail = {
   subject: string
