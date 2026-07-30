@@ -326,7 +326,7 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
 .env.example          Общий слой окружения (Redis, S3, TZ) — один на хост
 .env.*.example        Тонкие слои по сервисам (накладываются поверх .env)
 .github/workflows/    CI: lint.yml (ветки) + release.yml (master)
-.integration/         zx-скрипты релиза: conventional.mjs, imperative.mjs
+.integration/         Bun-скрипты релиза: conventional.ts, imperative.ts
 .changeset/           Changesets: конфиг + pending-changeset'ы
 ```
 
@@ -336,7 +336,7 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
 
 | Workflow | Триггер | Что делает |
 | --- | --- | --- |
-| [lint.yml](.github/workflows/lint.yml) | push в любую ветку **кроме** `master` | Biome (`biome ci`), commitlint (Conventional Commits), `bun run test` |
+| [lint.yml](.github/workflows/lint.yml) | push в любую ветку **кроме** `master` | Biome (`biome ci`), commitlint (Conventional Commits), `bun run typecheck`, `bun run test` |
 | [release.yml](.github/workflows/release.yml) | push в `master` | версионирование (changesets) → git-теги + GitHub Releases → сборка/пуш Docker-образов |
 
 ### Как работает релиз
@@ -355,7 +355,7 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
    (`createGithubReleases: true`). В npm пакеты **не** публикуются (они приватные,
    `access: restricted`) — распространение идёт Docker-образами.
 3. **Образы.** Если что-то зарелизено (`published == true`),
-   [imperative.mjs](.integration/imperative.mjs) собирает Docker-образ для каждого
+   [imperative.ts](.integration/imperative.ts) собирает Docker-образ для каждого
    зарелизенного **приложения** (`apps/*`; у `packages/*` нет `Dockerfile`) и пушит
    в `ghcr.io/<owner>/<app>:latest` и `:<version>-alpine`. При бампе общего пакета
    (`transport`/`stenograph`) зависящие приложения получают `patch`-бамп
@@ -372,8 +372,9 @@ apps/{server,telegram}/drizzle/  Сгенерированные миграции
    ```bash
    bunx changeset            # выбрать затронутые пакеты и тип бампа
    ```
-   > Опционально changeset'ы можно сгенерировать из conventional-коммитов локально:
-   > `bunx zx .integration/conventional.mjs` (в CI этот скрипт **не** запускается).
+   > Опционально changeset'ы можно сгенерировать из conventional-коммитов:
+   > `bun run changeset:conventional` (локально или ручным workflow
+   > [changeset.yml](.github/workflows/changeset.yml)).
 3. Закоммить `.changeset/*.md`, открой PR, проведи через `lint.yml`, смержи в `master`.
 4. CI откроет PR «**Update packages versions**» — проверь бампы версий и `CHANGELOG`,
    смержи его.

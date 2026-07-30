@@ -1,0 +1,82 @@
+#!/usr/bin/env bun
+
+import path from 'node:path'
+import process from 'node:process'
+import { getPackages } from '@manypkg/get-packages'
+import { $ } from 'bun'
+
+// Build and push Docker images for changed `apps/*` packages.
+
+const OWNER = 'mksavin'
+const APPS_PREFIX = `apps${path.sep}`
+
+type PublishedPackage = { name: string; version: string }
+
+const args = new Map(
+  process.argv.slice(2).map((arg) => {
+    const [key, value] = arg.replace(/^--/, '').split('=')
+    return [key, value ?? 'true'] as const
+  }),
+)
+
+const versions: PublishedPackage[] = JSON.parse(args.get('versions') ?? '[]')
+const dryRun = args.get('dry-run') === 'true'
+const noPublish = args.get('no-publish') === 'true'
+
+/** ghcr-safe image name: `@spotter/email` → `spotter-email`. */
+const toCode = (name: string): string =>
+  name
+    .replaceAll(/([a-z])([A-Z])/g, '$1-$2')
+    .replaceAll(/[\s/_]+/g, '-')
+    .replaceAll(/[@$#]+/g, '')
+    .toLowerCase()
+
+const { root, packages } = await getPackages(process.cwd())
+
+const byName = new Map(packages.map((pkg) => [pkg.packageJson.name, pkg]))
+
+const entries = versions.flatMap((version) => {
+  const pkg = byName.get(version.name)
+  if (!pkg) return []
+
+  const relativePath = path.relative(root.dir, pkg.dir)
+  // Only apps ship as images; packages have no Dockerfile.
+  if (!relativePath.startsWith(APPS_PREFIX)) return []
+
+  return [
+    {
+      name: version.name,
+      version: version.version,
+      relativePath,
+      code: toCode(version.name),
+    },
+  ]
+})
+
+if (entries.length === 0) {
+  console.log('No publishable application images. Nothing to build.')
+  process.exit(0)
+}
+
+console.log(`Got ${entries.length} application(s) to build.`)
+
+for (const entry of entries) {
+  const image = `ghcr.io/${OWNER}/${entry.code}`
+  const tags = [`${image}:latest`, `${image}:${entry.version}-alpine`]
+
+  console.log(
+    `[~] Building ${entry.name}@v${entry.version} (${entry.relativePath}) → ${image}`,
+  )
+
+  if (dryRun) continue
+
+  const tagArgs = tags.flatMap((tag) => ['-t', tag])
+
+  await $`docker build -f ${entry.relativePath}/Dockerfile ${root.dir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} ${tagArgs}`
+
+  if (!noPublish) {
+    await $`docker push ${image} --all-tags`
+  }
+}
+
+console.log('Images successfully built.')

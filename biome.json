@@ -9,7 +9,7 @@
     "include": [
       "apps/**/*.ts",
       "packages/**/*.ts",
-      ".integration/**/*.mjs",
+      ".integration/**/*.ts",
       "**/*.config.ts"
     ],
     "ignoreUnknown": false,
