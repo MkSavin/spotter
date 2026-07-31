@@ -177,7 +177,8 @@ GPU-транскод: в `production.ingest.yml` у `depot` уже пропис�
 
 ```
 push в master → release.yml → версии (changesets) → git-теги/Releases
-                            → сборка и пуш образов в ghcr.io/mksavin/spotter-*:latest
+                            → джоба на КАЖДОЕ приложение: сборка и пуш
+                              в ghcr.io/mksavin/spotter-*:latest
                             └── на этом CI заканчивается ─┐
                                                           ▼
               дальше их подхватывает Watchtower на каждом узле (см. выше)
@@ -188,6 +189,30 @@ push в master → release.yml → версии (changesets) → git-теги/Re
 (`:1.4.0-alpine` вместо `:latest`) и меняй её осознанно.
 
 Детали релиз-процесса (changesets, теги) — в [README](../README.md#cicd-и-релизы).
+
+### Если какой-то образ не собрался
+
+Каждое приложение собирается **отдельной джобой** (`Image (spotter-…)`), и они не
+зависят друг от друга: упавший образ не отменяет остальные — доедет всё, кроме него.
+
+1. В упавшем прогоне нажми **Re-run failed jobs** — пересоберутся только упавшие
+   джобы, уже собранные образы трогать не нужно.
+2. Если прогон старый или причина была в коде — собери недостающий образ руками
+   (версию возьми из `package.json` приложения):
+   ```bash
+   echo $CR_PAT | docker login ghcr.io -u mksavin --password-stdin
+   bun .integration/imperative.ts \
+     --only='@spotter/email' \
+     --versions='[{"name":"@spotter/email","version":"1.2.3"}]'
+   ```
+3. Проверить, доехал ли образ:
+   ```bash
+   docker manifest inspect ghcr.io/mksavin/spotter-email:1.2.3-alpine
+   ```
+   `manifest unknown` — образа в реестре нет.
+
+> Повторный push в `master` образы **не** пересоберёт: pending-changeset'ов уже нет,
+> `published` будет `false` и шаг сборки просто пропустится.
 
 ---
 

@@ -6,6 +6,12 @@ import { getPackages } from '@manypkg/get-packages'
 import { $ } from 'bun'
 
 // Build and push Docker images for changed `apps/*` packages.
+//
+//   --versions='[{"name":"@spotter/email","version":"1.2.3"}]'  what was released
+//   --matrix        print the build matrix as JSON instead of building
+//   --only=<name>   build just this package (one matrix job = one image)
+//   --dry-run       resolve and log, run no docker
+//   --no-publish    build without pushing
 
 const OWNER = 'mksavin'
 const APPS_PREFIX = `apps${path.sep}`
@@ -22,6 +28,8 @@ const args = new Map(
 const versions: PublishedPackage[] = JSON.parse(args.get('versions') ?? '[]')
 const dryRun = args.get('dry-run') === 'true'
 const noPublish = args.get('no-publish') === 'true'
+const asMatrix = args.get('matrix') === 'true'
+const only = args.get('only')
 
 /** ghcr-safe image name: `@spotter/email` → `spotter-email`. */
 const toCode = (name: string): string =>
@@ -53,14 +61,22 @@ const entries = versions.flatMap((version) => {
   ]
 })
 
-if (entries.length === 0) {
+// CI asks for the matrix first, then runs one job per entry.
+if (asMatrix) {
+  console.log(JSON.stringify({ include: entries }))
+  process.exit(0)
+}
+
+const selected = only ? entries.filter((entry) => entry.name === only) : entries
+
+if (selected.length === 0) {
   console.log('No publishable application images. Nothing to build.')
   process.exit(0)
 }
 
-console.log(`Got ${entries.length} application(s) to build.`)
+console.log(`Got ${selected.length} application(s) to build.`)
 
-for (const entry of entries) {
+for (const entry of selected) {
   const image = `ghcr.io/${OWNER}/${entry.code}`
   const tags = [`${image}:latest`, `${image}:${entry.version}-alpine`]
 

@@ -7,7 +7,7 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
 
     permissions:
@@ -16,6 +16,11 @@ jobs:
       contents: write
       pull-requests: write
       packages: write
+
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has-images: ${{ steps.matrix.outputs.has-images }}
 
     steps:
     - name: 'Checkout'
@@ -40,6 +45,41 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GH_BYPASS_TOKEN }}
 
+    # One matrix entry per released app, so each image builds in its own job.
+    - name: 'Resolve image build matrix'
+      id: matrix
+      if: steps.changesets.outputs.published == 'true'
+      run: |
+        matrix=$(bun .integration/imperative.ts --matrix --versions='${{ steps.changesets.outputs.publishedPackages }}')
+        echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+        count=$(echo "$matrix" | bun -e 'console.log(JSON.parse(await Bun.stdin.text()).include.length)')
+        echo "has-images=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        echo "Resolved $count image(s) to build."
+
+  # A failing image does not cancel the others: re-run only the failed jobs.
+  images:
+    needs: release
+    if: needs.release.outputs.has-images == 'true'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.release.outputs.matrix) }}
+
+    name: 'Image (${{ matrix.code }})'
+
+    steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v5
+
+    - name: 'Install bun'
+      uses: oven-sh/setup-bun@v2
+
     - name: 'Login to GitHub Container Registry'
       uses: docker/login-action@v4
       with:
@@ -47,8 +87,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: 'Imperative application images building'
-      if: steps.changesets.outputs.published == 'true'
-      run: bun .integration/imperative.ts --versions='${{ steps.changesets.outputs.publishedPackages }}'
+    - name: 'Build and push ${{ matrix.name }}'
+      run: |
+        bun .integration/imperative.ts \
+          --only='${{ matrix.name }}' \
+          --versions='[{"name":"${{ matrix.name }}","version":"${{ matrix.version }}"}]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -365,9 +365,12 @@ Makefile              Короткие алиасы над docker compose (make 
    (`createGithubReleases: true`). В npm пакеты **не** публикуются (они приватные,
    `access: restricted`) — распространение идёт Docker-образами.
 3. **Образы.** Если что-то зарелизено (`published == true`),
-   [imperative.ts](.integration/imperative.ts) собирает Docker-образ для каждого
-   зарелизенного **приложения** (`apps/*`; у `packages/*` нет `Dockerfile`) и пушит
-   в `ghcr.io/<owner>/<app>:latest` и `:<version>-alpine`. При бампе общего пакета
+   [imperative.ts](.integration/imperative.ts) в режиме `--matrix` отдаёт список
+   зарелизенных **приложений** (`apps/*`; у `packages/*` нет `Dockerfile`), и на
+   каждое запускается **отдельная matrix-джоба** `images`, которая собирает и пушит
+   свой образ в `ghcr.io/<owner>/<app>:latest` и `:<version>-alpine`.
+   `fail-fast: false` — упавший образ **не отменяет остальные**, а пересобрать
+   можно только его (**Re-run failed jobs**). При бампе общего пакета
    (`transport`/`stenograph`) зависящие приложения получают `patch`-бамп
    (`updateInternalDependencies: patch`) и пересобираются автоматически.
 
