@@ -1,4 +1,5 @@
-# Ingest node - the local node that handles the durable buffer, ingestion, and transcoding.
+# Ingest node - the local node that handles the durable buffer, ingestion, and
+# transcoding. One combined .env for this node (see .env.ingest.example).
 services:
   local-redis:
     image: redis:7-alpine
@@ -34,12 +35,12 @@ services:
       REDIS_URL: redis://local-redis:6379
       SOURCE_TYPE: frigate
       MQTT_BROKER: mqtt://mosquitto:1883
-    # Shared S3/staging config from .env; Frigate credentials (held ONLY here)
-    # from .env.frigate. Raw media is staged to S3, only keys travel onward.
-    # `environment:` above overrides the network endpoints for this host.
+    # Node-wide config (incl. FRIGATE_* NVR creds, held ONLY on this node) from
+    # the combined .env. Raw media is staged to S3, only keys travel onward.
     env_file:
       - ./.env
-      - ./.env.frigate
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
       - local-redis
       - mosquitto
@@ -52,10 +53,11 @@ services:
     environment:
       REDIS_URL: redis://local-redis:6379
       REDIS_CLIENT_ID: '@spotter/depot-1'
-    # Replica id stays inline above; shared infra + depot tuning come from files.
+    # Replica id stays inline above; shared config comes from the combined .env.
     env_file:
       - ./.env
-      - ./.env.depot
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
       - local-redis
     deploy:
@@ -81,10 +83,11 @@ services:
     environment:
       REDIS_URL: redis://local-redis:6379
       REDIS_CLIENT_ID: '@spotter/depot-2'
-    # Replica id stays inline above; shared infra + depot tuning come from files.
+    # Replica id stays inline above; shared config comes from the combined .env.
     env_file:
       - ./.env
-      - ./.env.depot
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
       - local-redis
     deploy:
@@ -108,16 +111,26 @@ services:
     networks:
       - spotter
     environment:
+      # Local-side Redis is the compose-network endpoint (pinned here). The
+      # cloud-side REDIS_REMOTE_URL (tunnel address, e.g. redis://10.0.0.1:6379)
+      # is deployer-specific and comes from the combined .env.
       REDIS_LOCAL_URL: redis://local-redis:6379
-      # Cloud-side Redis, reachable over the site-to-site VPN tunnel (Stage 7;
-      # e.g. XRAY-VLESS or AmneziaWG 2 on restricted networks). Replace with the
-      # cloud node's address inside the tunnel.
-      REDIS_REMOTE_URL: redis://10.0.0.1:6379
-    # Standalone: bridges two Redis hosts, so it does not layer the shared .env.
     env_file:
-      - ./.env.forwarder
+      - ./.env
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
       - local-redis
+
+  # Auto-update: pulls fresh :latest for labelled spotter-* only (local-redis
+  # and mosquitto are left alone). Daily by default; --cleanup drops old layers.
+  # On by default; disable with `make ingest WATCHTOWER=0`.
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 networks:
   spotter:

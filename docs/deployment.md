@@ -1,211 +1,323 @@
 # Развёртывание Spotter
 
-Пошаговая инструкция для трёх режимов: **разработка**, **единый узел** и
-**распределённо** (ingest + cloud). Написано для тех, кто впервые видит проект.
+**Скачал → заполнил один `.env` → одна команда.** По умолчанию поднимается
+максимум сервисов; необязательное отключается флагом. Написано для тех, кто
+впервые видит проект.
 
-## Как вообще всё устроено (в двух словах)
+## Быстрый старт (3 шага)
 
-- Сервисы **не** вызывают друг друга напрямую — общаются через **Redis Streams**.
-  Поэтому «развернуть» = поднять Redis + нужные контейнеры, которые в него пишут/читают.
-- Каждый сервис читает **два** env-файла: общий `.env` (Redis, S3, TZ — один на хост)
-  и тонкий `.env.<сервис>` поверх (креды/настройки конкретного сервиса).
-- Docker-образы уже собраны в CI и лежат в `ghcr.io/mksavin/spotter-*`. На хосте их
-  не собирают — только **скачивают и запускают**.
-- **Все compose-команды запускаются из корня репозитория** — пути к `.docker/` и
-  `.deployment/` относительные.
+### 1. Поставь Docker и скачай проект
 
-Топологии подробно (со схемами) — в [README](../README.md#архитектура).
+Нужен только **Docker** (с Docker Compose — входит в Docker Desktop и в
+`docker-compose-plugin`). Больше на хост ничего ставить не надо — ни bun, ни
+node, ни unzip.
+
+```bash
+git clone https://github.com/mksavin/spotter.git spotter
+cd spotter
+```
+
+### 2. Запусти мастер
+
+Мастер спросит режим, попросит **только обязательное** (S3 и токен бота),
+сгенерирует что нужно, поднимет стек и выдаст код доступа.
+
+```bash
+# если на хосте есть bun:
+bun .integration/install.ts
+
+# если bun нет — тот же мастер в контейнере:
+docker run --rm -it -v "$PWD":/w -w /w oven/bun bun .integration/install.ts
+```
+
+Выбери режим **single** (всё на одной машине) — самый простой. Впиши S3-креды и
+`TELEGRAM_TOKEN` от [@BotFather](https://t.me/BotFather). Остальное — с рабочими
+дефолтами.
+
+### 3. Войди
+
+Мастер напечатает одноразовый код доступа. Отправь боту:
+
+```
+/login <код>
+```
+
+Готово. Поднялись `redis`, `mosquitto`, `frigate`, `depot`, `server`,
+`telegram` и `watchtower` (авто-обновление). Дальше всё живёт само.
+
+> **Без мастера, вручную:** `cp .env.example .env`, впиши S3 + `TELEGRAM_TOKEN`,
+> затем `make single`, затем `make token`.
 
 ---
 
-## Подготовка (одна на любой режим)
+## Команды на каждый день
 
-1. Установить **Docker** и **Docker Compose** (входит в Docker Desktop / `docker compose`).
-2. Склонировать репозиторий и зайти в его корень:
-   ```bash
-   git clone https://github.com/mksavin/elercam.git spotter
-   cd spotter
-   ```
-3. Создать общий `.env` из примера и вписать реальные значения (Redis подставит compose,
-   а **S3 обязателен** — любой S3-совместимый бэкенд):
-   ```bash
-   cp .env.example .env
-   ```
-4. Для каждого поднимаемого сервиса создать его тонкий env-файл:
-   ```bash
-   cp .env.frigate.example  .env.frigate     # креды NVR (только на ingest/single)
-   cp .env.server.example   .env.server
-   cp .env.telegram.example .env.telegram    # токен бота
-   cp .env.depot.example    .env.depot
-   # опциональные фронтенды:
-   cp .env.pwa.example      .env.pwa
-   cp .env.email.example    .env.email
-   ```
-   Что заполнять — в комментариях внутри каждого файла и в `AGENTS.md` сервиса.
+Все команды — из корня репозитория (пути к `.docker/` относительные). Длинные
+`docker compose …` спрятаны за `make`:
+
+| Действие | Команда |
+| --- | --- |
+| Поднять единый узел | `make single` |
+| Поднять cloud-узел | `make cloud` |
+| Поднять ingest-узел | `make ingest` |
+| Статус | `make ps` (для cloud/ingest: `make ps MODE=cloud`) |
+| Логи одного сервиса | `make logs s=server` |
+| Остановить | `make down` |
+| Выпустить код доступа | `make token` |
+| Обновить вручную | `make update MODE=single` |
+
+`make single` не делает `pull` — `up -d` сам скачивает недостающие образы.
+`MODE` по умолчанию `single`; для распределёнки указывай `MODE=cloud` /
+`MODE=ingest` в `ps`/`logs`/`down`/`update`.
+
+Образы публичные (`ghcr.io/mksavin/spotter-*`) — **никакого `docker login`**.
 
 ---
 
-## Режим 1. Разработка (одна машина)
+## Как отключить необязательное
 
-Инфраструктура — в Docker, сами сервисы — на хосте через Bun (быстрый рестарт, HMR).
+### Авто-обновление (Watchtower)
+
+По умолчанию на узле крутится `watchtower`: раз в сутки проверяет реестр и
+пере-раскатывает обновлённые `spotter-*` (redis/mosquitto не трогает,
+`--cleanup` подчищает старые слои). Смержил релиз → CI собрал → Watchtower
+выкатил, руки не нужны.
+
+Не хочешь авто-обновление — подними без него:
 
 ```bash
-bun install                 # зависимости
-bun run docker:dev          # поднять redis + mosquitto
-bun run sign:token admin    # (один раз) выпустить код доступа для авторизации
-cd apps/server && bun start:watch    # домен
-cd apps/telegram && bun start:watch  # Telegram-фронтенд
-# фронтенд-разработка PWA: в apps/pwa два процесса —
-#   bun start:watch   (сервер: API + Redis + web-push, порт 3000)
-#   bun run web:dev    (Vite dev-сервер с HMR, проксирует /api → :3000)
+make single WATCHTOWER=0
 ```
 
-Остановить инфру: `docker compose --project-directory . -f .deployment/compose/development.yml down`.
+Изменить интервал (в секундах) — переменной `WATCHTOWER_INTERVAL`, напр. раз в
+час:
+
+```bash
+WATCHTOWER_INTERVAL=3600 make single
+```
+
+Тогда обновляй руками: `make update MODE=single` (pull → up → prune).
+
+### PWA и Email — фронтенды по желанию
+
+`telegram` поднимается всегда. **PWA** (устанавливаемое веб-приложение с
+пушами) и **Email** (SMTP-уведомления) — опциональны.
+
+- **single:** PWA/Email в стек не входят. Нужны — добавь их сервисы по образцу
+  из `production.cloud.yml`.
+- **cloud:** сервисы `spotter-pwa` и `spotter-email` в
+  `.deployment/compose/production.cloud.yml` **закомментированы**. Чтобы
+  включить — раскомментируй нужный блок и заполни его секцию в `.env`
+  (мастер умеет сгенерировать VAPID для PWA; вручную — см. ниже).
+
+PWA ставь **за TLS-прокси** (Caddy/nginx): service worker и Web Push работают
+только по HTTPS.
 
 ---
 
-## Режим 2. Единый узел (простой прод)
+## Режим 2. Единый узел (`single`) — подробно
 
-Одна машина ингестит с NVR **и** ходит в Telegram. Единый Redis, `forwarder` не нужен.
+Одна машина и ингестит с NVR, и ходит в Telegram. Единый Redis, `forwarder` не
+нужен.
 
 ```bash
-cp .env.example .env                       # + заполнить
-cp .env.frigate.example .env.frigate       # + креды NVR
-cp .env.server.example .env.server
-cp .env.telegram.example .env.telegram     # + токен бота
-cp .env.depot.example .env.depot
-
-docker compose --project-directory . -f .deployment/compose/production.single.yml pull
-bun run docker:single                      # = docker compose ... up -d
+cp .env.example .env       # впиши S3_* и TELEGRAM_TOKEN, остальное — дефолты
+make single                # up -d (без pull), поднимет весь стек
+make ps                    # проверить
+make logs s=server         # смотреть логи домена
+make token                 # выпустить код доступа admin
 ```
 
-Поднимутся: `redis`, `mosquitto`, `frigate`, `depot`, `server`, `telegram`.
-
-Проверка:
-```bash
-docker compose --project-directory . -f .deployment/compose/production.single.yml ps
-docker compose --project-directory . -f .deployment/compose/production.single.yml logs -f spotter-server
-```
-
-Выпустить код доступа для оператора (внутри контейнера server):
-```bash
-docker exec spotter-server bun apps/server/src/cli.ts sign admin
-```
+Заполнять в `.env` обязательно только `S3_*` и `TELEGRAM_TOKEN`. NVR-креды
+(`FRIGATE_*`) — там же (единый узел, утекать некуда). Секции `pwa`/`email` можно
+не трогать.
 
 ---
 
-## Режим 3. Распределённо (ingest + cloud)
+## Режим 3. Распределённо (`ingest` + `cloud`) — подробно
 
-**Две машины.** Между ними — VPN-туннель (site-to-site; для ограниченных сетей —
-XRAY-VLESS / AmneziaWG 2). Внутри туннеля у cloud-узла адрес вида `10.0.0.1`.
+**Две машины**, между ними — VPN-туннель (см. раздел ниже). Пример адресов
+внутри туннеля: cloud = `10.0.0.1`, ingest = `10.0.0.2`.
 
-- **ingest-узел** (рядом с камерами): буферизует и транскодит. `forwarder` зеркалит
-  стримы в облако и обратно, а при обрыве канала копит всё в `local-redis` (appendonly),
-  чтобы ничего не потерять.
-- **cloud-узел** (VPS): главный Redis, домен `server` и фронтенды (Telegram + опц. PWA).
+- **ingest-узел** (рядом с камерами): буферизует и транскодит. `forwarder`
+  зеркалит стримы в облако и обратно, при обрыве канала копит всё в
+  `local-redis` (appendonly) — ничего не теряется.
+- **cloud-узел** (VPS): главный Redis, домен `server` и фронтенды.
 
-### 3.1. На cloud-узле
-
-```bash
-cp .env.example .env                       # REDIS_URL здесь — локальный redis узла
-cp .env.server.example .env.server
-cp .env.telegram.example .env.telegram
-
-docker compose --project-directory . -f .deployment/compose/production.cloud.yml pull
-bun run docker:cloud
-```
-Поднимутся `redis` (главный durable-буфер) + `server` + `telegram`.
-
-> **Redis наружу не публикуй.** В `production.cloud.yml` порт `6379` открыт для примера —
-> в бою привяжи его к интерфейсу туннеля (`10.0.0.1:6379:6379`), а не к `0.0.0.0`.
-
-### 3.2. На ingest-узле
+### 3.1. Cloud-узел
 
 ```bash
-cp .env.example .env
-cp .env.frigate.example .env.frigate       # + креды NVR (живут ТОЛЬКО тут)
-cp .env.depot.example .env.depot
-cp .env.forwarder.example .env.forwarder
-
-# указать адрес облачного Redis внутри туннеля:
-#   REDIS_REMOTE_URL=redis://10.0.0.1:6379  (в production.ingest.yml / .env.forwarder)
-
-docker compose --project-directory . -f .deployment/compose/production.ingest.yml pull
-bun run docker:ingest
+cp .env.cloud.example .env    # S3_* + TELEGRAM_TOKEN; NVR-кредов тут НЕТ
+make cloud                    # redis + server + telegram (+ watchtower)
+make token                    # код доступа admin
 ```
-Поднимутся `local-redis` (durable), `mosquitto`, `frigate`, `depot×2` (опц. GPU), `forwarder`.
 
-### 3.3. Опциональный PWA-фронтенд (на cloud-узле)
+> **Redis наружу не публикуй.** В `production.cloud.yml` порт `6379` открыт для
+> примера — в бою привяжи его к интерфейсу туннеля (`10.0.0.1:6379:6379`), а не
+> к `0.0.0.0`.
 
-PWA в `production.cloud.yml` **закомментирован** (opt-in). Чтобы включить:
+### 3.2. Ingest-узел
 
-1. Сгенерировать свою VAPID-пару и вписать в `.env.pwa`:
-   ```bash
-   bunx web-push generate-vapid-keys
-   ```
-2. Раскомментировать блок `spotter-pwa` в `production.cloud.yml`.
-3. Поставить **за TLS-прокси** (Caddy/nginx) — Web Push и service worker работают
-   только по HTTPS. `bun run docker:cloud` подхватит сервис.
+```bash
+cp .env.ingest.example .env   # S3_* + FRIGATE_* (креды NVR живут ТОЛЬКО тут)
+# впиши REDIS_REMOTE_URL — адрес облачного Redis внутри туннеля:
+#   REDIS_REMOTE_URL=redis://10.0.0.1:6379
+make ingest                   # local-redis, mosquitto, frigate, depot×2, forwarder
+```
+
+GPU-транскод: в `production.ingest.yml` у `depot` уже прописаны блоки
+`deploy.resources`/`devices` под NVIDIA; выстави `VIDEO_ACCELERATION=cuda` в
+`.env`.
 
 ---
 
-## Автоматический деплой новых версий
+## Автодеплой: где заканчивается CI
 
-Важно понимать границу: **CI собирает образы, но НЕ раскатывает их на узлы.**
+**CI собирает образы, но НЕ раскатывает их на узлы.**
 
 ```
 push в master → release.yml → версии (changesets) → git-теги/Releases
                             → сборка и пуш образов в ghcr.io/mksavin/spotter-*:latest
                             └── на этом CI заканчивается ─┐
                                                           ▼
-                      узлы продолжают крутить СТАРЫЙ образ, пока их не обновишь
+              дальше их подхватывает Watchtower на каждом узле (см. выше)
 ```
+
+Хочешь контролировать «когда именно» — отключи Watchtower (`WATCHTOWER=0`) и
+обновляй руками `make update MODE=…`, либо пинь конкретную версию образа
+(`:1.4.0-alpine` вместо `:latest`) и меняй её осознанно.
 
 Детали релиз-процесса (changesets, теги) — в [README](../README.md#cicd-и-релизы).
 
-### Обновить узел вручную
+---
 
-На каждом узле, из корня репозитория, для его профиля:
+## Ручные операции
+
+### Сгенерировать VAPID-пару для PWA вручную
+
+Хостовый `web-push` не нужен — образ PWA его уже содержит:
+
 ```bash
-# пример для cloud-узла:
-docker compose --project-directory . -f .deployment/compose/production.cloud.yml pull
-docker compose --project-directory . -f .deployment/compose/production.cloud.yml up -d
-docker image prune -f      # убрать старые слои
+docker run --rm ghcr.io/mksavin/spotter-pwa bunx web-push generate-vapid-keys
 ```
-`pull` тянет свежий `:latest`, `up -d` пересоздаёт только изменившиеся контейнеры
-(остальные не трогает). БД/подписки переживают пересоздание — они в volume `.docker/*`.
 
-### Сделать это автоматическим
+Впиши `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` в `.env`. Публичный ключ клиент
+получает в рантайме через `GET /api/vapid` — пересобирать PWA не нужно.
+Ротация приватного ключа инвалидирует все существующие подписки.
 
-Чтобы узлы сами подхватывали новый `:latest`, добавь на каждый узел
-[**Watchtower**](https://containrrr.dev/watchtower/) — он периодически проверяет реестр
-и пере-раскатывает обновлённые контейнеры:
+### Сделать образы публичными (шаг владельца репозитория)
+
+Чтобы self-host обходился без `docker login`, образы должны быть публичными.
+Один раз, в UI GitHub, для **каждого** из семи образов
+(`spotter-depot`, `spotter-email`, `spotter-forwarder`, `spotter-frigate`,
+`spotter-pwa`, `spotter-server`, `spotter-telegram`):
+
+1. **GitHub → профиль/организация → Packages → выбрать `spotter-<имя>`.**
+2. **Package settings → Danger Zone → Change visibility → Public.**
+3. (Опц.) там же **Connect repository** → привязать к `mksavin/spotter`.
+
+После этого `make single/cloud/ingest` на любой машине тянет образы анонимно.
+
+### Выпустить код доступа вручную
+
 ```bash
-docker run -d --name watchtower --restart unless-stopped \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  containrrr/watchtower --cleanup --interval 300
+make token                                 # = docker exec spotter-server ./spotter sign admin
+# или напрямую, с опциями:
+docker exec spotter-server ./spotter sign admin -b <bot_username>
 ```
-После этого цикл сквозной: **смержил релиз → CI собрал образ → Watchtower выкатил его
-на узлы**. Для распределёнки Watchtower ставится и на ingest, и на cloud — каждый
-обновляет свои сервисы независимо.
-
-> Компромисс: Watchtower тянет `:latest` без ручного подтверждения. Если нужен контроль
-> «когда именно», оставляй ручной `pull && up -d` или пинь конкретную версию образа
-> (`:1.4.0-alpine` вместо `:latest`) и меняй её осознанно.
 
 ---
 
-## Шпаргалка
+## VPN-туннель между узлами (только для распределёнки)
 
-| Действие | Команда |
-| --- | --- |
-| dev-инфра | `bun run docker:dev` |
-| единый узел | `bun run docker:single` |
-| ingest-узел | `bun run docker:ingest` |
-| cloud-узел | `bun run docker:cloud` |
-| статус | `docker compose --project-directory . -f <профиль> ps` |
-| логи | `docker compose --project-directory . -f <профиль> logs -f <сервис>` |
-| обновить узел | `... pull && ... up -d` |
-| остановить | `docker compose --project-directory . -f <профиль> down` |
+ingest ↔ cloud общаются через приватный туннель: `forwarder` на ingest пишет в
+`REDIS_REMOTE_URL` (Redis на cloud), а Redis на cloud слушает **только**
+интерфейс туннеля. Ниже — свой WireGuard пошагово, затем — что делать, если
+обычный WG режется.
 
-`<профиль>` = один из `.deployment/compose/*.yml`.
+Адреса в примере: **cloud = `10.0.0.1`**, **ingest = `10.0.0.2`**.
+
+### Вариант A. Свой WireGuard (базовый)
+
+На **обоих** узлах: `apt install wireguard` (или пакет дистрибутива).
+
+**1. Ключи (на каждом узле):**
+
+```bash
+wg genkey | tee privatekey | wg pubkey > publickey
+cat privatekey   # приватный — в свой конфиг
+cat publickey    # публичный — отдать другой стороне
+```
+
+**2. Конфиг cloud-узла** — `/etc/wireguard/wg0.conf`:
+
+```ini
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = 51820
+PrivateKey = <приватный_ключ_CLOUD>
+
+[Peer]
+# ingest
+PublicKey = <публичный_ключ_INGEST>
+AllowedIPs = 10.0.0.2/32
+```
+
+**3. Конфиг ingest-узла** — `/etc/wireguard/wg0.conf`:
+
+```ini
+[Interface]
+Address = 10.0.0.2/24
+PrivateKey = <приватный_ключ_INGEST>
+
+[Peer]
+# cloud
+PublicKey = <публичный_ключ_CLOUD>
+Endpoint = <публичный_IP_CLOUD>:51820
+AllowedIPs = 10.0.0.1/32
+# держать туннель живым через NAT:
+PersistentKeepalive = 25
+```
+
+**4. Поднять на обоих узлах и проверить:**
+
+```bash
+wg-quick up wg0
+wg              # статус, рукопожатие
+ping 10.0.0.1  # с ingest — должен идти пинг до cloud
+```
+
+Автозапуск: `systemctl enable wg-quick@wg0`.
+
+**5. Привязать Redis к туннелю.** В `production.cloud.yml` замени публичный
+проброс на адрес туннеля, чтобы Redis слушал только его:
+
+```yaml
+    ports:
+      - '10.0.0.1:6379:6379'
+```
+
+На ingest в `.env`: `REDIS_REMOTE_URL=redis://10.0.0.1:6379`. `forwarder`
+пойдёт в облако через туннель.
+
+### Вариант B. AmneziaWG / XRAY-VLESS (когда обычный WG режется)
+
+В некоторых сетях ТСПУ (DPI) распознаёт и режет обычный WireGuard —
+рукопожатие не проходит или туннель рвётся. Тогда:
+
+- **AmneziaWG** — форк WireGuard с обфускацией трафика: тот же принцип и те же
+  конфиги, но пакеты не опознаются как WG. Наименьшая переделка относительно
+  варианта A. См. [amnezia.org](https://amnezia.org/) и `amneziawg-tools`.
+- **XRAY-VLESS (+ Reality)** — не VPN-в-классическом-смысле, а
+  прокси-транспорт, маскирующий трафик под обычный TLS к «настоящему» сайту.
+  Гибче против DPI, но и сложнее в настройке (нужен домен/сертификат-цель).
+  Redis-трафик заворачивается в VLESS-туннель, `REDIS_REMOTE_URL` смотрит на
+  локальный конец прокси. См. документацию [XTLS/Xray-core](https://xtls.github.io/).
+
+Пошаговой настройки этих двух здесь нет намеренно — она зависит от того, что
+именно режется в конкретной сети. Начни с варианта A; если WG не поднимается —
+переходи на AmneziaWG (минимальная переделка), а XRAY бери, когда режется и он.
+
+---
+
+Топологии и архитектура (со схемами) — в [README](../README.md#архитектура).

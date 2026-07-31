@@ -1,4 +1,5 @@
-# Cloud node - the main node running the Redis and Telegram bot services.
+# Cloud node - the main node running Redis and the delivery frontends.
+# One combined .env for this node (see .env.cloud.example).
 services:
   redis:
     image: redis:7-alpine
@@ -32,7 +33,8 @@ services:
       REDIS_URL: redis://redis:6379
     env_file:
       - ./.env
-      - ./.env.server
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     volumes:
       # Persist the domain SQLite database across container restarts.
       - ./.docker/server:/app/data
@@ -50,38 +52,19 @@ services:
       REDIS_URL: redis://redis:6379
     env_file:
       - ./.env
-      - ./.env.telegram
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
     volumes:
       # Persist the Telegram-local SQLite database across container restarts.
       - ./.docker/telegram:/app/data
     depends_on:
       - redis
 
-  # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event. Sends
-  # one notification email per event. Uncomment to enable; needs .env.email
-  # (SMTP creds + EMAIL_RECIPIENTS). Can also run on a separate web host that
-  # reaches this Redis by IP — it doesn't have to be co-located here.
-  # spotter-email:
-  #   image: ghcr.io/mksavin/spotter-email:latest
-  #   container_name: spotter-email
-  #   restart: unless-stopped
-  #   networks:
-  #     - spotter
-  #   environment:
-  #     REDIS_URL: redis://redis:6379
-  #   env_file:
-  #     - ./.env
-  #     - ./.env.email
-  #   volumes:
-  #     # Persist the email dedup ledger across container restarts.
-  #     - ./.docker/email:/app/data
-  #   depends_on:
-  #     - redis
-
   # PWA frontend (OPTIONAL): Web Push consumer that also serves the web app.
   # The main frontend — installable on iPhone/Android/desktop, pushes via VAPID.
-  # Uncomment to enable; needs .env.pwa (generate your own VAPID keypair with
-  # `bunx web-push generate-vapid-keys`). Put it behind a TLS reverse proxy —
+  # Uncomment to enable; fill the VAPID_* block in .env (install.ts generates a
+  # keypair, or run: docker run --rm ghcr.io/mksavin/spotter-pwa \
+  # bunx web-push generate-vapid-keys). Put it behind a TLS reverse proxy —
   # service workers and Web Push require HTTPS.
   # spotter-pwa:
   #   image: ghcr.io/mksavin/spotter-pwa:latest
@@ -95,12 +78,45 @@ services:
   #     REDIS_URL: redis://redis:6379
   #   env_file:
   #     - ./.env
-  #     - ./.env.pwa
+  #   labels:
+  #     com.centurylinklabs.watchtower.enable: 'true'
   #   volumes:
   #     # Persist push subscriptions + feed cache across container restarts.
   #     - ./.docker/pwa:/app/data
   #   depends_on:
   #     - redis
+
+  # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event. Sends
+  # one notification email per event. Uncomment to enable; fill the SMTP_* /
+  # EMAIL_RECIPIENTS block in .env. Can also run on a separate web host that
+  # reaches this Redis by IP — it doesn't have to be co-located here.
+  # spotter-email:
+  #   image: ghcr.io/mksavin/spotter-email:latest
+  #   container_name: spotter-email
+  #   restart: unless-stopped
+  #   networks:
+  #     - spotter
+  #   environment:
+  #     REDIS_URL: redis://redis:6379
+  #   env_file:
+  #     - ./.env
+  #   labels:
+  #     com.centurylinklabs.watchtower.enable: 'true'
+  #   volumes:
+  #     # Persist the email dedup ledger across container restarts.
+  #     - ./.docker/email:/app/data
+  #   depends_on:
+  #     - redis
+
+  # Auto-update: pulls fresh :latest for labelled spotter-* only (redis left
+  # alone). Daily by default; --cleanup drops old layers.
+  # On by default; disable with `make cloud WATCHTOWER=0`.
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 networks:
   spotter:

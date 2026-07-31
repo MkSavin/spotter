@@ -18,10 +18,11 @@ bun run web:dev        # Vite dev-сервер (проксирует /api на l
 bun test               # тесты серверной части (src/)
 ```
 
-Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_*`, `TZ`) + тонкий `.env.pwa`
-(см. [.env.pwa.example](../../.env.pwa.example)) поверх: `REDIS_GROUP_ID` (`spotter-pwa`),
-`VAPID_*`, `PORT`, `PUBLIC_URL`, `PWA_COALESCE_MS`, `PWA_ACCESS_CODES`, `DATABASE_PATH`,
-`SOURCE_ID`, `S3_PRESIGN_EXPIRY`. `requireConfig` валидирует на старте (fail-fast).
+Окружение: единый `.env` узла (секция `pwa` в [.env.example](../../.env.example) /
+[.env.cloud.example](../../.env.cloud.example)). Сервис читает `REDIS_URL`, `S3_*`, `TZ`,
+`VAPID_*`, `PORT`, `PUBLIC_URL`, `PWA_COALESCE_MS`, `PWA_ACCESS_CODES`, `S3_PRESIGN_EXPIRY`;
+consumer-группа (`spotter-pwa`), `DATABASE_PATH`, `SOURCE_ID` — с дефолтами в коде.
+`requireConfig` валидирует на старте (fail-fast).
 **VAPID-пару генерирует сам деплойер** (`bunx web-push generate-vapid-keys`); публичный
 ключ отдаётся клиенту рантайм-эндпойнтом `GET /api/vapid` — один билд PWA работает у
 любого деплойера без пересборки. Сервис **полностью опционален** и требует **HTTPS**
@@ -128,4 +129,5 @@ sonner 2.0). Осознанные отклонения: `drizzle-orm`/`drizzle-k
 - Человекочитаемый рендер события (лейблы/тайминг) — из общего `@spotter/transport`
   (`renderEvent`), тот же, что теперь у email; Telegram оставляет свой HTML-рендер.
 - В `production.cloud.yml` сервис добавлен **закомментированным** (opt-in): раскомментировать,
-  завести `.env.pwa`, поставить за TLS-прокси.
+  заполнить секцию `pwa` в `.env` (VAPID генерит `install.ts` или `bunx web-push generate-vapid-keys`),
+  поставить за TLS-прокси.

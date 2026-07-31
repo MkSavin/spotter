@@ -15,10 +15,11 @@ cd apps/email
 bun start            # или bun start:watch
 bun test
 ```
-Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_*`, `TZ`) + тонкий `.env.email`
-(см. [.env.email.example](../../.env.email.example)) поверх: `REDIS_GROUP_ID` (`spotter-email`),
-`SMTP_*`, `EMAIL_RECIPIENTS`, `EMAIL_MODE`, `DATABASE_PATH`, `SOURCE_ID`, `S3_PRESIGN_EXPIRY`,
-`PUBLIC_URL`. `requireConfig` валидирует на старте; `SmtpGateway.verify()` дополнительно
+Окружение: единый `.env` узла (секция `email` в [.env.example](../../.env.example) /
+[.env.cloud.example](../../.env.cloud.example)). Сервис читает `REDIS_URL`, `S3_*`, `TZ`,
+`SMTP_*`, `EMAIL_RECIPIENTS`, `EMAIL_MODE`, `S3_PRESIGN_EXPIRY`, `PUBLIC_URL`;
+consumer-группа (`spotter-email`), `DATABASE_PATH`, `SOURCE_ID` — с дефолтами в коде.
+`requireConfig` валидирует на старте; `SmtpGateway.verify()` дополнительно
 проверяет коннект/креды SMTP до входа в цикл (fail-fast). NVR-кредов нет — S3 только для
 presign байтов кадра. Сервис **полностью опционален**: не поднимаешь — ничего не ломается.
 
@@ -86,4 +87,4 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ sendEmailActi
 - Может жить на отдельном веб-хосте и ходить в главный Redis по IP (как отдельный инстанс), а не
   обязательно рядом с server/redis.
 - В `production.cloud.yml` сервис добавлен **закомментированным** (opt-in): раскомментировать +
-  завести `.env.email`.
+  заполнить секцию `email` в `.env`.

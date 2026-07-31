@@ -12,11 +12,13 @@ cd apps/frigate
 bun start            # или bun start:watch
 bun test
 ```
-Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_*` стейджинг сырья, `TZ`) + тонкий
-`.env.frigate` (см. [.env.frigate.example](../../.env.frigate.example)) поверх:
-`REDIS_GROUP_ID`, `SOURCE_ID`, `SOURCE_TYPE` (по умолч. `frigate`), `S3_STAGING_PREFIX`,
-`MQTT_BROKER`, `FRIGATE_REMOTE_URL` / `FRIGATE_AUTH_USER` / `FRIGATE_AUTH_SECRET`.
-**Креды NVR (`FRIGATE_*`) живут ТОЛЬКО здесь** — в общий `.env` их выносить нельзя.
+Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
+[.env.ingest.example](../../.env.ingest.example) для ingest). Сервис читает `REDIS_URL`,
+`S3_*` (стейджинг сырья), `TZ`, `S3_STAGING_PREFIX`, `FRIGATE_REMOTE_URL` /
+`FRIGATE_AUTH_USER` / `FRIGATE_AUTH_SECRET`; `SOURCE_TYPE` (по умолч. `frigate`) и
+`MQTT_BROKER` compose задаёт inline через `environment:`; consumer-группа и `SOURCE_ID` —
+с дефолтами в коде. **Креды NVR (`FRIGATE_*`) живут ТОЛЬКО на узле с камерами** — в
+cloud-`.env` их выносить нельзя.
 
 ## Точка входа
 

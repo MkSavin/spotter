@@ -13,10 +13,11 @@ cd apps/telegram
 bun start            # или bun start:watch
 bun test
 ```
-Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_*`, `TZ`) + тонкий `.env.telegram`
-(см. [.env.telegram.example](../../.env.telegram.example)) поверх: `REDIS_GROUP_ID`
-(`spotter-telegram`), `TELEGRAM_TOKEN`, `DATABASE_PATH`, `SOURCE_ID`, `S3_PRESIGN_EXPIRY`.
-NVR-кредов нет — S3 только для presign-байтов. `requireConfig` валидирует на старте.
+Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
+[.env.cloud.example](../../.env.cloud.example) для cloud). Сервис читает `REDIS_URL`,
+`S3_*`, `TZ`, `TELEGRAM_TOKEN`, `S3_PRESIGN_EXPIRY`; consumer-группа (`spotter-telegram`),
+`DATABASE_PATH`, `SOURCE_ID` — с дефолтами в коде. NVR-кредов нет — S3 только для
+presign-байтов. `requireConfig` валидирует на старте.
 
 ## Точка входа
 

@@ -10,7 +10,7 @@ WORKDIR /app
 
 FROM base AS install
 
-COPY package.json .npmrc ./
+COPY package.json ./
 COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
 RUN bun install

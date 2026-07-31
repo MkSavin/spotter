@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "bun --env-file=../../.env --env-file=../../.env.depot src/index.ts",
-    "start:watch": "bun --watch --env-file=../../.env --env-file=../../.env.depot src/index.ts",
+    "start": "bun --env-file=../../.env src/index.ts",
+    "start:watch": "bun --watch --env-file=../../.env src/index.ts",
     "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun test",

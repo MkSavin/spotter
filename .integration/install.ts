@@ -1,0 +1,225 @@
+#!/usr/bin/env bun
+
+// First-run wizard: seeds .env from a template, asks only what is required,
+// brings the stack up and prints an admin code. Idempotent — an existing .env
+// is kept unless the user opts to overwrite.
+//
+//   bun .integration/install.ts
+//   docker run --rm -it -v "$PWD":/w -w /w oven/bun bun .integration/install.ts
+
+import { existsSync } from 'node:fs'
+import process from 'node:process'
+import { createInterface } from 'node:readline/promises'
+import { $ } from 'bun'
+
+type Mode = 'single' | 'cloud' | 'ingest'
+
+const rl = createInterface({ input: process.stdin, output: process.stdout })
+
+const PWA_IMAGE = 'ghcr.io/mksavin/spotter-pwa:latest'
+
+const say = (msg = '') => console.log(msg)
+const step = (n: number, msg: string) => say(`\n[${n}] ${msg}`)
+
+const ask = async (question: string, fallback = ''): Promise<string> => {
+  const suffix = fallback ? ` [${fallback}]` : ''
+  const answer = (await rl.question(`  ${question}${suffix}: `)).trim()
+  return answer || fallback
+}
+
+const askYesNo = async (question: string, def = false): Promise<boolean> => {
+  const hint = def ? 'Y/n' : 'y/N'
+  const answer = (await rl.question(`  ${question} (${hint}): `))
+    .trim()
+    .toLowerCase()
+  if (!answer) return def
+  return answer === 'y' || answer === 'yes' || answer === 'д' || answer === 'да'
+}
+
+/** Replace `KEY=...` in place, preserving comments and ordering. */
+const setEnv = (content: string, key: string, value: string): string => {
+  const line = `${key}=${value}`
+  const pattern = new RegExp(`^${key}=.*$`, 'm')
+  return pattern.test(content)
+    ? content.replace(pattern, line)
+    : `${content}\n${line}\n`
+}
+
+const fail = (msg: string): never => {
+  say(`\n✗ ${msg}`)
+  rl.close()
+  process.exit(1)
+}
+
+// 1. Docker
+step(1, 'Проверяю Docker…')
+try {
+  await $`docker --version`.quiet()
+  await $`docker compose version`.quiet()
+  say('  ✓ Docker и Docker Compose на месте')
+} catch {
+  fail(
+    'Не найден Docker или Docker Compose. Установи Docker Desktop / docker + \n' +
+      '    docker-compose-plugin и запусти заново.',
+  )
+}
+
+// 2. Mode
+step(2, 'Режим развёртывания')
+say('  1) single — всё на одной машине (проще всего)')
+say(
+  '  2) cloud  — облачный узел распределёнки (server + telegram + опц. pwa/email)',
+)
+say('  3) ingest — узел рядом с камерами (frigate + depot + forwarder)')
+const modeChoice = await ask('Выбор (1/2/3)', '1')
+const mode: Mode =
+  ({ '1': 'single', '2': 'cloud', '3': 'ingest' } as const)[modeChoice] ??
+  'single'
+const exampleByMode: Record<Mode, string> = {
+  single: '.env.example',
+  cloud: '.env.cloud.example',
+  ingest: '.env.ingest.example',
+}
+const example = exampleByMode[mode]
+say(`  → режим: ${mode} (шаблон ${example})`)
+
+// 3. Seed .env (idempotent)
+step(3, 'Готовлю .env')
+if (existsSync('.env')) {
+  const overwrite = await askYesNo(
+    '.env уже существует. Перезаписать из шаблона? (n — оставить и выйти)',
+    false,
+  )
+  if (!overwrite) {
+    say('  ✓ Оставляю текущий .env без изменений.')
+    say(`\nЗапусти стек вручную:  make ${mode}`)
+    rl.close()
+    process.exit(0)
+  }
+}
+if (!existsSync(example))
+  fail(`Не найден шаблон ${example} в корне репозитория.`)
+let env = await Bun.file(example).text()
+say(`  ✓ Скопировал ${example} → .env (пока в памяти)`)
+
+// 4. Required values
+step(4, 'Обязательные параметры')
+say('  S3-хранилище (любой S3-совместимый бэкенд):')
+env = setEnv(
+  env,
+  'S3_HOST',
+  await ask(
+    'S3_HOST',
+    mode === 'single' ? 'http://localhost:9000' : 'https://s3.example.com',
+  ),
+)
+env = setEnv(env, 'S3_ACCESS', await ask('S3_ACCESS'))
+env = setEnv(env, 'S3_SECRET', await ask('S3_SECRET'))
+env = setEnv(env, 'S3_BUCKET', await ask('S3_BUCKET', 'spotter'))
+
+if (mode === 'single' || mode === 'cloud') {
+  env = setEnv(
+    env,
+    'TELEGRAM_TOKEN',
+    await ask('TELEGRAM_TOKEN (от @BotFather)'),
+  )
+}
+
+if (mode === 'ingest') {
+  say('  Доступ к Frigate/NVR (живёт только на этом узле):')
+  env = setEnv(
+    env,
+    'FRIGATE_REMOTE_URL',
+    await ask('FRIGATE_REMOTE_URL', 'https://frigate.example.local'),
+  )
+  env = setEnv(
+    env,
+    'FRIGATE_AUTH_USER',
+    await ask('FRIGATE_AUTH_USER', 'admin'),
+  )
+  env = setEnv(env, 'FRIGATE_AUTH_SECRET', await ask('FRIGATE_AUTH_SECRET'))
+  say('  Облачный Redis внутри VPN-туннеля:')
+  env = setEnv(
+    env,
+    'REDIS_REMOTE_URL',
+    await ask('REDIS_REMOTE_URL', 'redis://10.0.0.1:6379'),
+  )
+}
+
+// 5. PWA / VAPID (opt-in)
+if (mode === 'single' || mode === 'cloud') {
+  step(5, 'PWA-фронтенд (опционально)')
+  const wantPwa = await askYesNo(
+    'Включить PWA (Web Push)? Сгенерирую VAPID-пару',
+    false,
+  )
+  if (wantPwa) {
+    env = setEnv(
+      env,
+      'PUBLIC_URL',
+      await ask('PUBLIC_URL (за TLS-прокси)', 'https://spotter.example.com'),
+    )
+    say('  Генерирую VAPID-ключи в контейнере…')
+    try {
+      const out =
+        await $`docker run --rm ${PWA_IMAGE} bunx web-push generate-vapid-keys`.text()
+      const pub = out.match(/Public Key:\s*\n?([A-Za-z0-9_-]+)/)?.[1]
+      const priv = out.match(/Private Key:\s*\n?([A-Za-z0-9_-]+)/)?.[1]
+      if (pub && priv) {
+        env = setEnv(env, 'VAPID_PUBLIC_KEY', pub)
+        env = setEnv(env, 'VAPID_PRIVATE_KEY', priv)
+        say('  ✓ VAPID-пара записана в .env')
+      } else {
+        say(
+          '  ! Не смог распарсить вывод web-push — заполни VAPID_* вручную позже.',
+        )
+      }
+    } catch {
+      say(`  ! Не удалось сгенерировать VAPID (нет образа ${PWA_IMAGE}?).`)
+      say('    Заполни VAPID_* вручную позже — см. .env.')
+    }
+    say('  Не забудь раскомментировать сервис spotter-pwa в профиле cloud.')
+  }
+}
+
+// 6. Write .env
+step(6, 'Записываю .env')
+await Bun.write('.env', env)
+say(
+  '  ✓ .env готов. Проверь остальные значения при желании — там рабочие дефолты.',
+)
+
+// 7. Bring the stack up
+step(7, 'Поднимаю стек')
+const bringUp = await askYesNo(`Запустить сейчас (make ${mode})?`, true)
+if (!bringUp) {
+  say(`\nГотово. Когда будешь готов:  make ${mode}`)
+  rl.close()
+  process.exit(0)
+}
+try {
+  await $`make ${mode}`
+} catch {
+  fail(`make ${mode} завершился с ошибкой — смотри вывод выше.`)
+}
+
+// 8. Access code (single/cloud only)
+if (mode === 'single' || mode === 'cloud') {
+  step(8, 'Код доступа администратора')
+  say('  Жду, пока server применит миграции…')
+  await Bun.sleep(4000)
+  try {
+    const token =
+      await $`docker exec spotter-server ./spotter sign admin`.text()
+    say('\n──────────────────────────────────────────────')
+    say(token.trim())
+    say('──────────────────────────────────────────────')
+    say('  Отправь боту:  /login <код>')
+  } catch {
+    say('  ! Не удалось выпустить код автоматически. Позже:  make token')
+  }
+}
+
+say('\n✓ Готово.')
+rl.close()
+process.exit(0)

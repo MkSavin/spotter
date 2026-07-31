@@ -13,10 +13,12 @@ bun start            # или bun start:watch
 bun test
 bun run sign:token   # CLI: выпустить access-код (src/cli.ts)
 ```
-Окружение слоёное: общий `.env` (`REDIS_URL`, `S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`) +
-тонкий `.env.server` (см. [.env.server.example](../../.env.server.example)) поверх:
-`REDIS_GROUP_ID` (`spotter-server`), `DATABASE_PATH`, `SOURCE_ID`. NVR-кредов **нет** —
-сервер ходит только в Redis и S3. `requireConfig` валидирует обязательное на старте.
+Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
+[.env.cloud.example](../../.env.cloud.example) для cloud) — compose раздаёт его всем
+контейнерам. Сервис читает `REDIS_URL`, `S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`; consumer-группа
+(`spotter-server`), `DATABASE_PATH` и `SOURCE_ID` — с дефолтами в коде (переопределяются
+env при необходимости). NVR-кредов **нет** — сервер ходит только в Redis и S3.
+`requireConfig` валидирует обязательное на старте.
 
 ## Точка входа
 

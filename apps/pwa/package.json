@@ -4,8 +4,8 @@
   "description": "PWA frontend: delivery consumer that sends Web Push and serves the web app",
   "main": "index.js",
   "scripts": {
-    "start": "bun --env-file=../../.env --env-file=../../.env.pwa src/index.ts",
-    "start:watch": "bun --watch --env-file=../../.env --env-file=../../.env.pwa src/index.ts",
+    "start": "bun --env-file=../../.env src/index.ts",
+    "start:watch": "bun --watch --env-file=../../.env src/index.ts",
     "web:dev": "bun --bun vite web",
     "web:build": "bun --bun vite build web",
     "build": "bun run web:build && bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable",

@@ -167,23 +167,22 @@ bun install
 
 ### 2. Окружение
 
-Окружение **слоёное**: общий `.env` (Redis, S3, TZ — объявляются ОДИН раз) плюс
-тонкий `.env.<сервис>` с тем, что специфично сервису. Каждый сервис при старте
-грузит общий слой, затем свой (последний побеждает):
+**Один `.env` на узел** — compose раздаёт его всем контейнерам, лишние
+переменные сервис игнорирует. Обязательны только `S3_*` и `TELEGRAM_TOKEN`;
+остальное — с рабочими дефолтами.
 
 ```bash
-cp .env.example          .env            # общий слой: REDIS_URL, S3_*, TZ
-cp .env.server.example   .env.server     # REDIS_GROUP_ID, DATABASE_PATH, SOURCE_ID
-cp .env.telegram.example .env.telegram   # + TELEGRAM_TOKEN, S3_PRESIGN_EXPIRY
-cp .env.frigate.example  .env.frigate    # + FRIGATE_* (креды NVR), MQTT_BROKER
+cp .env.example .env    # для single/dev; впиши S3_* и TELEGRAM_TOKEN
 ```
 
-Поменять Redis-endpoint или S3-креды — правится только общий `.env`. Тонкие файлы
-несут лишь `REDIS_GROUP_ID`, пути БД, `SOURCE_ID` и т.п. Ни server, ни telegram
-**не** держат креды NVR — `FRIGATE_*` живут ТОЛЬКО в `.env.frigate` и в общий слой
-не попадают. Конфиг валидируется на старте: если обязательной переменной нет,
-сервис падает с перечнем всех недостающих (`requireConfig`). Для офлайн-разработки
-без Frigate: `cp .env.test.example .env.test` и адаптер `apps/test`.
+Для распределёнки — два узловых шаблона: `.env.cloud.example` (server + telegram
++ опц. pwa/email) и `.env.ingest.example` (frigate + depot + forwarder).
+NVR-креды (`FRIGATE_*`) живут ТОЛЬКО на ingest-узле и на cloud не попадают.
+Per-service consumer-группы, пути БД и `SOURCE_ID` — **дефолты в коде**, в `.env`
+их держать не нужно. Конфиг валидируется на старте: если обязательной переменной
+нет, сервис падает с перечнем всех недостающих (`requireConfig`). Для
+офлайн-разработки без Frigate: `cp .env.test.example .env.test` и адаптер
+`apps/test`.
 
 ### 3. Инфраструктура (Docker)
 
@@ -223,9 +222,10 @@ cd apps/telegram && bun start
 | `bun run sign:token`        | Создать код доступа (см. ниже)                         |
 | `bunx biome check --write`  | Линт + автоформат                                      |
 | `bun run docker:dev`        | Поднять dev-инфру (redis + mosquitto)                  |
-| `bun run docker:single`     | Поднять весь прод-стек на одной машине (redis, mosquitto, frigate, depot, server, telegram) |
-| `bun run docker:ingest`     | Поднять прод-узел ingest (local-redis, mosquitto, frigate, depot×N, forwarder) |
-| `bun run docker:cloud`      | Поднять прод-узел cloud (redis + server + telegram)    |
+| `make single`               | Поднять весь прод-стек на одной машине (redis, mosquitto, frigate, depot, server, telegram, watchtower) |
+| `make ingest`               | Поднять прод-узел ingest (local-redis, mosquitto, frigate, depot×N, forwarder) |
+| `make cloud`                | Поднять прод-узел cloud (redis + server + telegram)    |
+| `make token`                | Выпустить код доступа admin (внутри контейнера)        |
 
 ## Авторизация
 
@@ -279,18 +279,25 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 
 ## Развёртывание (Docker)
 
-> 📖 **Пошаговая инструкция для всех режимов** (разработка / единый узел /
-> распределённо) + автодеплой новых версий — в [docs/deployment.md](docs/deployment.md).
+> 📖 **Быстрый старт (3 шага) и пошаговая инструкция** для всех режимов
+> (разработка / единый узел / распределённо), автодеплой и VPN-туннель — в
+> [docs/deployment.md](docs/deployment.md). Самый быстрый путь — мастер:
+> `bun .integration/install.ts` (или в контейнере `oven/bun`).
 
-Compose-файлы лежат в [.deployment/compose/](.deployment/compose/) и запускаются из
-корня репозитория (важно для относительных путей к `.docker`/`.deployment`):
+Образы публичные (`ghcr.io/mksavin/spotter-*`) — `docker login` не нужен.
+Длинные `docker compose …` спрятаны за `make` (запускается из корня репозитория,
+это важно для относительных путей к `.docker`/`.deployment`):
 
 | Профиль | Команда | Что поднимает | Узлы |
 | --- | --- | --- | --- |
 | **development** | `bun run docker:dev` | `redis` + `mosquitto` (инфра; приложения — на хосте через `bun start`) | одна машина |
-| **production · single** | `bun run docker:single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `server`, `telegram` (без `forwarder`) | одна машина |
-| **production · ingest** | `bun run docker:ingest` | `local-redis` (durable), `mosquitto`, `frigate`, `depot×N` (опц. GPU), `forwarder` | ingest-узел |
-| **production · cloud** | `bun run docker:cloud` | `redis` (главный durable-буфер) + `server` + `telegram` | облачный узел |
+| **production · single** | `make single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `server`, `telegram`, `watchtower` (без `forwarder`) | одна машина |
+| **production · ingest** | `make ingest` | `local-redis` (durable), `mosquitto`, `frigate`, `depot×N` (опц. GPU), `forwarder`, `watchtower` | ingest-узел |
+| **production · cloud** | `make cloud` | `redis` (главный durable-буфер) + `server` + `telegram` + `watchtower` | облачный узел |
+
+По умолчанию на прод-узле крутится `watchtower` — раз в сутки авто-обновляет
+`spotter-*` из реестра. Отключить: `make single WATCHTOWER=0`. `bun run docker:*`
+остаются для совместимости, но ведём через `make`.
 
 **Один узел (`single`)** — простейший прод: одна машина и ингестит с NVR, и ходит
 в Telegram, единый Redis, `forwarder` не нужен.
@@ -302,7 +309,8 @@ Compose-файлы лежат в [.deployment/compose/](.deployment/compose/) и
 стороне ingest ненадёжен или ограничен.
 
 S3 задаётся через `.env` (любой S3-совместимый бэкенд). Для ограниченных/цензурируемых
-сетей в качестве туннеля ориентируйтесь на XRAY-VLESS или AmneziaWG 2 (см. дорожную карту).
+сетей в качестве туннеля — свой WireGuard, а при DPI-блокировке AmneziaWG или
+XRAY-VLESS; пошагово в [docs/deployment.md](docs/deployment.md#vpn-туннель-между-узлами-только-для-распределёнки).
 
 ## Структура репозитория
 
@@ -323,10 +331,12 @@ apps/telegram/src/db/  SQLite-схема и репозиторий (Drizzle): tg
 apps/{server,telegram}/drizzle/  Сгенерированные миграции Drizzle
 .deployment/compose/  Compose-профили: development, production.single, production.ingest, production.cloud
 .deployment/          Конфиги инфраструктуры (mosquitto, …)
-.env.example          Общий слой окружения (Redis, S3, TZ) — один на хост
-.env.*.example        Тонкие слои по сервисам (накладываются поверх .env)
+Makefile              Короткие алиасы над docker compose (make single/cloud/ingest/update/logs/ps/down/token)
+.env.example          Единый .env для single/dev (все сервисы, один файл)
+.env.cloud.example    Шаблон cloud-узла (server + telegram + опц. pwa/email)
+.env.ingest.example   Шаблон ingest-узла (frigate + depot + forwarder, NVR-креды)
 .github/workflows/    CI: lint.yml (ветки) + release.yml (master)
-.integration/         Bun-скрипты релиза: conventional.ts, imperative.ts
+.integration/         Bun-скрипты: install.ts (мастер), conventional.ts, imperative.ts
 .changeset/           Changesets: конфиг + pending-changeset'ы
 ```
 
