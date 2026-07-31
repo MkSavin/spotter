@@ -21,7 +21,7 @@ ifeq ($(WATCHTOWER),0)
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help single cloud ingest up update logs ps down token
+.PHONY: help single cloud ingest up update data logs ps down token
 
 help: ## Показать это меню
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -36,13 +36,20 @@ cloud: ## Поднять cloud-узел (redis, server, telegram, + опц. pwa/
 ingest: ## Поднять ingest-узел (local-redis, mosquitto, frigate, depot×N, forwarder)
 	$(MAKE) up MODE=ingest
 
-up: ## Внутренняя цель: docker compose up -d (без pull — up сам тянет отсутствующее)
+up: data ## Внутренняя цель: docker compose up -d (без pull — up сам тянет отсутствующее)
 	$(COMPOSE) up -d $(UP_FLAGS)
 
-update: ## Ручное обновление узла: pull свежий :latest, пересоздать, подчистить слои
+update: data ## Ручное обновление узла: pull свежий :latest, пересоздать, подчистить слои
 	$(COMPOSE) pull
 	$(COMPOSE) up -d $(UP_FLAGS)
 	docker image prune -f
+
+# Docker would create these as root, but the apps write SQLite as uid 1000.
+DATA_DIRS = .docker/server .docker/telegram .docker/pwa .docker/email
+
+data:
+	@mkdir -p $(DATA_DIRS)
+	@chown -R 1000:1000 $(DATA_DIRS) 2>/dev/null || true
 
 # Короткое имя (server) → сервис compose (spotter-server); redis/mosquitto/
 # local-redis/watchtower и уже-полные spotter-* имена оставляем как есть.

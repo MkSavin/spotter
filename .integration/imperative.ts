@@ -10,8 +10,12 @@ import { $ } from 'bun'
 //   --versions='[{"name":"@spotter/email","version":"1.2.3"}]'  what was released
 //   --matrix        print the build matrix as JSON instead of building
 //   --only=<name>   build just this package (one matrix job = one image)
+//   --platform=...  target platforms (default: amd64 + arm64)
 //   --dry-run       resolve and log, run no docker
 //   --no-publish    build without pushing
+//
+// Multi-platform needs a docker-container builder:
+//   docker buildx create --name spotter-multi --driver docker-container --use
 
 const OWNER = 'mksavin'
 const APPS_PREFIX = `apps${path.sep}`
@@ -30,6 +34,9 @@ const dryRun = args.get('dry-run') === 'true'
 const noPublish = args.get('no-publish') === 'true'
 const asMatrix = args.get('matrix') === 'true'
 const only = args.get('only')
+
+// A single-arch image dies with `exec format error` on the other side.
+const platform = args.get('platform') ?? 'linux/amd64,linux/arm64'
 
 /** ghcr-safe image name: `@spotter/email` → `spotter-email`. */
 const toCode = (name: string): string =>
@@ -88,11 +95,10 @@ for (const entry of selected) {
 
   const tagArgs = tags.flatMap((tag) => ['-t', tag])
 
-  await $`docker build -f ${entry.relativePath}/Dockerfile ${root.dir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} ${tagArgs}`
+  // A local tag holds one arch only, so the manifest goes straight to ghcr.
+  const outputArgs = noPublish ? ['--output=type=cacheonly'] : ['--push']
 
-  if (!noPublish) {
-    await $`docker push ${image} --all-tags`
-  }
+  await $`docker buildx build --platform ${platform} -f ${entry.relativePath}/Dockerfile ${root.dir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} ${tagArgs} ${outputArgs}`
 }
 
 console.log('Images successfully built.')

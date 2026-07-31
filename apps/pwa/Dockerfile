@@ -7,10 +7,14 @@ FROM oven/bun:1.3.14 AS bundle
 ARG APP_RELATIVE_PATH
 WORKDIR /app
 
+# Scopes the install cache per arch.
+ARG TARGETARCH
+
 COPY package.json bun.lock ./
 COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun-$TARGETARCH,sharing=locked \
+    bun install --frozen-lockfile
 
 COPY . .
 

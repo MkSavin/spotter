@@ -201,10 +201,18 @@ push в master → release.yml → версии (changesets) → git-теги/Re
    (версию возьми из `package.json` приложения):
    ```bash
    echo $CR_PAT | docker login ghcr.io -u mksavin --password-stdin
+
+   # Образы собираются под amd64 + arm64, а обычный драйвер так не умеет.
+   docker buildx create --name spotter-multi --driver docker-container --use
+
    bun .integration/imperative.ts \
      --only='@spotter/email' \
      --versions='[{"name":"@spotter/email","version":"1.2.3"}]'
    ```
+
+   > На Apple Silicon **не** собирай образы обычным `docker build` без
+   > `--platform`: получится arm64-образ, и на amd64-сервере контейнер упадёт с
+   > `exec format error`.
 3. Проверить, доехал ли образ:
    ```bash
    docker manifest inspect ghcr.io/mksavin/spotter-email:1.2.3-alpine

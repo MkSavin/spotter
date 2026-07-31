@@ -16,8 +16,6 @@ type Mode = 'single' | 'cloud' | 'ingest'
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
-const PWA_IMAGE = 'ghcr.io/mksavin/spotter-pwa:latest'
-
 const say = (msg = '') => console.log(msg)
 const step = (n: number, msg: string) => say(`\n[${n}] ${msg}`)
 
@@ -34,6 +32,27 @@ const askYesNo = async (question: string, def = false): Promise<boolean> => {
     .toLowerCase()
   if (!answer) return def
   return answer === 'y' || answer === 'yes' || answer === 'д' || answer === 'да'
+}
+
+const toBase64Url = (bytes: ArrayBuffer): string =>
+  Buffer.from(bytes)
+    .toString('base64')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '')
+
+/** VAPID keypair in base64url. Not via the image: it ships no node_modules. */
+const generateVapidKeys = async () => {
+  const { publicKey, privateKey } = await crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign', 'verify'],
+  )
+  const jwk = await crypto.subtle.exportKey('jwk', privateKey)
+  return {
+    publicKey: toBase64Url(await crypto.subtle.exportKey('raw', publicKey)),
+    privateKey: jwk.d ?? '',
+  }
 }
 
 /** Replace `KEY=...` in place, preserving comments and ordering. */
@@ -159,23 +178,14 @@ if (mode === 'single' || mode === 'cloud') {
       'PUBLIC_URL',
       await ask('PUBLIC_URL (за TLS-прокси)', 'https://spotter.example.com'),
     )
-    say('  Генерирую VAPID-ключи в контейнере…')
+    say('  Генерирую VAPID-ключи…')
     try {
-      const out =
-        await $`docker run --rm ${PWA_IMAGE} bunx web-push generate-vapid-keys`.text()
-      const pub = out.match(/Public Key:\s*\n?([A-Za-z0-9_-]+)/)?.[1]
-      const priv = out.match(/Private Key:\s*\n?([A-Za-z0-9_-]+)/)?.[1]
-      if (pub && priv) {
-        env = setEnv(env, 'VAPID_PUBLIC_KEY', pub)
-        env = setEnv(env, 'VAPID_PRIVATE_KEY', priv)
-        say('  ✓ VAPID-пара записана в .env')
-      } else {
-        say(
-          '  ! Не смог распарсить вывод web-push — заполни VAPID_* вручную позже.',
-        )
-      }
+      const { publicKey, privateKey } = await generateVapidKeys()
+      env = setEnv(env, 'VAPID_PUBLIC_KEY', publicKey)
+      env = setEnv(env, 'VAPID_PRIVATE_KEY', privateKey)
+      say('  ✓ VAPID-пара записана в .env')
     } catch {
-      say(`  ! Не удалось сгенерировать VAPID (нет образа ${PWA_IMAGE}?).`)
+      say('  ! Не удалось сгенерировать VAPID-пару.')
       say('    Заполни VAPID_* вручную позже — см. .env.')
     }
     say('  Не забудь раскомментировать сервис spotter-pwa в профиле cloud.')

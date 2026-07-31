@@ -10,14 +10,19 @@ WORKDIR /app
 
 FROM base AS install
 
-COPY package.json ./
+# Scopes the install cache per arch.
+ARG TARGETARCH
+
+COPY package.json bun.lock ./
 COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
-RUN bun install
+RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun-$TARGETARCH,sharing=locked \
+    bun install --frozen-lockfile
 
 FROM base AS bundle
 
-COPY --from=install --parents **/node_modules ./
+# `--parents` would nest this as /app/app/node_modules.
+COPY --from=install /app/node_modules ./node_modules
 COPY . .
 RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable
 RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/cli.ts --outfile ${APP_RELATIVE_PATH}/dist/spotter --target bun --env disable
