@@ -60,36 +60,32 @@ services:
     depends_on:
       - redis
 
-  # PWA frontend (OPTIONAL): Web Push consumer that also serves the web app.
-  # The main frontend — installable on iPhone/Android/desktop, pushes via VAPID.
-  # Uncomment to enable; fill the VAPID_* block in .env (install.ts generates a
-  # keypair, or run: docker run --rm ghcr.io/mksavin/spotter-pwa \
-  # bunx web-push generate-vapid-keys). Put it behind a TLS reverse proxy —
-  # service workers and Web Push require HTTPS.
-  # spotter-pwa:
-  #   image: ghcr.io/mksavin/spotter-pwa:latest
-  #   container_name: spotter-pwa
-  #   restart: unless-stopped
-  #   networks:
-  #     - spotter
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     REDIS_URL: redis://redis:6379
-  #   env_file:
-  #     - ./.env
-  #   labels:
-  #     com.centurylinklabs.watchtower.enable: 'true'
-  #   volumes:
-  #     # Persist push subscriptions + feed cache across container restarts.
-  #     - ./.docker/pwa:/app/data
-  #   depends_on:
-  #     - redis
+  # PWA frontend (OPTIONAL): installable app and Web Push consumer.
+  # Uncomment to enable; set VAPID_* in .env. Use behind HTTPS reverse proxy.
+  # Service workers and Web Push require HTTPS.
+  spotter-pwa:
+    image: ghcr.io/mksavin/spotter-pwa:latest
+    container_name: spotter-pwa
+    restart: unless-stopped
+    networks:
+      - spotter
+    ports:
+      - "3000:3000"
+    environment:
+      REDIS_URL: redis://redis:6379
+    env_file:
+      - ./.env
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    volumes:
+      # Persist push subscriptions + feed cache across container restarts.
+      - ./.docker/pwa:/app/data
+    depends_on:
+      - redis
 
-  # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event. Sends
-  # one notification email per event. Uncomment to enable; fill the SMTP_* /
-  # EMAIL_RECIPIENTS block in .env. Can also run on a separate web host that
-  # reaches this Redis by IP — it doesn't have to be co-located here.
+  # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event.
+  # Uncomment to enable and set SMTP_* / EMAIL_RECIPIENTS in .env. Can run
+  # separately if it can access Redis by IP.
   # spotter-email:
   #   image: ghcr.io/mksavin/spotter-email:latest
   #   container_name: spotter-email
@@ -103,7 +99,6 @@ services:
   #   labels:
   #     com.centurylinklabs.watchtower.enable: 'true'
   #   volumes:
-  #     # Persist the email dedup ledger across container restarts.
   #     - ./.docker/email:/app/data
   #   depends_on:
   #     - redis

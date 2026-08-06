@@ -220,7 +220,7 @@ if (mode === 'single' || mode === 'cloud') {
   await Bun.sleep(4000)
   try {
     const token =
-      await $`docker exec spotter-server ./spotter sign admin`.text()
+      await $`docker exec spotter-server bun spotter sign admin`.text()
     say('\n──────────────────────────────────────────────')
     say(token.trim())
     say('──────────────────────────────────────────────')

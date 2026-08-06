@@ -254,9 +254,9 @@ docker run --rm ghcr.io/mksavin/spotter-pwa bunx web-push generate-vapid-keys
 ### Выпустить код доступа вручную
 
 ```bash
-make token                                 # = docker exec spotter-server ./spotter sign admin
+make token                                 # = docker exec spotter-server bun spotter sign admin
 # или напрямую, с опциями:
-docker exec spotter-server ./spotter sign admin -b <bot_username>
+docker exec spotter-server bun spotter sign admin -b <bot_username>
 ```
 
 ---

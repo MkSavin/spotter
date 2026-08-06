@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { program } from 'commander'
@@ -7,9 +8,17 @@ import { tokensRepo } from './db/repository'
 import { parseRole } from './helpers/role'
 import { normalizeUsername } from './helpers/username'
 
+// Bundled, `import.meta.dir` is /app, so `../data` would escape to /data.
 const defaultDatabase =
   process.env.DATABASE_PATH ??
-  path.join(import.meta.dir, '..', 'data', 'server.sqlite')
+  path.join(
+    [
+      path.join(import.meta.dir, '..', 'data'),
+      path.join(process.cwd(), 'data'),
+    ].find((candidate) => existsSync(candidate)) ??
+      path.join(process.cwd(), 'data'),
+    'server.sqlite',
+  )
 
 /** Generates a short URL-safe code (12 base64url chars from 9 random bytes). */
 const generateCode = (): string => {

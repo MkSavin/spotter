@@ -65,4 +65,4 @@ down: ## Остановить узел
 	$(COMPOSE) down
 
 token: ## Выпустить код доступа admin (внутри контейнера spotter-server)
-	docker exec spotter-server ./spotter sign admin
+	docker exec spotter-server bun spotter sign admin
