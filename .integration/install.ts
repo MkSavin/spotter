@@ -16,6 +16,10 @@ type Mode = 'single' | 'cloud' | 'ingest'
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
+// Probing with the depot image itself: it is needed anyway, so nothing extra
+// is pulled, and it tests the very container that will run in production.
+const DEPOT_IMAGE = 'ghcr.io/mksavin/spotter-depot:latest'
+
 const say = (msg = '') => console.log(msg)
 const step = (n: number, msg: string) => say(`\n[${n}] ${msg}`)
 
@@ -55,13 +59,46 @@ const generateVapidKeys = async () => {
   }
 }
 
-/** Replace `KEY=...` in place, preserving comments and ordering. */
+type GpuProbe = { usable: boolean; reason: string }
+
+/**
+ * Probes CUDA end to end: only a container that actually starts with a GPU
+ * proves the driver, the toolkit and the kernel module all line up.
+ */
+const probeGpu = async (): Promise<GpuProbe> => {
+  try {
+    await $`nvidia-smi`.quiet()
+  } catch {
+    return { usable: false, reason: 'карта или драйвер NVIDIA не обнаружены' }
+  }
+
+  const runtimes = await $`docker info --format ${'{{json .Runtimes}}'}`
+    .quiet()
+    .text()
+    .catch(() => '')
+  if (!runtimes.includes('nvidia'))
+    return { usable: false, reason: 'не установлен nvidia-container-toolkit' }
+
+  try {
+    await $`docker run --rm --gpus all ${DEPOT_IMAGE} true`.quiet()
+    return { usable: true, reason: '' }
+  } catch {
+    // Typically a driver upgrade with the old module still loaded.
+    return {
+      usable: false,
+      reason: 'контейнер с --gpus не стартует (нужна перезагрузка узла?)',
+    }
+  }
+}
+
+/** Replace `KEY=...` in place, keeping any trailing `# hint` on that line. */
 const setEnv = (content: string, key: string, value: string): string => {
-  const line = `${key}=${value}`
   const pattern = new RegExp(`^${key}=.*$`, 'm')
-  return pattern.test(content)
-    ? content.replace(pattern, line)
-    : `${content}\n${line}\n`
+  if (!pattern.test(content)) return `${content}\n${key}=${value}\n`
+  return content.replace(pattern, (current) => {
+    const hint = current.match(/\s+#.*$/)?.[0] ?? ''
+    return `${key}=${value}${hint}`
+  })
 }
 
 const fail = (msg: string): never => {
@@ -165,9 +202,27 @@ if (mode === 'ingest') {
   )
 }
 
-// 5. PWA / VAPID (opt-in)
+// 5. Transcoding acceleration (ingest runs the depot replicas)
+let useGpu = false
+if (mode === 'ingest') {
+  step(5, 'Ускорение перекодирования')
+  say('  Проверяю GPU (это занимает несколько секунд)…')
+  const gpu = await probeGpu()
+  if (gpu.usable) {
+    useGpu = true
+    env = setEnv(env, 'VIDEO_ACCELERATION', 'cuda')
+    say('  ✓ NVIDIA работает — включаю cuda (в разы быстрее CPU)')
+  } else {
+    env = setEnv(env, 'VIDEO_ACCELERATION', 'cpu')
+    say(`  → GPU недоступен: ${gpu.reason}`)
+    say('    Ставлю cpu — медленнее, но работает везде.')
+    say('    Починив GPU, поставь VIDEO_ACCELERATION=cuda и подними с GPU=1.')
+  }
+}
+
+// 6. PWA / VAPID (opt-in)
 if (mode === 'single' || mode === 'cloud') {
-  step(5, 'PWA-фронтенд (опционально)')
+  step(6, 'PWA-фронтенд (опционально)')
   const wantPwa = await askYesNo(
     'Включить PWA (Web Push)? Сгенерирую VAPID-пару',
     false,
@@ -192,30 +247,33 @@ if (mode === 'single' || mode === 'cloud') {
   }
 }
 
-// 6. Write .env
-step(6, 'Записываю .env')
+// 7. Write .env
+step(7, 'Записываю .env')
 await Bun.write('.env', env)
 say(
   '  ✓ .env готов. Проверь остальные значения при желании — там рабочие дефолты.',
 )
 
-// 7. Bring the stack up
-step(7, 'Поднимаю стек')
-const bringUp = await askYesNo(`Запустить сейчас (make ${mode})?`, true)
+// 8. Bring the stack up
+step(8, 'Поднимаю стек')
+// GPU=1 pulls in the overlay that reserves the card for the depot replicas.
+const upCommand = useGpu ? `make ${mode} GPU=1` : `make ${mode}`
+const bringUp = await askYesNo(`Запустить сейчас (${upCommand})?`, true)
 if (!bringUp) {
-  say(`\nГотово. Когда будешь готов:  make ${mode}`)
+  say(`\nГотово. Когда будешь готов:  ${upCommand}`)
   rl.close()
   process.exit(0)
 }
 try {
-  await $`make ${mode}`
+  if (useGpu) await $`make ${mode} GPU=1`
+  else await $`make ${mode}`
 } catch {
-  fail(`make ${mode} завершился с ошибкой — смотри вывод выше.`)
+  fail(`${upCommand} завершился с ошибкой — смотри вывод выше.`)
 }
 
-// 8. Access code (single/cloud only)
+// 9. Access code (single/cloud only)
 if (mode === 'single' || mode === 'cloud') {
-  step(8, 'Код доступа администратора')
+  step(9, 'Код доступа администратора')
   say('  Жду, пока server применит миграции…')
   await Bun.sleep(4000)
   try {

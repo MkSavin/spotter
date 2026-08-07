@@ -165,9 +165,26 @@ cp .env.ingest.example .env   # S3_* + FRIGATE_* (креды NVR живут ТО
 make ingest                   # local-redis, mosquitto, frigate, depot×2, forwarder
 ```
 
-GPU-транскод: в `production.ingest.yml` у `depot` уже прописаны блоки
-`deploy.resources`/`devices` под NVIDIA; выстави `VIDEO_ACCELERATION=cuda` в
-`.env`.
+**GPU-транскод.** С картой перекодирование в разы быстрее, поэтому
+`install.ts` проверяет GPU сам: пробует запустить контейнер с `--gpus all` и,
+если получилось, ставит `VIDEO_ACCELERATION=cuda` и поднимает узел с `GPU=1`.
+Если нет — откатывается на CPU и пишет причину.
+
+Вручную то же самое. Нужны карта NVIDIA, драйвер и `nvidia-container-toolkit`:
+
+```bash
+make ingest GPU=1             # добавляет production.ingest.gpu.yml
+```
+
+и в `.env` — `VIDEO_ACCELERATION=cuda` (без этого ffmpeg останется на CPU, а
+зарезервированная карта будет простаивать).
+
+Если контейнеры `depot` не стартуют с ошибкой
+`nvidia-container-cli: initialization error: nvml error: driver/library version
+mismatch` — драйвер на хосте обновился, а в ядре остался загруженный старый
+модуль. Лечится перезагрузкой узла (`sudo reboot`); проверить можно через
+`nvidia-smi` — он выдаст ту же ошибку. Пока разбираешься, узел можно поднять без
+карты: просто `make ingest` без `GPU=1`.
 
 ---
 

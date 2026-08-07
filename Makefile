@@ -8,12 +8,20 @@
 #
 #  Отключить авто-обновление (Watchtower): добавь WATCHTOWER=0, напр.
 #      make single WATCHTOWER=0
+#
+#  NVIDIA-ускорение для depot (ingest): make ingest GPU=1
+#      Нужны драйвер и nvidia-container-toolkit; в .env — VIDEO_ACCELERATION=cuda.
 # ═══════════════════════════════════════════════════════════════════════
 
 # Режим по умолчанию для ps/logs/down/update. single|cloud|ingest.
 MODE ?= single
 
-COMPOSE = docker compose --project-directory . -f .deployment/compose/production.$(MODE).yml
+# GPU=1 → добавить NVIDIA-ускорение для depot (нужен драйвер + nvidia-container-toolkit).
+ifeq ($(GPU),1)
+  GPU_FILE = -f .deployment/compose/production.ingest.gpu.yml
+endif
+
+COMPOSE = docker compose --project-directory . -f .deployment/compose/production.$(MODE).yml $(GPU_FILE)
 
 # WATCHTOWER=0 → не поднимать сервис авто-обновления.
 ifeq ($(WATCHTOWER),0)

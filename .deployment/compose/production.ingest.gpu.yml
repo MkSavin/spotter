@@ -1,0 +1,41 @@
+# NVIDIA acceleration for the depot replicas — an overlay over
+# production.ingest.yml, applied by `make ingest GPU=1`.
+#
+# Needs the driver plus nvidia-container-toolkit on the host. Without them the
+# containers refuse to start, which is why this is opt-in: the base profile
+# transcodes on the CPU and runs anywhere.
+#
+# Also set VIDEO_ACCELERATION=cuda in .env, otherwise ffmpeg stays on the CPU
+# and the reserved GPU sits idle.
+services:
+  spotter-depot-1:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    devices:
+      - /dev/nvidia-caps:/dev/nvidia-caps
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-modeset:/dev/nvidia-modeset
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+
+  spotter-depot-2:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    devices:
+      - /dev/nvidia-caps:/dev/nvidia-caps
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-modeset:/dev/nvidia-modeset
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
