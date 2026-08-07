@@ -6,11 +6,11 @@ services:
     restart: unless-stopped
     networks:
       - spotter
-    # In a real deployment bind Redis to the private VPN interface only (e.g.
-    # '10.0.0.1:6379:6379'), never publicly — the ingest forwarder connects
-    # through the tunnel.
+    # Bound to the VPN interface only — the ingest forwarder reaches it through
+    # the tunnel. Set REDIS_BIND to your tunnel address (see docs/deployment.md);
+    # the 127.0.0.1 default keeps Redis off the public internet.
     ports:
-      - '6379:6379'
+      - '${REDIS_BIND:-127.0.0.1}:6379:6379'
     # appendonly = the main durable buffer; survives bot restarts, XACK/DLQ model
     # reclaims anything left pending.
     command: ['redis-server', '--appendonly', 'yes']

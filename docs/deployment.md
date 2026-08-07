@@ -333,23 +333,98 @@ ping 10.0.0.1  # с ingest — должен идти пинг до cloud
 На ingest в `.env`: `REDIS_REMOTE_URL=redis://10.0.0.1:6379`. `forwarder`
 пойдёт в облако через туннель.
 
-### Вариант B. AmneziaWG / XRAY-VLESS (когда обычный WG режется)
+### Вариант B. AmneziaWG (когда обычный WG режется)
 
 В некоторых сетях ТСПУ (DPI) распознаёт и режет обычный WireGuard —
-рукопожатие не проходит или туннель рвётся. Тогда:
+рукопожатие не проходит или туннель рвётся. AmneziaWG — форк WireGuard с
+обфускацией: тот же принцип и те же конфиги, но пакеты не опознаются как WG.
 
-- **AmneziaWG** — форк WireGuard с обфускацией трафика: тот же принцип и те же
-  конфиги, но пакеты не опознаются как WG. Наименьшая переделка относительно
-  варианта A. См. [amnezia.org](https://amnezia.org/) и `amneziawg-tools`.
-- **XRAY-VLESS (+ Reality)** — не VPN-в-классическом-смысле, а
-  прокси-транспорт, маскирующий трафик под обычный TLS к «настоящему» сайту.
-  Гибче против DPI, но и сложнее в настройке (нужен домен/сертификат-цель).
-  Redis-трафик заворачивается в VLESS-туннель, `REDIS_REMOTE_URL` смотрит на
-  локальный конец прокси. См. документацию [XTLS/Xray-core](https://xtls.github.io/).
+Ниже — подключение ingest к **уже поднятому** на cloud AmneziaVPN
+(поставленному десктопным клиентом Amnezia — он разворачивает на сервере
+docker-контейнер `amnezia-awg`).
 
-Пошаговой настройки этих двух здесь нет намеренно — она зависит от того, что
-именно режется в конкретной сети. Начни с варианта A; если WG не поднимается —
-переходи на AmneziaWG (минимальная переделка), а XRAY бери, когда режется и он.
+**1. На cloud: выпустить конфиг для ingest.**
+
+В десктопном клиенте Amnezia: соединение с сервером → **Пользователи** →
+добавить нового (`ingest`) → выгрузить его конфиг (`.conf`). Это обычный
+AmneziaWG-конфиг с секцией `[Interface]`, где кроме ключей есть параметры
+обфускации `Jc/Jmin/Jmax/S1/S2/H1..H4` — **они должны совпадать с серверными**,
+иначе рукопожатия не будет. Не собирай конфиг руками: выгружай из клиента.
+
+**2. На ingest: поставить amneziawg.**
+
+```bash
+sudo apt install -y software-properties-common python3-launchpadlib gnupg2
+sudo add-apt-repository -y ppa:amnezia/ppa
+sudo apt update && sudo apt install -y amneziawg amneziawg-tools
+```
+
+**3. Положить конфиг.** `awg-quick` ищет его **только** в
+`/etc/amnezia/amneziawg/`:
+
+```bash
+sudo mkdir -p /etc/amnezia/amneziawg
+sudo cp ingest.conf /etc/amnezia/amneziawg/awg0.conf
+sudo chmod 600 /etc/amnezia/amneziawg/awg0.conf
+```
+
+**4. Ограничить туннель одной подсетью.** Клиент Amnezia по умолчанию выдаёт
+`AllowedIPs = 0.0.0.0/0` — это заворачивает в VPN *весь* трафик узла, включая
+доступ к камерам в локальной сети и выгрузку в S3. Нам нужен только адрес
+cloud-Redis, поэтому в `[Peer]` замени на подсеть туннеля:
+
+```ini
+AllowedIPs = 10.8.1.0/24
+PersistentKeepalive = 25
+```
+
+`PersistentKeepalive` обязателен: ingest за NAT, без него cloud не сможет
+достучаться после простоя. Точную подсеть и адрес сервера смотри в своём
+конфиге (`Address` в `[Interface]`) — у Amnezia это обычно `10.8.1.0/24`.
+
+**5. Поднять и проверить:**
+
+```bash
+sudo awg-quick up awg0
+sudo awg                       # статус, latest handshake
+ping -c3 10.8.1.1              # адрес cloud внутри туннеля
+sudo systemctl enable awg-quick@awg0   # автозапуск
+```
+
+Если `latest handshake` пустой — не проходит обфускация: сверь `Jc/S1/H1…` с
+серверными и проверь, что порт cloud доступен (`ListenPort` из конфига).
+
+**6. Привязать к проекту.** На cloud Redis должен слушать **только** туннель.
+В `production.cloud.yml`:
+
+```yaml
+    ports:
+      - '10.8.1.1:6379:6379'
+```
+
+На ingest в `.env`:
+
+```ini
+REDIS_REMOTE_URL=redis://10.8.1.1:6379
+```
+
+Больше ничего менять не нужно: `spotter-forwarder` живёт в bridge-сети compose,
+и трафик к `10.8.1.1` уходит через шлюз Docker на хост, а хост уже направляет
+его в `awg0`. Пробрасывать туннель внутрь контейнера или переводить его в
+`network_mode: host` не требуется.
+
+**7. Проверить связность end-to-end** (с ingest):
+
+```bash
+docker compose -f .deployment/compose/production.ingest.yml \
+  run --rm spotter-forwarder sh -c 'nc -zv 10.8.1.1 6379'
+```
+
+> **Про XRAY-VLESS.** Если режется и AmneziaWG — берут XRAY-VLESS (+Reality):
+> это не VPN, а прокси-транспорт под видом обычного TLS. Redis заворачивается в
+> VLESS-туннель, `REDIS_REMOTE_URL` смотрит на локальный конец прокси. Настройка
+> зависит от домена-цели и здесь не расписана — см.
+> [XTLS/Xray-core](https://xtls.github.io/).
 
 ---
 
