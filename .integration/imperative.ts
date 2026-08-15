@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { getPackages } from '@manypkg/get-packages'
@@ -8,6 +9,7 @@ import { $ } from 'bun'
 // Build and push Docker images for changed `apps/*` packages.
 //
 //   --versions='[{"name":"@spotter/email","version":"1.2.3"}]'  what was released
+//   --from-workspace  take versions from package.json instead of --versions
 //   --matrix        print the build matrix as JSON instead of building
 //   --only=<name>   build just this package (one matrix job = one image)
 //   --platform=...  target platforms (default: amd64 + arm64)
@@ -33,6 +35,7 @@ const versions: PublishedPackage[] = JSON.parse(args.get('versions') ?? '[]')
 const dryRun = args.get('dry-run') === 'true'
 const noPublish = args.get('no-publish') === 'true'
 const asMatrix = args.get('matrix') === 'true'
+const fromWorkspace = args.get('from-workspace') === 'true'
 const only = args.get('only')
 
 // A single-arch image dies with `exec format error` on the other side.
@@ -46,17 +49,32 @@ const toCode = (name: string): string =>
     .replaceAll(/[@$#]+/g, '')
     .toLowerCase()
 
-const { root, packages } = await getPackages(process.cwd())
+// manypkg v1 returned `root: { dir }`; v2+ renamed it to a plain `rootDir`.
+const workspace = await getPackages(process.cwd())
+const { packages } = workspace
+const rootDir =
+  (workspace as { rootDir?: string }).rootDir ??
+  (workspace as unknown as { root: { dir: string } }).root.dir
 
 const byName = new Map(packages.map((pkg) => [pkg.packageJson.name, pkg]))
 
-const entries = versions.flatMap((version) => {
+// At publish time changesets already bumped package.json, so the versions to
+// build are simply what the workspace holds.
+const released: PublishedPackage[] = fromWorkspace
+  ? packages.map((pkg) => ({
+      name: pkg.packageJson.name,
+      version: pkg.packageJson.version ?? '0.0.0',
+    }))
+  : versions
+
+const entries = released.flatMap((version) => {
   const pkg = byName.get(version.name)
   if (!pkg) return []
 
-  const relativePath = path.relative(root.dir, pkg.dir)
-  // Only apps ship as images; packages have no Dockerfile.
+  const relativePath = path.relative(rootDir, pkg.dir)
+  // A Dockerfile is what makes a package shippable — `apps/test` has none.
   if (!relativePath.startsWith(APPS_PREFIX)) return []
+  if (!existsSync(path.join(pkg.dir, 'Dockerfile'))) return []
 
   return [
     {
@@ -98,7 +116,7 @@ for (const entry of selected) {
   // A local tag holds one arch only, so the manifest goes straight to ghcr.
   const outputArgs = noPublish ? ['--output=type=cacheonly'] : ['--push']
 
-  await $`docker buildx build --platform ${platform} -f ${entry.relativePath}/Dockerfile ${root.dir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} ${tagArgs} ${outputArgs}`
+  await $`docker buildx build --platform ${platform} -f ${entry.relativePath}/Dockerfile ${rootDir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} ${tagArgs} ${outputArgs}`
 }
 
 console.log('Images successfully built.')

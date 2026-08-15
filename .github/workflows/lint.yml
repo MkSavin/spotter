@@ -2,6 +2,9 @@ name: 'Lint'
 
 on:
   workflow_dispatch:
+  # On PRs this is the required gate before merging (see branch protection).
+  pull_request:
+    branches: [ master ]
   push:
     branches:
       - '**'
@@ -11,7 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: lint-${{ github.ref }}
+  # head_ref on PRs, ref on pushes — otherwise a branch and its PR count twice.
+  group: lint-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -342,57 +342,76 @@ Makefile              Короткие алиасы над docker compose (make 
 
 ## CI/CD и релизы
 
-Два GitHub Actions workflow:
+Три GitHub Actions workflow:
 
 | Workflow | Триггер | Что делает |
 | --- | --- | --- |
-| [lint.yml](.github/workflows/lint.yml) | push в любую ветку **кроме** `master` | Biome (`biome ci`), commitlint (Conventional Commits), `bun run typecheck`, `bun run test` |
-| [release.yml](.github/workflows/release.yml) | push в `master` | версионирование (changesets) → git-теги + GitHub Releases → сборка/пуш Docker-образов |
+| [lint.yml](.github/workflows/lint.yml) | PR в `master` + push в любую ветку кроме `master` | Biome (`biome ci`), commitlint (Conventional Commits), `bun run typecheck`, `bun run test` |
+| [release.yml](.github/workflows/release.yml) | push в `master` | version-PR → сборка образов → git-теги + GitHub Releases |
+| [changeset.yml](.github/workflows/changeset.yml) | вручную | генерация changeset'ов из conventional-коммитов |
 
 ### Как работает релиз
 
-Версионирование — через [changesets](https://github.com/changesets/changesets).
-Релиз идёт в **два прохода** по `master`:
+Версионирование — [changesets](https://github.com/changesets/changesets)
+(`action@v2` + `cli@3`). Релиз **транзакционный**: теги и GitHub Releases
+появляются только после того, как все образы собраны и доехали в ghcr.
 
-1. **Накопление.** В `master` лежат **changeset-файлы** (`.changeset/*.md`) — каждый
-   описывает, какие пакеты и как бампнуть (`patch`/`minor`/`major`).
-   `changesets/action` видит их и **открывает PR** «chore(ci): Update packages
-   versions»: внутри PR выполняется `changeset version` — поднимаются версии в
-   `package.json`, пишутся `CHANGELOG.md`, использованные changeset'ы удаляются.
-2. **Публикация.** Когда этот PR смержен, на следующем прогоне `release.yml`
-   pending-changeset'ов больше нет → запускается `publish` (`bun run publish` =
-   `bunx changeset tag`): создаются **git-теги** и **GitHub Releases**
-   (`createGithubReleases: true`). В npm пакеты **не** публикуются (они приватные,
-   `access: restricted`) — распространение идёт Docker-образами.
-3. **Образы.** Если что-то зарелизено (`published == true`),
-   [imperative.ts](.integration/imperative.ts) в режиме `--matrix` отдаёт список
-   зарелизенных **приложений** (`apps/*`; у `packages/*` нет `Dockerfile`), и на
-   каждое запускается **отдельная matrix-джоба** `images`, которая собирает и пушит
-   свой образ в `ghcr.io/<owner>/<app>:latest` и `:<version>-alpine`.
-   `fail-fast: false` — упавший образ **не отменяет остальные**, а пересобрать
-   можно только его (**Re-run failed jobs**). При бампе общего пакета
-   (`transport`/`stenograph`) зависящие приложения получают `patch`-бамп
-   (`updateInternalDependencies: patch`) и пересобираются автоматически.
+`release.yml` состоит из четырёх джоб; первая (`mode`) вызывает
+`changesets/action/select-mode` и решает, что делать дальше:
 
-Секреты: `GH_BYPASS_TOKEN` (PAT — пуш version-PR и тегов в обход branch protection),
-`GITHUB_TOKEN` (логин в ghcr.io + создание Releases).
+1. **`mode: version`** — в `master` есть changeset-файлы (`.changeset/*.md`).
+   Джоба `version` открывает/обновляет PR «chore(ci): Update packages versions»:
+   внутри него `changeset version` поднимает версии в `package.json`, пишет
+   `CHANGELOG.md` и удаляет использованные changeset'ы. **Этот PR — кнопка
+   «выпустить версию».**
+2. **`mode: publish`** — PR смержен, pending-changeset'ов больше нет.
+   `mode` строит матрицу через `imperative.ts --matrix --from-workspace`
+   (версии берутся из `package.json`, в матрицу попадают только пакеты
+   с `Dockerfile`), и джоба `images` собирает **по образу на джобу**
+   в `ghcr.io/<owner>/<app>:latest` и `:<version>-alpine`.
+   `fail-fast: false` — упавший образ не отменяет остальные.
+3. **Фиксация.** Джоба `publish` запускается только если **все** matrix-джобы
+   успешны (`needs.images.result == 'success'`) — тогда `changeset git-tag`
+   создаёт git-теги и GitHub Releases. Упал хоть один образ — тегов и Releases
+   **не будет**, а **Re-run failed jobs** доведёт релиз до конца.
+   Релиз без образов (бампнулись только `packages/*`) тоже получает теги.
+
+В npm ничего не публикуется — пакеты приватные (`privatePackages: {version, tag}`),
+распространение идёт Docker-образами. При бампе общего пакета
+(`transport`/`stenograph`) зависящие приложения получают `patch`-бамп
+(`updateInternalDependencies: patch`) и пересобираются автоматически.
+
+Секреты: `GH_BYPASS_TOKEN` (PAT — пуш version-PR и тегов в обход branch
+protection), `GITHUB_TOKEN` (логин в ghcr.io).
 
 ### Как выпустить новую версию
 
-1. Веди работу в ветке, коммить по **Conventional Commits** (`fix:` → patch,
-   `feat:` → minor, `feat!:` / `BREAKING CHANGE` → major). Иначе упадёт commitlint.
-2. Добавь changeset, описывающий релиз:
+1. Заведи ветку от `master` — прямой push в `master` запрещён
+   (см. [Защита ветки](#защита-ветки-master)). Коммить по **Conventional
+   Commits** (`fix:` → patch, `feat:` → minor, `feat!:` → major).
+2. Добавь changeset:
    ```bash
    bunx changeset            # выбрать затронутые пакеты и тип бампа
    ```
-   > Опционально changeset'ы можно сгенерировать из conventional-коммитов:
-   > `bun run changeset:conventional` (локально или ручным workflow
+   > Опционально — сгенерировать из conventional-коммитов:
+   > `bun run changeset:conventional` (локально или workflow
    > [changeset.yml](.github/workflows/changeset.yml)).
-3. Закоммить `.changeset/*.md`, открой PR, проведи через `lint.yml`, смержи в `master`.
-4. CI откроет PR «**Update packages versions**» — проверь бампы версий и `CHANGELOG`,
-   смержи его.
-5. На мерж этого PR `release.yml` проставит теги, создаст GitHub Releases и
-   соберёт/запушит Docker-образы.
+3. Открой PR, дождись зелёного `lint.yml`, смержи в `master`.
+4. CI откроет PR «**Update packages versions**» — проверь бампы и `CHANGELOG`,
+   смержи его. Это и есть команда «релизнуть».
+5. Дальше всё само: соберутся образы, и **только при полном успехе** появятся
+   теги и GitHub Releases.
+
+### Защита ветки `master`
+
+Настраивается один раз в **Settings → Branches → Add branch ruleset** для
+`master`:
+
+- **Require a pull request before merging** — прямой push запрещён.
+- **Require status checks to pass** → выбрать джобу `build` из `lint.yml`.
+- **Restrict deletions**, **Block force pushes**.
+- **Bypass list** → аккаунт-владелец `GH_BYPASS_TOKEN`, иначе CI не сможет
+  запушить version-PR и теги.
 
 ## Дорожная карта
 

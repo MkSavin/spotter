@@ -14,7 +14,12 @@ import config from '../.changeset/config.json' with { type: 'json' }
 
 const cwd = process.cwd()
 
-const { root, packages } = await getPackages(cwd)
+// v1 returns `root: { dir }`; v2 renamed it to a plain `rootDir` string.
+const workspace = await getPackages(cwd)
+const { packages } = workspace
+const rootDir =
+  (workspace as { rootDir?: string }).rootDir ??
+  (workspace as unknown as { root: { dir: string } }).root.dir
 
 const visiblePackages = packages.filter(
   ({ packageJson }) =>
@@ -113,7 +118,7 @@ const changesets = await Promise.all(
     if (!affectedFiles.length) return undefined
 
     const affectedPackages = visiblePackages.filter((entry) => {
-      const dir = path.relative(root.dir, entry.dir)
+      const dir = path.relative(rootDir, entry.dir)
       return affectedFiles.some((file) => belongs(file, dir))
     })
 

@@ -6,21 +6,61 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
+# Transactional release: tags and GitHub Releases appear only once every image
+# is in ghcr. A failed build means the release never happened, and re-running
+# finishes it.
+#
+#   push to master with changesets → mode=version → "Update packages versions" PR
+#   merging that PR                → mode=publish → images → tags + Releases
 jobs:
-  release:
+  # Reads the changeset state and picks what happens next.
+  mode:
+    runs-on: ubuntu-latest
+
+    outputs:
+      mode: ${{ steps.select.outputs.mode }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      has-images: ${{ steps.matrix.outputs.has-images }}
+
+    steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: 'Select mode'
+      id: select
+      uses: changesets/action/select-mode@v2
+
+    - name: 'Install bun'
+      if: steps.select.outputs.mode == 'publish'
+      uses: oven-sh/setup-bun@v2
+
+    - name: 'Install dependencies'
+      if: steps.select.outputs.mode == 'publish'
+      run: bun install --frozen-lockfile
+
+    # The merged PR already bumped package.json, so read the versions from there.
+    - name: 'Resolve image build matrix'
+      id: matrix
+      if: steps.select.outputs.mode == 'publish'
+      run: |
+        matrix=$(bun .integration/imperative.ts --matrix --from-workspace)
+        echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+        count=$(echo "$matrix" | bun -e 'console.log(JSON.parse(await Bun.stdin.text()).include.length)')
+        echo "has-images=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        echo "Resolved $count image(s) to build."
+
+  # Changesets are pending: open or refresh the version PR. Merging it releases.
+  version:
+    needs: mode
+    if: needs.mode.outputs.mode == 'version'
+
     runs-on: ubuntu-latest
 
     permissions:
-      checks: read
-      statuses: write
       contents: write
       pull-requests: write
-      packages: write
-
-    outputs:
-      published: ${{ steps.changesets.outputs.published }}
-      matrix: ${{ steps.matrix.outputs.matrix }}
-      has-images: ${{ steps.matrix.outputs.has-images }}
 
     steps:
     - name: 'Checkout'
@@ -34,32 +74,18 @@ jobs:
     - name: 'Install dependencies'
       run: bun install --frozen-lockfile
 
-    - name: 'Run changesets'
-      id: changesets
-      uses: changesets/action@v1
+    - name: 'Create or update version PR'
+      uses: changesets/action/version@v2
       with:
-        title: 'chore(ci): Update packages versions'
-        commit: 'chore(ci): Update packages versions'
-        createGithubReleases: true
-        publish: bun run publish
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_BYPASS_TOKEN }}
+        github-token: ${{ secrets.GH_BYPASS_TOKEN }}
+        commit-message: 'chore(ci): Update packages versions'
+        pr-title: 'chore(ci): Update packages versions'
 
-    # One matrix entry per released app, so each image builds in its own job.
-    - name: 'Resolve image build matrix'
-      id: matrix
-      if: steps.changesets.outputs.published == 'true'
-      run: |
-        matrix=$(bun .integration/imperative.ts --matrix --versions='${{ steps.changesets.outputs.publishedPackages }}')
-        echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-        count=$(echo "$matrix" | bun -e 'console.log(JSON.parse(await Bun.stdin.text()).include.length)')
-        echo "has-images=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-        echo "Resolved $count image(s) to build."
-
-  # A failing image does not cancel the others: re-run only the failed jobs.
+  # One image per job. `fail-fast: false` keeps a failure from cancelling the
+  # rest, so only the broken one needs a re-run.
   images:
-    needs: release
-    if: needs.release.outputs.has-images == 'true'
+    needs: mode
+    if: needs.mode.outputs.mode == 'publish' && needs.mode.outputs.has-images == 'true'
 
     runs-on: ubuntu-latest
 
@@ -69,7 +95,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.release.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.mode.outputs.matrix) }}
 
     name: 'Image (${{ matrix.code }})'
 
@@ -99,5 +125,37 @@ jobs:
         bun .integration/imperative.ts \
           --only='${{ matrix.name }}' \
           --versions='[{"name":"${{ matrix.name }}","version":"${{ matrix.version }}"}]'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Where the release becomes final. `success` holds only when every matrix job
+  # passed; one failure and nothing gets tagged. `skipped` means a release with
+  # no images at all (only packages/* bumped), which still deserves its tags.
+  publish:
+    needs: [ mode, images ]
+    if: >-
+      needs.mode.outputs.mode == 'publish' &&
+      (needs.images.result == 'success' || needs.images.result == 'skipped')
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: 'Checkout'
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: 'Install bun'
+      uses: oven-sh/setup-bun@v2
+
+    - name: 'Install dependencies'
+      run: bun install --frozen-lockfile
+
+    - name: 'Tag packages and create releases'
+      uses: changesets/action/publish@v2
+      with:
+        github-token: ${{ secrets.GH_BYPASS_TOKEN }}
+        script: bun run publish
+        create-github-releases: true
+        push-git-tags: true
