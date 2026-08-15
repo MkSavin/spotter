@@ -28,17 +28,16 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: 'Select mode'
-      id: select
-      uses: changesets/action/select-mode@v2
-
+    # select-mode shells out to @changesets/cli, so deps must exist first.
     - name: 'Install bun'
-      if: steps.select.outputs.mode == 'publish'
       uses: oven-sh/setup-bun@v2
 
     - name: 'Install dependencies'
-      if: steps.select.outputs.mode == 'publish'
       run: bun install --frozen-lockfile
+
+    - name: 'Select mode'
+      id: select
+      uses: changesets/action/select-mode@v2
 
     # The merged PR already bumped package.json, so read the versions from there.
     - name: 'Resolve image build matrix'
