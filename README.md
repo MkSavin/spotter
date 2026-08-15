@@ -150,7 +150,7 @@ Telegram-локальный стейт и пресайнит медиа. Кон�
 ## Технический стек
 
 - **Рантайм:** [Bun](https://bun.sh) 1.3.14 — запуск, тесты, сборка, S3-клиент
-- **Монорепо:** Turborepo + workspaces (`apps/*`, `packages/*`)
+- **Монорепо:** bun workspaces (`apps/*`, `packages/*`)
 - **Транспорт:** Redis Streams (встроенный `Bun.RedisClient`, consumer groups) + MQTT (Mosquitto)
 - **БД:** SQLite (`bun:sqlite`) + Drizzle ORM (split: [apps/server/src/db/schema.ts](apps/server/src/db/schema.ts) — домен, [apps/telegram/src/db/schema.ts](apps/telegram/src/db/schema.ts) — Telegram-стейт)
 - **Хранилище:** любое S3-совместимое (внешний провайдер или self-hosted MinIO/Garage)
@@ -199,7 +199,7 @@ docker compose up -d
 ### 4. Запуск сервисов
 
 ```bash
-bun start                   # все сервисы параллельно через turbo
+bun start                   # все сервисы параллельно
 bun start:watch             # то же, с авто-перезапуском (--watch)
 ```
 
@@ -213,7 +213,7 @@ cd apps/telegram && bun start
 
 | Команда                     | Действие                                              |
 | --------------------------- | ----------------------------------------------------- |
-| `bun start`                 | Запустить все сервисы (`turbo run start --parallel`)   |
+| `bun start`                 | Запустить все сервисы (`bun --filter`)                 |
 | `bun start:watch`           | Запуск с hot-reload                                    |
 | `bun test`                  | Тесты во всех воркспейсах (`bun:test`)                 |
 | `bun test:coverage`         | Тесты с покрытием                                      |

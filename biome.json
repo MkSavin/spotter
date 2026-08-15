@@ -12,7 +12,6 @@
       "**/.integration/**/*.ts",
       "**/*.config.ts",
       "!**/*dist/**/*",
-      "!**/*.turbo/**/*",
       "!**/*.docker/**/*"
     ],
     "ignoreUnknown": false

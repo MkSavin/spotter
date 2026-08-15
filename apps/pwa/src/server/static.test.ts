@@ -4,7 +4,7 @@ import type { CoreContext } from '../context'
 import { createDatabase } from '../db/client'
 import { createServer } from './createServer'
 
-// Runs against the real web/dist built by `bun run web:build`.
+// Serves the real web/dist; `bun run test` builds it first.
 const makeContext = (): CoreContext =>
   ({
     config: {

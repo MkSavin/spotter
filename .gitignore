@@ -5,9 +5,7 @@
 /coverage
 /**/*/coverage
 /.docker
-/.turbo
 /.vite
-/*/**/.turbo
 /*/**/.vite
 
 /*/**/temp

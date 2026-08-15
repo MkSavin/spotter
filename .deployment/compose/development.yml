@@ -1,4 +1,4 @@
-# Development infra. Run apps separately via turbo
+# Development infra. Run apps separately with `bun start`
 services:
   redis:
     image: redis:7-alpine

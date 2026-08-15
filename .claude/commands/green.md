@@ -1,34 +1,22 @@
 ---
-description: Scoped green check — typecheck + tests on affected packages, then biome
-allowed-tools: Bash(turbo run typecheck:*), Bash(turbo run test:*), Bash(biome check:*), Bash(bunx biome:*), Bash(bun run green:*)
+description: Green check — typecheck + tests + biome across the repo
+allowed-tools: Bash(bun run green:*), Bash(bun run test:*), Bash(bunx tsc:*), Bash(bunx biome:*)
 ---
 
-Run the scoped verification suite and report **concisely**. Goal: keep the repo green with
-minimal context — scope to affected packages, only surface failures.
+Run the verification suite and report **concisely**. The whole repo takes ~3 seconds, so there is
+no scoping to reason about — just run it and surface failures.
 
 ## Steps
 
-1. Run the affected typecheck + tests (turbo scopes to changed packages and replays cache for
-   unchanged ones):
+```bash
+bun run green
+```
 
-   ```bash
-   TURBO_SCM_BASE=master turbo run typecheck test --affected
-   ```
-
-   `$ARGUMENTS` may narrow further (e.g. `--filter=@spotter/bot` to force a single package, or
-   `--force` to bypass cache). Append them if provided.
-
-2. Run biome over the repo (single shared config, fast — no per-package scoping needed):
-
-   ```bash
-   biome check
-   ```
+That is `tsc --noEmit`, then `bun test apps packages` (which builds the pwa web bundle first via
+`pretest`), then `biome check`. `$ARGUMENTS`, if given, narrows the run — e.g. a single test path.
 
 ## Reporting
 
-- If everything passes: one line — `✅ green (typecheck + tests + biome)`, plus which packages
-  turbo actually ran vs. replayed from cache.
-- If something fails: show **only** the failing package(s) and the relevant error lines, not the
-  full output. Then state the smallest fix and (unless told otherwise) apply it and re-run.
-- Never run the full-repo `tsc --noEmit` (`bun run typecheck:full`) unless `--affected` misses
-  something (e.g. a root-level `*.config.ts`); note if you fall back to it and why.
+- If everything passes: one line — `✅ green (typecheck + tests + biome)`.
+- If something fails: show **only** the failing file(s) and the relevant error lines, not the full
+  output. Then state the smallest fix and (unless told otherwise) apply it and re-run.

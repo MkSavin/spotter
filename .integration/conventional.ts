@@ -96,7 +96,6 @@ const ignore = [
   /\.env.*$/i,
   /\.build-meta$/i,
   /(?:^|\/)dist\//i,
-  /(?:^|\/)\.turbo\//i,
   /(?:^|\/)\.idea\//i,
   /(?:^|\/)(?:\.integration|\.github|\.deployment)\//i,
   /(?:^|\/)\.changeset\//i,

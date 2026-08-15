@@ -6,7 +6,7 @@
 ## TL;DR
 
 - **Рантайм — только Bun.** Никаких `npm`/`node`/`ts-node`. Запуск: `bun start`, тесты: `bun test`.
-- **Монорепо** Turborepo: 8 сервисов (`apps/*`, включая опциональные `email` и `pwa`) + 3 пакета (`packages/*`).
+- **Монорепо** на bun workspaces: 8 сервисов (`apps/*`, включая опциональные `email` и `pwa`) + 3 пакета (`packages/*`).
 - **Связь между сервисами — через Redis Streams** (и MQTT на входе). Прямых вызовов между сервисами нет.
 - **Стиль:** Biome — одинарные кавычки, без `;`, отступ 2 пробела. Запускай `bunx biome check --write` перед завершением.
 - **Open-source self-hosting:** проект рассчитан на развёртывание сторонними людьми у себя.
@@ -51,11 +51,11 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | ----------------- | ------------------------------------------ |
 | Запуск всего      | `bun start` / `bun start:watch`            |
 | Запуск сервиса    | `cd apps/<svc> && bun start`               |
-| **Зелёный чек**   | `/green` или `bun run green` — scoped typecheck+тесты затронутых пакетов (turbo `--affected` + кэш) + biome |
+| **Зелёный чек**   | `/green` или `bun run green` — typecheck + тесты + biome по всему репо (~3 с) |
 | Тесты             | `bun test` (или `cd apps/<svc> && bun test`) |
 | Покрытие          | `bun test:coverage`                        |
 | Линт + формат     | `bunx biome check --write`                 |
-| Проверка типов    | `bun run typecheck` (turbo per-package; `typecheck:full` — весь репо одним `tsc`) |
+| Проверка типов    | `bun run typecheck` (`tsc --noEmit` по всему репо)      |
 | Миграции БД       | `cd apps/<server\|telegram> && bunx drizzle-kit generate` |
 | Токен авторизации | `bun run sign:token <role>`                |
 
@@ -167,9 +167,8 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
   коротко, простым языком и **на английском**. Компактный JSDoc в одну строку, а не простыня.
   Лишние комментарии — это техдолг на их поддержку. Полный регламент (в т.ч. языки:
   код — английский, документация/UI — русский) — в [CONTRIBUTING.md](CONTRIBUTING.md).
-- Перед завершением задачи прогоняй `/green` (или `bun run green`) — он скоупит typecheck+тесты
-  на затронутые пакеты и добивает biome. Полный прогон по всему репо нужен редко (`bun run test`,
-  `bun run typecheck:full`).
+- Перед завершением задачи прогоняй `/green` (или `bun run green`) — typecheck, тесты и biome
+  по всему репо за ~3 секунды.
 
 ## Подводные камни
 
