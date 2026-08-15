@@ -81,8 +81,7 @@ jobs:
         commit-message: 'chore(ci): Update packages versions'
         pr-title: 'chore(ci): Update packages versions'
 
-  # One image per job. `fail-fast: false` keeps a failure from cancelling the
-  # rest, so only the broken one needs a re-run.
+  # One image per job, so only a broken one needs a re-run.
   images:
     needs: mode
     if: needs.mode.outputs.mode == 'publish' && needs.mode.outputs.has-images == 'true'
@@ -126,9 +125,7 @@ jobs:
           --only='${{ matrix.name }}' \
           --versions='[{"name":"${{ matrix.name }}","version":"${{ matrix.version }}"}]'
 
-  # Where the release becomes final. `success` holds only when every matrix job
-  # passed; one failure and nothing gets tagged. `skipped` means a release with
-  # no images at all (only packages/* bumped), which still deserves its tags.
+  # `success` holds only if every image built; `skipped` is a packages-only release.
   publish:
     needs: [ mode, images ]
     if: >-

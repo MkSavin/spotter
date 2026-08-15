@@ -32,10 +32,6 @@
 !**/.env.*.example
 !.env.example
 
-# Production-based configuration
-/config.ts
-bot.config.ts
-
 # Planning artifacts
 /.agents/plans
 

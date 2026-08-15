@@ -35,14 +35,8 @@ node_modules
 # Temporary
 /*/**/temp
 
-# Environments and configuration
-apps/bot/.env.example
-config.ts
-bot.config.ts
-
 # Development configurations
 biome.json
-.releaserc.json
 
 # Testing
 coverage*
@@ -50,7 +44,6 @@ coverage*
 
 # Docker
 docker-compose*
-apps/bot/Dockerfile
 .dockerignore
 
 # Other

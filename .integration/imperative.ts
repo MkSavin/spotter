@@ -58,8 +58,7 @@ const rootDir =
 
 const byName = new Map(packages.map((pkg) => [pkg.packageJson.name, pkg]))
 
-// At publish time changesets already bumped package.json, so the versions to
-// build are simply what the workspace holds.
+// At publish time changesets already bumped package.json.
 const released: PublishedPackage[] = fromWorkspace
   ? packages.map((pkg) => ({
       name: pkg.packageJson.name,

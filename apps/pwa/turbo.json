@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "dependsOn": ["^typecheck", "web:build"],
+      "inputs": ["$TURBO_DEFAULT$", "../../tsconfig.json"]
+    },
+    "web:build": {
+      "outputs": ["web/dist/**"]
+    }
+  }
+}

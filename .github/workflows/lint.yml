@@ -34,16 +34,16 @@ jobs:
     - name: 'Install dependencies'
       run: bun install --frozen-lockfile
 
-    # Both linters come from the lockfile, so CI and local runs cannot drift
-    # apart — and commitlint resolves its `extends` from our node_modules.
+    # Both linters come from the lockfile, so CI cannot drift from local runs.
     - name: 'Run commitlint'
       env:
-        # Empty on a brand-new branch, where `before` is all zeroes.
         BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
       run: |
-        if [ -z "$BASE" ] || [ "$BASE" = '0000000000000000000000000000000000000000' ]; then
+        # `before` may be zeroes or sit on another branch (merged version PR).
+        if ! git merge-base --is-ancestor "$BASE" HEAD 2>/dev/null; then
           BASE=$(git rev-parse HEAD~1)
         fi
+        echo "Linting $BASE..HEAD"
         bunx commitlint --from "$BASE" --to HEAD
 
     - name: 'Run Biome'

@@ -17,10 +17,7 @@
     "sign:token": "bun apps/server/src/cli.ts sign",
     "changeset:conventional": "bun .integration/conventional.ts",
     "publish": "changeset git-tag",
-    "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d",
-    "docker:single": "docker compose --project-directory . -f .deployment/compose/production.single.yml up -d",
-    "docker:ingest": "docker compose --project-directory . -f .deployment/compose/production.ingest.yml up -d",
-    "docker:cloud": "docker compose --project-directory . -f .deployment/compose/production.cloud.yml up -d"
+    "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d"
   },
   "private": "true",
   "keywords": [],
@@ -36,9 +33,8 @@
     "@types/bun": "^1.3.14",
     "@types/fluent-ffmpeg": "^2.1.28",
     "conventional-commits-parser": "^6.1.0",
-    "lodash": "^4.17.21",
     "turbo": "^2.4.4",
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   },
   "workspaces": ["apps/*", "packages/*"],
   "dependencies": {
