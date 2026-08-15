@@ -1,13 +1,13 @@
 import {
-  type StreamMessageController,
   bufferToJson,
   mediaStreams,
+  type StreamMessageController,
   safeParseMediaRequest,
 } from '@spotter/transport'
 import type { SinkConfig } from '../config/sinkConfig'
 import type { SinkContext } from '../runtime/context'
 import type { MediaProvider } from './MediaProvider'
-import { stageMedia, stagedClipKey, stagedSnapshotKey } from './stageMedia'
+import { stagedClipKey, stagedSnapshotKey, stageMedia } from './stageMedia'
 
 /**
  * Handles `spotter.media.request.<source>`: resolves the requested clip/snapshot

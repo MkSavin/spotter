@@ -1,4 +1,4 @@
-import { type SpotterEvent, parseSpotterEvent } from '@spotter/transport'
+import { parseSpotterEvent, type SpotterEvent } from '@spotter/transport'
 
 /**
  * Maps a raw Frigate MQTT payload (`frigate/events`) to the canonical
@@ -8,7 +8,7 @@ import { type SpotterEvent, parseSpotterEvent } from '@spotter/transport'
 export const parseFrigateEvent = (contents: any): SpotterEvent => {
   const event = contents?.after
 
-  if (!event || !event.id || !event.camera || !event.label) {
+  if (!event?.id || !event.camera || !event.label) {
     throw new Error('Got not parsable event. Skipping...')
   }
 

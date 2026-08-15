@@ -1,9 +1,9 @@
 import process from 'node:process'
 import {
-  RedisRegulator,
-  StreamProducer,
   connectRedis,
   mediaStreams,
+  RedisRegulator,
+  StreamProducer,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'

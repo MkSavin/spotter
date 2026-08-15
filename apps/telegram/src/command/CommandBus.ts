@@ -2,8 +2,8 @@ import { randomBytes } from 'node:crypto'
 import {
   type CommandReply,
   type CommandRequest,
-  type StreamProducer,
   deliveryStreams,
+  type StreamProducer,
   safeParseCommandReply,
 } from '@spotter/transport'
 import type { RedisClient } from 'bun'

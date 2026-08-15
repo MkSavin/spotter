@@ -1,7 +1,7 @@
 import type { Bot, Middleware } from 'grammy'
 import type { BotApi, BotContext } from '../../context'
-import type { SpotterCommand } from './SpotterCommand'
 import { isVisible } from './access'
+import type { SpotterCommand } from './SpotterCommand'
 
 export const registerCommands = (
   bot: Bot<BotContext, BotApi>,

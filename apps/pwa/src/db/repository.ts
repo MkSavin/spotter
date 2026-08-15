@@ -1,10 +1,10 @@
 import { desc, eq, sql } from 'drizzle-orm'
 import type { PwaDatabase } from './client'
 import {
-  type PushSubscriptionRow,
-  type RecentEvent,
   notifiedEvents,
+  type PushSubscriptionRow,
   pushSubscriptions,
+  type RecentEvent,
   recentEvents,
 } from './schema'
 

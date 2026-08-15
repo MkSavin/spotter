@@ -1,8 +1,8 @@
 import type { Stenograph } from '../Stenograph'
 import type {
   StenographMessage,
-  StenographRenderRepository,
   StenographRenderer,
+  StenographRenderRepository,
 } from '../types'
 import {
   StenographTransport,

@@ -1,7 +1,7 @@
 import {
+  eventStreams,
   type SpotterEvent,
   type StreamProducer,
-  eventStreams,
 } from '@spotter/transport'
 
 /**

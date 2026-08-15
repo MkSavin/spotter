@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import type { ServerContext } from '../context'
-import { type ServerDatabase, createDatabase } from '../db/client'
+import { createDatabase, type ServerDatabase } from '../db/client'
 import { recipientsRepo, tokensRepo } from '../db/repository'
 import { applicationLogger } from '../log'
 import { loginRedeemHandler, userSignHandler } from './handlers'

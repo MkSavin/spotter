@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto'
 import {
   type CommandReply,
   type DeliveryRecipient,
-  type MediaRequest,
   deliveryStreams,
   eventCode,
+  type MediaRequest,
   mediaStreams,
   resolveSource,
 } from '@spotter/transport'

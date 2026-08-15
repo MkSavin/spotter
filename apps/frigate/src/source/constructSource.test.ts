@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { defaultLogger } from 'stenograph'
 import type { CoreConfig } from '../config'
+import { constructSource, type SourceCode } from './constructSource'
 import { FrigateSource } from './FrigateSource'
-import { type SourceCode, constructSource } from './constructSource'
 
 const config = {
   source: { type: 'frigate', frigate: { broker: 'mqtt://localhost:1883' } },

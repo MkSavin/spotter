@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import {
   currentEndpoint,
@@ -6,7 +7,6 @@ import {
   subscribeDevice,
   unsubscribeDevice,
 } from '@/lib/push'
-import { useCallback, useEffect, useState } from 'react'
 
 export type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported'
 

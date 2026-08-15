@@ -1,9 +1,9 @@
 import {
-  RedisRegulator,
-  type RegulatorHandle,
   catalogUpdatedStream,
   deliveryStreams,
   mediaStreams,
+  RedisRegulator,
+  type RegulatorHandle,
 } from '@spotter/transport'
 import type { Bot } from 'grammy'
 import type {

@@ -11,7 +11,7 @@ export const sender = <Context extends BaseContext>(
       return context.reply('Команда должна быть вызвана пользователем')
     }
 
-    if (instruction === 'not-present' && !!from) {
+    if (instruction === 'not-present' && from) {
       return context.reply(
         'Команда должна быть вызвана без контекста пользователя',
       )

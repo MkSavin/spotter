@@ -1,6 +1,4 @@
 import { eventCode } from '@spotter/transport'
-import type { PwaDatabase } from '../db/client'
-import type { PushGateway } from '../push/PushGateway'
 import {
   type NotificationPayload,
   renderBurstNotification,

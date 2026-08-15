@@ -1,11 +1,5 @@
 import { type InferSelectModel, sql } from 'drizzle-orm'
-import {
-  integer,
-  primaryKey,
-  real,
-  sqliteTable,
-  text,
-} from 'drizzle-orm/sqlite-core'
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 export const ROLES = ['VIEWER', 'USER', 'ADMIN'] as const
 export type Role = (typeof ROLES)[number]

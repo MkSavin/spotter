@@ -106,10 +106,10 @@ describe('attachInnoxious', () => {
 
   test('malformed media causes rejection', async () => {
     const api: any = {
-      sendPhoto: async (chatId: any, photo: any) => {
+      sendPhoto: async (_chatId: any, photo: any) => {
         if (!photo) throw new Error('bad media')
       },
-      sendMediaGroup: async (chatId: any, media: any) => {
+      sendMediaGroup: async (_chatId: any, media: any) => {
         if (!media) throw new Error('bad media')
       },
       sendDocument: async () => {},

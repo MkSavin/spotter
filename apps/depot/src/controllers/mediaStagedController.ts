@@ -1,7 +1,7 @@
 import {
-  type StreamMessageController,
   bufferToJson,
   mediaStreams,
+  type StreamMessageController,
   safeParseMediaStaged,
 } from '@spotter/transport'
 import { mediaStagedAction } from '../actions/mediaStagedAction'

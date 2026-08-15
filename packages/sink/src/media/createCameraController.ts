@@ -1,13 +1,13 @@
 import {
-  type StreamMessageController,
   bufferToJson,
   mediaStreams,
+  type StreamMessageController,
   safeParseCameraRequest,
 } from '@spotter/transport'
 import type { SinkConfig } from '../config/sinkConfig'
 import type { SinkContext } from '../runtime/context'
 import type { MediaProvider } from './MediaProvider'
-import { stageMedia, stagedFrameKey } from './stageMedia'
+import { stagedFrameKey, stageMedia } from './stageMedia'
 
 /**
  * Handles `spotter.camera.request.<source>`: resolves the latest frame through

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { Stenograph } from '../Stenograph'
 import { prefixFormat } from '../format/prefixFormat'
+import { Stenograph } from '../Stenograph'
 import { StenographTransport } from '../transport/StenographTransport'
 import type { StenographLevelRepository, StenographMessage } from '../types'
 

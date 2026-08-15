@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  type SpotterEvent,
   parseSpotterEvent,
   resolveSource,
+  type SpotterEvent,
   safeParseSpotterEvent,
   spotterEventSchema,
 } from './spotterEvent'

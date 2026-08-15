@@ -1,8 +1,8 @@
 import {
   type Catalog,
   type CatalogEntry,
-  type StreamProducer,
   catalogKey,
+  type StreamProducer,
   safeParseCatalog,
 } from '@spotter/transport'
 import type { Stenograph } from 'stenograph'

@@ -4,7 +4,7 @@ import type { EventSink } from '@spotter/sink'
 import { Command } from 'commander'
 import type { Stenograph } from 'stenograph'
 import type { TestConfig } from '../config'
-import { type EventPhase, buildEvent, newEventId } from './buildEvent'
+import { buildEvent, type EventPhase, newEventId } from './buildEvent'
 
 const PROMPT = 'spotter-test> '
 

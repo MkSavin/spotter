@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { SpotterEvent } from '@spotter/transport'
-import { type ServerDatabase, createDatabase } from './client'
+import { createDatabase, type ServerDatabase } from './client'
 import { eventsRepo, recipientsRepo, tokensRepo } from './repository'
 
 const makeEvent = (overrides: Partial<SpotterEvent> = {}): SpotterEvent => ({

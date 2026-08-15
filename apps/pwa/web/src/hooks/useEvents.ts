@@ -1,6 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { FeedEntry } from '@/lib/types'
-import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type EventsState = {
   events: FeedEntry[]

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { type PwaDatabase, createDatabase } from './client'
+import { createDatabase, type PwaDatabase } from './client'
 import {
   notifiedEventsRepo,
   recentEventsRepo,

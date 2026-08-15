@@ -1,5 +1,5 @@
 import { publishEvent } from '@spotter/sink'
-import { type StreamMessageController, bufferToJson } from '@spotter/transport'
+import { bufferToJson, type StreamMessageController } from '@spotter/transport'
 import type { CoreContext } from '../../context'
 import {
   type EventTestPayload,

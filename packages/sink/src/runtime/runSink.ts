@@ -1,10 +1,10 @@
 import process from 'node:process'
 import {
+  connectRedis,
+  mediaStreams,
   RedisRegulator,
   type StreamMessageController,
   StreamProducer,
-  connectRedis,
-  mediaStreams,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
@@ -12,9 +12,9 @@ import type { Catalog } from '../catalog/Catalog'
 import { publishCatalog } from '../catalog/publishCatalog'
 import type { SinkConfig } from '../config/sinkConfig'
 import { publishEvent } from '../helpers/publishEvent'
-import type { MediaProvider } from '../media/MediaProvider'
 import { createCameraController } from '../media/createCameraController'
 import { createMediaController } from '../media/createMediaController'
+import type { MediaProvider } from '../media/MediaProvider'
 import type { Source, SourceHandle } from '../source/Source'
 import type { SinkContext } from './context'
 

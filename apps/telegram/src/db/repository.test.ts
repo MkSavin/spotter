@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { type TelegramDatabase, createDatabase } from './client'
+import { createDatabase, type TelegramDatabase } from './client'
 import { eventMessagesRepo, tgBindingsRepo, tgChatsRepo } from './repository'
 
 describe('telegram db repository', () => {

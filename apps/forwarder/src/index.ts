@@ -1,8 +1,8 @@
 import process from 'node:process'
 import {
+  connectRedis,
   RedisRegulator,
   StreamProducer,
-  connectRedis,
 } from '@spotter/transport'
 import { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
@@ -10,7 +10,7 @@ import information from '../package.json'
 import { resolveConfig } from './config'
 import { forward } from './forward'
 import { applicationLogger } from './log'
-import { UP_STREAMS, downStreams } from './streams'
+import { downStreams, UP_STREAMS } from './streams'
 
 type BridgeContext = {
   subscriber: RedisClient

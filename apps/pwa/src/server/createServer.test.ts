@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { defaultLogger } from 'stenograph'
 import type { CoreContext } from '../context'
 import { createDatabase } from '../db/client'

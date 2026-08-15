@@ -1,6 +1,6 @@
 import {
-  type StreamMessageController,
   bufferToJson,
+  type StreamMessageController,
   safeParseCatalog,
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'

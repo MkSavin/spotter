@@ -1,14 +1,14 @@
 import process from 'node:process'
 import {
+  connectRedis,
   type RegulatorHandle,
   StreamProducer,
-  connectRedis,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import { CatalogCache } from './catalog/CatalogCache'
 import { resolveConfig } from './config'
 import type { ServerContext } from './context'
-import { type ServerDatabase, createDatabase } from './db/client'
+import { createDatabase, type ServerDatabase } from './db/client'
 import { applicationLogger } from './log'
 import { serverTransport } from './transport/serverTransport'
 

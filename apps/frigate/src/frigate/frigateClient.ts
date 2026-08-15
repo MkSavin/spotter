@@ -15,7 +15,7 @@ export const frigateUrls = {
 /** Strips trailing slash / query noise from the configured host URL. */
 export const normalizeHostUrl = (hostUrl: string): string =>
   hostUrl.replaceAll(
-    /^\s*((?:http|ftp)s?:\/\/[\w.\/]*?)\/?(?:\?.*)?\s*$/gi,
+    /^\s*((?:http|ftp)s?:\/\/[\w./]*?)\/?(?:\?.*)?\s*$/gi,
     '$1',
   )
 

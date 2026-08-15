@@ -3,9 +3,9 @@ import { hydrateApi, hydrateContext } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import {
+  connectRedis,
   type RegulatorHandle,
   StreamProducer,
-  connectRedis,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import { Bot, session } from 'grammy'
@@ -19,7 +19,7 @@ import {
 } from './commands/framework/registry'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
-import { type TelegramDatabase, createDatabase } from './db/client'
+import { createDatabase, type TelegramDatabase } from './db/client'
 import { tgBindingsRepo } from './db/repository'
 import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { timeout } from './helpers/timeout'

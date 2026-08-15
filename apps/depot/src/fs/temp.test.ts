@@ -26,7 +26,7 @@ describe('temp helper', () => {
       let threw = false
       try {
         await fs.stat(controller.directory)
-      } catch (err) {
+      } catch (_err) {
         threw = true
       }
       expect(threw).toBe(true)

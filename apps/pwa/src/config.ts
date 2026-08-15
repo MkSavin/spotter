@@ -1,6 +1,6 @@
 import {
-  type RedisConfig,
   env,
+  type RedisConfig,
   redactConfig,
   requireConfig,
   resolveRedisConfig,

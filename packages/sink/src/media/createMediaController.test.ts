@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import { defaultLogger } from 'stenograph'
 import type { SinkContext } from '../runtime/context'
-import type { MediaProvider } from './MediaProvider'
 import { createMediaController } from './createMediaController'
+import type { MediaProvider } from './MediaProvider'
 
 const realFetch = globalThis.fetch
 

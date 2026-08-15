@@ -27,7 +27,7 @@ describe('dir helper', () => {
       let threw = false
       try {
         await fs.stat(testPath)
-      } catch (err) {
+      } catch (_err) {
         threw = true
       }
       expect(threw).toBe(true)

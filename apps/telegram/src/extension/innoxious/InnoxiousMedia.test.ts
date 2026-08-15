@@ -1,10 +1,10 @@
-import { beforeAll, describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import { InputFile } from 'grammy'
 import { InnoxiousMedia, InnoxiousMediaGroup } from './InnoxiousMedia'
 
 // Helper to stub global fetch
 const makeFetchStub = (ok = true, bytes = [1, 2, 3]) => {
-  return async (url: string) => {
+  return async (_url: string) => {
     return {
       ok,
       arrayBuffer: async () => Uint8Array.from(bytes).buffer,

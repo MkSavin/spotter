@@ -2,11 +2,11 @@ import type { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
 import { connectRedis } from '../helpers/connectRedis'
 import {
-  type StreamMessage,
-  type StreamRecord,
   parseEntries,
   parsePendingReply,
   parseReadGroupReply,
+  type StreamMessage,
+  type StreamRecord,
 } from './parseStreamReply'
 
 export type { StreamMessage } from './parseStreamReply'

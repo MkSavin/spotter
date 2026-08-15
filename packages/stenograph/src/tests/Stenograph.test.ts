@@ -1,9 +1,9 @@
-import { Stenograph } from '../Stenograph'
 import { combineFormat } from '../format/combineFormat'
 import { prefixFormat } from '../format/prefixFormat'
+import { Stenograph } from '../Stenograph'
 import {
-  StenographConsole,
   consoleRenderer,
+  StenographConsole,
 } from '../transport/StenographConsole'
 import type { StenographLevelRepository } from '../types'
 

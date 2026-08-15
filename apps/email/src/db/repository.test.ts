@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { type EmailDatabase, createDatabase } from './client'
+import { createDatabase, type EmailDatabase } from './client'
 import { notifiedEventsRepo } from './repository'
 
 describe('email db repository', () => {

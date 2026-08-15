@@ -28,14 +28,6 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: 'Setup Biome'
-      uses: biomejs/setup-biome@v2
-      with:
-        version: latest
-
-    - name: 'Run Biome'
-      run: biome ci .
-
     - name: 'Run linter'
       uses: wagoid/commitlint-github-action@v5
       with:
@@ -46,6 +38,10 @@ jobs:
 
     - name: 'Install dependencies'
       run: bun install --frozen-lockfile
+
+    # Biome comes from the lockfile, so CI and local runs cannot drift apart.
+    - name: 'Run Biome'
+      run: bunx biome ci .
 
     - name: 'Typecheck'
       run: bun run typecheck

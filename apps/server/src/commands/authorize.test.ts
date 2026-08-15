@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { type ServerDatabase, createDatabase } from '../db/client'
+import { createDatabase, type ServerDatabase } from '../db/client'
 import { recipientsRepo } from '../db/repository'
 import { authorizeCommand } from './authorize'
 import { commandAccess } from './handlers'

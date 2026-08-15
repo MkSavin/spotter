@@ -1,10 +1,10 @@
 import {
-  RedisRegulator,
-  type RegulatorHandle,
   catalogUpdatedStream,
   deliveryStreams,
   eventStreams,
   mediaStreams,
+  RedisRegulator,
+  type RegulatorHandle,
 } from '@spotter/transport'
 import type { ServerContext } from '../context'
 import { catalogController } from './controllers/catalogController'

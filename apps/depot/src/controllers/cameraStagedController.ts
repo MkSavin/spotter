@@ -1,7 +1,7 @@
 import {
-  type StreamMessageController,
   bufferToJson,
   mediaStreams,
+  type StreamMessageController,
   safeParseCameraStaged,
 } from '@spotter/transport'
 import { cameraStagedAction } from '../actions/cameraStagedAction'

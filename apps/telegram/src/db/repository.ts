@@ -3,10 +3,10 @@ import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { TelegramDatabase } from './client'
 import {
   type EventMessage,
+  eventMessages,
   type Role,
   type TgBinding,
   type TgChat,
-  eventMessages,
   tgBindings,
   tgChats,
 } from './schema'

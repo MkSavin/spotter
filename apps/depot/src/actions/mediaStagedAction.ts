@@ -1,7 +1,7 @@
 import {
+  eventCode,
   type MediaProcessed,
   type MediaStaged,
-  eventCode,
 } from '@spotter/transport'
 import type { CoreContext } from '../context'
 import { processStaged } from '../processing/processStaged'
