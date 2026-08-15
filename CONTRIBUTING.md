@@ -71,6 +71,10 @@ if (seen.has(event.id)) return
 
 - **Conventional Commits** — иначе упадёт commitlint:
   `fix:` → patch, `feat:` → minor, `feat!:` / `BREAKING CHANGE` → major.
+  Типы: `agents`, `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`,
+  `refactor`, `revert`, `style`, `test`.
+  Регистр заголовка не проверяется — пиши как читается (`fix: Biome upgrade`).
+  Проверить сообщение локально: `echo 'fix: ...' | bunx commitlint`.
 - К изменению, влияющему на пользователей, добавляй changeset: `bunx changeset`.
 - Версионирование и сборка образов — автоматические, по мержу в `master`.
   Детали — в [README](README.md#cicd-и-релизы).

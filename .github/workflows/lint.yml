@@ -28,18 +28,24 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: 'Run linter'
-      uses: wagoid/commitlint-github-action@v5
-      with:
-        configFile: commitlint.config.ts
-
     - name: 'Install bun'
       uses: oven-sh/setup-bun@v2
 
     - name: 'Install dependencies'
       run: bun install --frozen-lockfile
 
-    # Biome comes from the lockfile, so CI and local runs cannot drift apart.
+    # Both linters come from the lockfile, so CI and local runs cannot drift
+    # apart — and commitlint resolves its `extends` from our node_modules.
+    - name: 'Run commitlint'
+      env:
+        # Empty on a brand-new branch, where `before` is all zeroes.
+        BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        if [ -z "$BASE" ] || [ "$BASE" = '0000000000000000000000000000000000000000' ]; then
+          BASE=$(git rev-parse HEAD~1)
+        fi
+        bunx commitlint --from "$BASE" --to HEAD
+
     - name: 'Run Biome'
       run: bunx biome ci .
 
