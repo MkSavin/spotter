@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  # head_ref on PRs, ref on pushes — otherwise a branch and its PR count twice.
-  group: lint-${{ github.head_ref || github.ref }}
+  # Keyed per event: a push must never cancel the PR run gating the merge.
+  group: lint-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
