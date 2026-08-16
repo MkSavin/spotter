@@ -1,5 +1,18 @@
 # @spotter/forwarder
 
+## 1.4.0
+
+### Minor Changes
+
+- 9569cee: feat: real progress for a requested clip
+  
+  The "Видео" button now moves through its actual stages (запрошено → скачивается → конвертируется) instead of showing one frozen label until the video lands. A clip that fails or takes too long ends with a retry button and the reason, so a stuck request is something the user can act on rather than a spinner that never stops.
+
+### Patch Changes
+
+- Updated dependencies [9569cee]
+  - @spotter/transport@1.5.0
+
 ## 1.3.0
 
 ### Minor Changes
