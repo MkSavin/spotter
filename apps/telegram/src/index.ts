@@ -31,6 +31,8 @@ import { applicationLogger } from './log'
 import { logging } from './middlewares/bot/logging'
 import type { GlobalSession, UserSession } from './session'
 import { HeartbeatRegistry } from './status/HeartbeatRegistry'
+import { notifyRollout } from './status/notifyRollout'
+import { RolloutWatcher } from './status/RolloutWatcher'
 import { telegramTransport } from './transport/telegramTransport'
 
 let db: TelegramDatabase | undefined
@@ -128,6 +130,14 @@ const polling = async (): Promise<void> => {
   const catalog = new CatalogCache(applicationLogger.sub('catalog'))
   const heartbeats = new HeartbeatRegistry(applicationLogger.sub('heartbeat'))
 
+  // `bot` is built further down, but the first notice is a debounce away.
+  let bot: Awaited<ReturnType<typeof initialize>> | undefined
+  const rolloutLogger = applicationLogger.sub('rollout')
+  const rollouts = new RolloutWatcher(database, rolloutLogger, {
+    onRollout: (changes) =>
+      bot && notifyRollout(bot.api, database, rolloutLogger, changes),
+  })
+
   const subscriber = new RedisClient(config.redis.url)
   // Dedicated connection for the CommandBus reply poller.
   const commandSubscriber = new RedisClient(config.redis.url)
@@ -164,6 +174,7 @@ const polling = async (): Promise<void> => {
     db: database,
     catalog,
     heartbeats,
+    rollouts,
     s3,
     producer,
     subscriber,
@@ -177,6 +188,7 @@ const polling = async (): Promise<void> => {
       await coreContext.runner?.stop()
     }
     stopHeartbeat()
+    rollouts.stop()
     commandBus.stop()
     await transport?.stop()
     subscriber.close()
@@ -189,7 +201,7 @@ const polling = async (): Promise<void> => {
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
 
-  const bot = await initialize(coreContext)
+  bot = await initialize(coreContext)
 
   registerCommands(bot, commandRegistry)
   registerClipCallback(bot)

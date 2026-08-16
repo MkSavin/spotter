@@ -23,6 +23,7 @@ import type {
 } from './extension/innoxious/InnoxiousMedia'
 import type { Session } from './session'
 import type { HeartbeatRegistry } from './status/HeartbeatRegistry'
+import type { RolloutWatcher } from './status/RolloutWatcher'
 
 type Methods<R extends RawApi> = string & keyof R
 type Payload<M extends Methods<R>, R extends RawApi> = M extends unknown
@@ -45,6 +46,7 @@ export type CoreContext = {
   db: TelegramDatabase
   catalog: CatalogCache
   heartbeats: HeartbeatRegistry
+  rollouts: RolloutWatcher
   s3: S3Client
   subscriber: RedisClient
   producer: StreamProducer

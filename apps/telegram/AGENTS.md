@@ -84,8 +84,21 @@ Telegram-локальный стейт — **никакого домена/ро�
   uuid↔chat + кэш роли для сессии (роль — копия, истина в server).
 - `event_messages ((event_id, tg_chat_id) PK, message_id)` — какой message-id отправлен в
   какой чат (для edits и медиа-ответов).
+- `service_versions ((node, service) PK, version, seen_at)` — последняя виденная версия
+  каждого сервиса; нужна, чтобы выкат детектился и после рестарта самого бота.
 
 После правок `schema.ts` — `bunx drizzle-kit generate` (миграции в `apps/telegram/drizzle/`).
+
+## Состояние инфраструктуры (`src/status/`)
+
+Сервисы шлют heartbeat в `spotter.heartbeat` раз в 30 секунд; `heartbeatController`
+раздаёт их двум потребителям:
+
+- `HeartbeatRegistry` — последний удар на `node/service` в памяти, читается `/status`.
+  Сервис не исчезает при молчании, а помечается протухшим (`HEARTBEAT_STALE_MS`).
+- `RolloutWatcher` — сравнивает версию с сохранённой в `service_versions` и через
+  `ROLLOUT_DEBOUNCE_MS` (90 с тишины) шлёт админам одно беззвучное сообщение на всю
+  волну. Первый в жизни удар сервиса молчит — иначе установка отчиталась бы как выкат.
 
 ## Особенности
 

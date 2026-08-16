@@ -60,8 +60,26 @@ export const eventMessages = sqliteTable(
   (table) => [primaryKey({ columns: [table.eventId, table.tgChatId] })],
 )
 
+/**
+ * Last version seen per service, so a rollout is still detected after the bot
+ * itself restarts — an in-memory registry would report every service as new.
+ */
+export const serviceVersions = sqliteTable(
+  'service_versions',
+  {
+    node: text('node').notNull(),
+    service: text('service').notNull(),
+    version: text('version').notNull(),
+    seenAt: integer('seen_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [primaryKey({ columns: [table.node, table.service] })],
+)
+
 export type TgChat = InferSelectModel<typeof tgChats>
 export type TgBinding = InferSelectModel<typeof tgBindings>
+export type ServiceVersion = InferSelectModel<typeof serviceVersions>
 
 export type EventMessage = {
   id: number

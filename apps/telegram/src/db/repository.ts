@@ -5,6 +5,8 @@ import {
   type EventMessage,
   eventMessages,
   type Role,
+  type ServiceVersion,
+  serviceVersions,
   type TgBinding,
   type TgChat,
   tgBindings,
@@ -166,4 +168,45 @@ export const eventMessagesRepo = {
       }
     })
   },
+}
+
+export const serviceVersionsRepo = {
+  list: (db: TelegramDatabase): ServiceVersion[] =>
+    db.select().from(serviceVersions).all(),
+
+  /**
+   * Stores the version and returns the one it replaced, or undefined when the
+   * service was never seen. Read and write share a transaction, so two
+   * heartbeats cannot both see the old value and report the rollout twice.
+   */
+  record: (
+    db: TelegramDatabase,
+    node: string,
+    service: string,
+    version: string,
+  ): string | undefined =>
+    db.transaction((tx) => {
+      const previous = tx
+        .select({ version: serviceVersions.version })
+        .from(serviceVersions)
+        .where(
+          and(
+            eq(serviceVersions.node, node),
+            eq(serviceVersions.service, service),
+          ),
+        )
+        .get()?.version
+
+      if (previous === version) return version
+
+      tx.insert(serviceVersions)
+        .values({ node, service, version, seenAt: new Date() })
+        .onConflictDoUpdate({
+          target: [serviceVersions.node, serviceVersions.service],
+          set: { version, seenAt: new Date() },
+        })
+        .run()
+
+      return previous
+    }),
 }

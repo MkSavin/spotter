@@ -15,4 +15,5 @@ export const heartbeatController: StreamMessageController<
   if (!beat) return
 
   context.heartbeats.apply(beat)
+  context.rollouts.apply(beat)
 }
