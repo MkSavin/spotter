@@ -18,9 +18,21 @@ export const shouldOfferClip = (event: SpotterEvent): boolean =>
 export const videoButtonKeyboard = (eventId: string): InlineKeyboard =>
   new InlineKeyboard().text('🎬 Видео', `${CLIP_PREFIX}${eventId}`)
 
-/** Disabled-looking keyboard shown right after the button is tapped. */
-export const videoProcessingKeyboard = (): InlineKeyboard =>
-  new InlineKeyboard().text(
-    '⏳ Видео обрабатывается…',
-    `${CLIP_PREFIX}${CLIP_WAIT}`,
-  )
+/** What the user sees while a clip is on its way. */
+export const STAGE_LABELS = {
+  requested: '⏳ Запрошено…',
+  fetching: '⏳ Скачивается с камеры…',
+  staged: '⏳ Конвертируется…',
+} as const
+
+export type ClipStage = keyof typeof STAGE_LABELS
+
+/** Disabled-looking keyboard shown while the clip is being prepared. */
+export const videoProcessingKeyboard = (
+  stage: ClipStage = 'requested',
+): InlineKeyboard =>
+  new InlineKeyboard().text(STAGE_LABELS[stage], `${CLIP_PREFIX}${CLIP_WAIT}`)
+
+/** Offers another go after a clip failed or took too long. */
+export const videoRetryKeyboard = (eventId: string): InlineKeyboard =>
+  new InlineKeyboard().text('🎬 Видео — повторить', `${CLIP_PREFIX}${eventId}`)

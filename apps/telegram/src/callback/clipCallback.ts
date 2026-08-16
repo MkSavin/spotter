@@ -6,6 +6,12 @@ import {
   videoProcessingKeyboard,
 } from '../transport/view/eventKeyboard'
 
+/** Server error codes, in words the user can act on. */
+const CLIP_ERRORS: Record<string, string> = {
+  'not-found': 'Событие не найдено',
+  'no-clip': 'У события нет видео',
+}
+
 /**
  * Registers the "Видео" inline-button handler. Tapping it requests an on-demand
  * clip transcode (event.clip RPC); the transcoded video flows back through the
@@ -30,11 +36,17 @@ export const registerClipCallback = (bot: Bot<BotContext, BotApi>): void => {
     try {
       // Swap to the disabled state immediately to prevent duplicate requests.
       await context.editMessageReplyMarkup({
-        reply_markup: videoProcessingKeyboard(),
+        reply_markup: videoProcessingKeyboard('requested'),
       })
     } catch (error) {
       context.logger.debug('Failed to set processing keyboard', error)
     }
+
+    const logger = context.logger.sub('clip')
+
+    // Start the clock before the RPC: stage updates may arrive while it is
+    // still in flight, and an unknown clip would be ignored by the tracker.
+    context.clips.begin(eventId)
 
     try {
       const reply = await context.commandBus.send(
@@ -42,13 +54,18 @@ export const registerClipCallback = (bot: Bot<BotContext, BotApi>): void => {
         { eventId },
         context.session.user.recipientUuid,
       )
+      // A rejected request used to be logged and nothing else: the user kept
+      // staring at "processing" for a clip that was never going to come.
       if (!reply.ok) {
-        context.logger
-          .sub('clip')
-          .warn(`event.clip rejected for ${eventId}: ${reply.error}`)
+        logger.warn(`event.clip rejected for ${eventId}: ${reply.error}`)
+        context.clips.fail(
+          eventId,
+          CLIP_ERRORS[reply.error ?? ''] ?? 'Запрос отклонён',
+        )
       }
     } catch (error) {
-      context.logger.sub('clip').error('event.clip command failed', error)
+      logger.error('event.clip command failed', error)
+      context.clips.fail(eventId, 'Сервис не ответил')
     }
   })
 }

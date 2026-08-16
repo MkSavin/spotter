@@ -36,6 +36,16 @@ export const mediaStagedController: StreamMessageController<
   const result = await mediaStagedAction(staged, { ...context, logger })
 
   if (!result) {
+    await producer
+      .publish(mediaStreams.mediaProgress, {
+        eventId: staged.eventId,
+        stage: 'failed',
+        reason: 'Не удалось перекодировать видео',
+      })
+      .catch(() => undefined)
+    await producer.publish(mediaStreams.mediaProcessed, {
+      eventId: staged.eventId,
+    })
     return
   }
 

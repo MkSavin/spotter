@@ -1,5 +1,6 @@
 import {
   bufferToJson,
+  type MediaStage,
   mediaStreams,
   type StreamMessageController,
   safeParseMediaRequest,
@@ -36,6 +37,17 @@ export const createMediaController = <TConfig extends SinkConfig>(
     const logger = baseLogger.sub('media', topic, request.eventId)
     const prefix = config.s3.stagingPrefix
 
+    const report = (stage: MediaStage, reason?: string): Promise<unknown> =>
+      producer
+        .publish(mediaStreams.mediaProgress, {
+          eventId: request.eventId,
+          stage,
+          ...(reason ? { reason } : {}),
+        })
+        .catch(() => undefined)
+
+    await report('fetching')
+
     let rawClipKey: string | undefined
     let rawSnapshotKey: string | undefined
 
@@ -63,6 +75,7 @@ export const createMediaController = <TConfig extends SinkConfig>(
     // "processing" button stuck forever (e.g. the NVR 404s an unknown event).
     if (!rawClipKey && !rawSnapshotKey) {
       logger.debug('Nothing staged for media request')
+      await report('failed', 'Видео недоступно на регистраторе')
       await producer.publish(mediaStreams.mediaProcessed, {
         eventId: request.eventId,
       })
@@ -75,6 +88,7 @@ export const createMediaController = <TConfig extends SinkConfig>(
       rawClipKey,
       rawSnapshotKey,
     })
+    await report('staged')
 
     logger.info(`Staged media published to "${mediaStreams.mediaStaged}"`)
   }

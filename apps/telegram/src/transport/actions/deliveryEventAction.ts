@@ -32,6 +32,9 @@ export const deliveryEventAction = async (
   // action === 'media' — attach transcoded media to the existing messages.
   const messages = eventMessagesRepo.find(db, eventId)
 
+  // The media edit below repaints the button, so the wait is over either way.
+  context.clips.complete(eventId)
+
   if (clipKey) {
     // The clip supersedes the snapshot: video replaces the photo, button gone.
     const video: InputMediaVideo = {

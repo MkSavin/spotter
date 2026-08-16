@@ -70,14 +70,22 @@ describe('createMediaController', () => {
       'staging/frigate-home/event-e1-clip.mp4',
       'staging/frigate-home/event-e1-snapshot.jpg',
     ])
-    expect(published).toHaveLength(1)
-    expect(published[0].stream).toBe('spotter.media.staged')
-    expect(published[0].payload).toEqual({
+    const staged = published.find(
+      (entry) => entry.stream === mediaStreams.mediaStaged,
+    )
+    expect(staged?.payload).toEqual({
       eventId: 'e1',
       source: 'frigate-home',
       rawClipKey: 'staging/frigate-home/event-e1-clip.mp4',
       rawSnapshotKey: 'staging/frigate-home/event-e1-snapshot.jpg',
     })
+
+    // The frontend follows these to move the "processing" button along.
+    expect(
+      published
+        .filter((entry) => entry.stream === mediaStreams.mediaProgress)
+        .map((entry) => (entry.payload as { stage: string }).stage),
+    ).toEqual(['fetching', 'staged'])
   })
 
   test('ignores requests addressed to a different source', async () => {
@@ -106,8 +114,20 @@ describe('createMediaController', () => {
     )
 
     // Silence would leave the bot's "processing" button stuck forever.
-    expect(published).toHaveLength(1)
-    expect(published[0]?.stream).toBe(mediaStreams.mediaProcessed)
-    expect(published[0]?.payload).toEqual({ eventId: 'e1' })
+    const processed = published.find(
+      (entry) => entry.stream === mediaStreams.mediaProcessed,
+    )
+    expect(processed?.payload).toEqual({ eventId: 'e1' })
+
+    // And the button says why, instead of just going back to idle.
+    const failure = published.find(
+      (entry) =>
+        entry.stream === mediaStreams.mediaProgress &&
+        (entry.payload as { stage: string }).stage === 'failed',
+    )
+    expect(failure?.payload).toMatchObject({
+      eventId: 'e1',
+      stage: 'failed',
+    })
   })
 })

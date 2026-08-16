@@ -14,6 +14,8 @@ import { Bot, session } from 'grammy'
 import information from '../package.json'
 import { registerClipCallback } from './callback/clipCallback'
 import { CatalogCache } from './catalog/CatalogCache'
+import { ClipTracker } from './clip/ClipTracker'
+import { renderClipState } from './clip/renderClipState'
 import { CommandBus } from './command/CommandBus'
 import { commandRegistry } from './commands/commandList'
 import {
@@ -138,6 +140,15 @@ const polling = async (): Promise<void> => {
       bot && notifyRollout(bot.api, database, rolloutLogger, changes),
   })
 
+  const clipLogger = applicationLogger.sub('clip')
+  const clips = new ClipTracker(clipLogger, {
+    render: (eventId, outcome) =>
+      bot &&
+      renderClipState(bot.api, database, clipLogger, eventId, outcome).catch(
+        (error) => clipLogger.warn(`Clip repaint failed: ${error}`),
+      ),
+  })
+
   const subscriber = new RedisClient(config.redis.url)
   // Dedicated connection for the CommandBus reply poller.
   const commandSubscriber = new RedisClient(config.redis.url)
@@ -175,6 +186,7 @@ const polling = async (): Promise<void> => {
     catalog,
     heartbeats,
     rollouts,
+    clips,
     s3,
     producer,
     subscriber,
@@ -189,6 +201,7 @@ const polling = async (): Promise<void> => {
     }
     stopHeartbeat()
     rollouts.stop()
+    clips.stop()
     commandBus.stop()
     await transport?.stop()
     subscriber.close()

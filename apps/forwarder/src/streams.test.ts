@@ -17,7 +17,12 @@ describe('forwarder stream map', () => {
       mediaStreams.mediaProcessed,
       mediaStreams.cameraProcessed,
       heartbeatStream,
+      mediaStreams.mediaProgress,
     ])
+  })
+
+  test('carries media progress, so a pending clip shows its stage', () => {
+    expect(UP_STREAMS).toContain(mediaStreams.mediaProgress)
   })
 
   test('carries heartbeats, so /status sees the ingest node', () => {

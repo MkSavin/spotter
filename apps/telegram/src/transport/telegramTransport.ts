@@ -18,6 +18,7 @@ import { catalogController } from './controllers/catalogController'
 import { deliveryEventController } from './controllers/deliveryEventController'
 import { deliveryRecipientController } from './controllers/deliveryRecipientController'
 import { heartbeatController } from './controllers/heartbeatController'
+import { mediaProgressController } from './controllers/mediaProgressController'
 
 export const telegramTransport = async (
   bot: Bot<BotContext, BotApi>,
@@ -31,6 +32,7 @@ export const telegramTransport = async (
     .message(mediaStreams.cameraProcessed, cameraFrameController)
     .message(catalogUpdatedStream, catalogController)
     .message(heartbeatStream, heartbeatController)
+    .message(mediaStreams.mediaProgress, mediaProgressController)
     .run(
       { ...context, logger, bot },
       {

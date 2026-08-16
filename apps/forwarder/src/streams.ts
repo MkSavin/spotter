@@ -30,6 +30,9 @@ export const UP_STREAMS = [
   // Liveness of the ingest-side services; without this `/status` only ever
   // shows the cloud node.
   heartbeatStream,
+  // Stage updates for a pending clip, so the bot shows real progress instead
+  // of a spinner frozen until the video lands.
+  mediaStreams.mediaProgress,
 ] as const
 
 /**

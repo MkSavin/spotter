@@ -14,6 +14,7 @@ import type {
 import type { Message } from 'grammy/types'
 import type { Stenograph } from 'stenograph'
 import type { CatalogCache } from './catalog/CatalogCache'
+import type { ClipTracker } from './clip/ClipTracker'
 import type { CommandBus } from './command/CommandBus'
 import type { Config } from './config'
 import type { TelegramDatabase } from './db/client'
@@ -47,6 +48,7 @@ export type CoreContext = {
   catalog: CatalogCache
   heartbeats: HeartbeatRegistry
   rollouts: RolloutWatcher
+  clips: ClipTracker
   s3: S3Client
   subscriber: RedisClient
   producer: StreamProducer

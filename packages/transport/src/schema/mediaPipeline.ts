@@ -53,6 +53,24 @@ export const mediaProcessedSchema = z.object({
 })
 export type MediaProcessed = z.infer<typeof mediaProcessedSchema>
 
+/**
+ * How far along an event's media is. Published to `spotter.media.progress` at
+ * each step so a frontend can show real state instead of a frozen spinner.
+ *
+ * `staged` means the bytes left the NVR and transcoding began; `failed` ends the
+ * wait with a reason. The terminal success is `mediaProcessed`, not a stage.
+ */
+export const mediaStageSchema = z.enum(['fetching', 'staged', 'failed'])
+export type MediaStage = z.infer<typeof mediaStageSchema>
+
+export const mediaProgressSchema = z.object({
+  eventId: z.string().min(1),
+  stage: mediaStageSchema,
+  /** Short human-readable cause, only for `failed`. */
+  reason: z.string().optional(),
+})
+export type MediaProgress = z.infer<typeof mediaProgressSchema>
+
 // --- Camera frame: request → staged → processed ---------------------------
 
 /**
@@ -106,6 +124,8 @@ export const mediaStreams = {
   mediaStaged: 'spotter.media.staged',
   /** `spotter.event.media_processed` — transcoded event media in S3. */
   mediaProcessed: 'spotter.event.media_processed',
+  /** `spotter.media.progress` — how far along an event's media is. */
+  mediaProgress: 'spotter.media.progress',
   /** `spotter.camera.request.<source>` — camera frame requests, per source. */
   cameraRequest: (source: string): string => `spotter.camera.request.${source}`,
   /** `spotter.camera.staged` — raw camera frame staged in S3. */
@@ -133,6 +153,13 @@ export const safeParseMediaProcessed = (
   value: unknown,
 ): MediaProcessed | null => {
   const result = mediaProcessedSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
+export const safeParseMediaProgress = (
+  value: unknown,
+): MediaProgress | null => {
+  const result = mediaProgressSchema.safeParse(value)
   return result.success ? result.data : null
 }
 
