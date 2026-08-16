@@ -1,5 +1,11 @@
 # @spotter/sink
 
+## 1.2.1
+
+### Patch Changes
+
+- 53f39ad: fix: cli doctor and cli logs follow
+
 ## 1.2.0
 
 ### Minor Changes
