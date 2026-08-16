@@ -128,6 +128,6 @@ sonner 2.0). Осознанные отклонения: `drizzle-orm`/`drizzle-k
 - Может жить на отдельном веб-хосте и ходить в главный Redis по IP — как отдельный инстанс.
 - Человекочитаемый рендер события (лейблы/тайминг) — из общего `@spotter/transport`
   (`renderEvent`), тот же, что теперь у email; Telegram оставляет свой HTML-рендер.
-- В `production.cloud.yml` сервис добавлен **закомментированным** (opt-in): раскомментировать,
-  заполнить секцию `pwa` в `.env` (VAPID генерит `install.ts` или `bunx web-push generate-vapid-keys`),
-  поставить за TLS-прокси.
+- В `production.cloud.yml` сервис под compose-профилем `pwa` (opt-in): поднимается флагом
+  `./spotter up --pwa`, нужна секция `pwa` в `.env` (VAPID генерит `install.ts` или
+  `bunx web-push generate-vapid-keys`) и TLS-прокси.

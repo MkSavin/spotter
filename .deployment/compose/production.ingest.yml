@@ -96,7 +96,7 @@ services:
 
   # Auto-update: pulls fresh :latest for labelled spotter-* only (local-redis
   # and mosquitto are left alone). Daily by default; --cleanup drops old layers.
-  # On by default; disable with `make ingest WATCHTOWER=0`.
+  # On by default; disable with `./spotter up --no-watchtower`.
   watchtower:
     image: containrrr/watchtower
     restart: unless-stopped

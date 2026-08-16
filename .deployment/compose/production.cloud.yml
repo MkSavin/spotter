@@ -6,9 +6,8 @@ services:
     restart: unless-stopped
     networks:
       - spotter
-    # Bound to the VPN interface only — the ingest forwarder reaches it through
-    # the tunnel. Set REDIS_BIND to your tunnel address (see docs/deployment.md);
-    # the 127.0.0.1 default keeps Redis off the public internet.
+    # Loopback only — the ingest forwarder arrives through an SSH tunnel that
+    # lands on 127.0.0.1 (see docs/deployment.md). Keeps Redis off the internet.
     ports:
       - '${REDIS_BIND:-127.0.0.1}:6379:6379'
     # appendonly = the main durable buffer; survives bot restarts, XACK/DLQ model
@@ -61,9 +60,10 @@ services:
       - redis
 
   # PWA frontend (OPTIONAL): installable app and Web Push consumer.
-  # Uncomment to enable; set VAPID_* in .env. Use behind HTTPS reverse proxy.
-  # Service workers and Web Push require HTTPS.
+  # Enable with `./spotter up --pwa`; set VAPID_* in .env. Service workers and
+  # Web Push require HTTPS, so put it behind a TLS reverse proxy.
   spotter-pwa:
+    profiles: [pwa]
     image: ghcr.io/mksavin/spotter-pwa:latest
     container_name: spotter-pwa
     restart: unless-stopped
@@ -84,28 +84,28 @@ services:
       - redis
 
   # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event.
-  # Uncomment to enable and set SMTP_* / EMAIL_RECIPIENTS in .env. Can run
-  # separately if it can access Redis by IP.
-  # spotter-email:
-  #   image: ghcr.io/mksavin/spotter-email:latest
-  #   container_name: spotter-email
-  #   restart: unless-stopped
-  #   networks:
-  #     - spotter
-  #   environment:
-  #     REDIS_URL: redis://redis:6379
-  #   env_file:
-  #     - ./.env
-  #   labels:
-  #     com.centurylinklabs.watchtower.enable: 'true'
-  #   volumes:
-  #     - ./.docker/email:/app/data
-  #   depends_on:
-  #     - redis
+  # Enable with `./spotter up --email`; set SMTP_* / EMAIL_RECIPIENTS in .env.
+  spotter-email:
+    profiles: [email]
+    image: ghcr.io/mksavin/spotter-email:latest
+    container_name: spotter-email
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+    env_file:
+      - ./.env
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    volumes:
+      - ./.docker/email:/app/data
+    depends_on:
+      - redis
 
   # Auto-update: pulls fresh :latest for labelled spotter-* only (redis left
   # alone). Daily by default; --cleanup drops old layers.
-  # On by default; disable with `make cloud WATCHTOWER=0`.
+  # On by default; disable with `./spotter up --no-watchtower`.
   watchtower:
     image: containrrr/watchtower
     restart: unless-stopped

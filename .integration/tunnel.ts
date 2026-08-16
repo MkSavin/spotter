@@ -1,0 +1,148 @@
+// SSH tunnel to the cloud Redis, set up as a systemd service.
+//
+// The cloud Redis stays bound to loopback; the ingest forwarder reaches it
+// through this tunnel. It listens on the docker0 address rather than
+// 127.0.0.1 — inside the forwarder container loopback means the container.
+
+import { existsSync } from 'node:fs'
+import process from 'node:process'
+import { $ } from 'bun'
+
+const KEY = '/root/.ssh/spotter-tunnel'
+const UNIT = '/etc/systemd/system/spotter-tunnel.service'
+
+export type TunnelSetup = {
+  host: string
+  user: string
+  port: number
+  bridge: string
+}
+
+/** Host address on the docker bridge — where the tunnel must listen. */
+export const bridgeAddress = async (): Promise<string | undefined> => {
+  const output = await $`ip -4 -brief addr show docker0`
+    .quiet()
+    .text()
+    .catch(() => '')
+  return output.match(/(\d+\.\d+\.\d+\.\d+)\/\d+/)?.[1]
+}
+
+export const isRoot = (): boolean => process.getuid?.() === 0
+
+/** Public key for the node, created on first run. */
+export const ensureKey = async (): Promise<string> => {
+  if (!existsSync(KEY)) {
+    await $`ssh-keygen -t ed25519 -N ${''} -f ${KEY} -C spotter-tunnel`.quiet()
+  }
+  return (await $`cat ${KEY}.pub`.text()).trim()
+}
+
+/** Restricted authorized_keys line: this key may only forward Redis. */
+export const authorizedLine = (publicKey: string): string =>
+  'command="",no-agent-forwarding,no-X11-forwarding,no-pty,' +
+  `permitopen="127.0.0.1:6379" ${publicKey}`
+
+export const trustHost = async (setup: TunnelSetup): Promise<boolean> => {
+  const { exitCode } =
+    await $`ssh -i ${KEY} -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10 -p ${setup.port} ${setup.user}@${setup.host} true`
+      .quiet()
+      .nothrow()
+  return exitCode === 0
+}
+
+const unitFile = (setup: TunnelSetup): string => `[Unit]
+Description=Spotter Redis tunnel to cloud
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -NT -i ${KEY} \\
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \\
+  -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new \\
+  -p ${setup.port} \\
+  -L ${setup.bridge}:6379:127.0.0.1:6379 \\
+  ${setup.user}@${setup.host}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+`
+
+export const installService = async (setup: TunnelSetup): Promise<void> => {
+  await Bun.write(UNIT, unitFile(setup))
+  await $`systemctl daemon-reload`.quiet()
+  await $`systemctl enable --now spotter-tunnel`.quiet()
+}
+
+/** True once the tunnel accepts connections on the bridge address. */
+export const verify = async (bridge: string): Promise<boolean> => {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const socket = await Bun.connect({
+        hostname: bridge,
+        port: 6379,
+        socket: { data() {} },
+      })
+      socket.end()
+      return true
+    } catch {
+      await Bun.sleep(1000)
+    }
+  }
+  return false
+}
+
+export type Prompt = {
+  say: (msg?: string) => void
+  ask: (question: string, fallback?: string) => Promise<string>
+}
+
+/**
+ * Interactive setup shared by `spotter install ingest` and `spotter tunnel`.
+ * Returns the Redis URL once the tunnel answers, undefined otherwise.
+ */
+export const configure = async ({
+  say,
+  ask,
+}: Prompt): Promise<string | undefined> => {
+  const bridge = await bridgeAddress()
+  if (!bridge) {
+    say('  ! Не нашёл интерфейс docker0 — Docker запущен?')
+    return undefined
+  }
+  if (!isRoot()) {
+    say('  ! Нужны права root, чтобы поставить службу — запусти через sudo.')
+    return undefined
+  }
+
+  const host = await ask('Адрес облачного узла (IP или домен)')
+  const user = await ask('SSH-пользователь на нём', 'root')
+  const port = Number(await ask('SSH-порт', '22')) || 22
+  const setup = { host, user, port, bridge }
+
+  const publicKey = await ensureKey()
+  say('\n  Добавь эту строку на облачном узле в ~/.ssh/authorized_keys:\n')
+  say(`  ${authorizedLine(publicKey)}\n`)
+  say('  Ключ ограничен: он может только пробросить Redis, зайти на сервер им')
+  say('  нельзя. Скопируй строку целиком, вместе с началом до ssh-ed25519.\n')
+  await ask('Готово? Нажми Enter', ' ')
+
+  say('  Проверяю подключение…')
+  if (!(await trustHost(setup))) {
+    say('  ! Не удалось подключиться — проверь ключ, адрес и порт.')
+    return undefined
+  }
+
+  say('  Поднимаю службу…')
+  await installService(setup)
+  if (!(await verify(bridge))) {
+    say('  ! Служба поставлена, но порт не отвечает.')
+    say('    Смотри: systemctl status spotter-tunnel')
+    return undefined
+  }
+
+  const url = `redis://${bridge}:6379`
+  say(`  ✓ Туннель работает: ${url}`)
+  return url
+}

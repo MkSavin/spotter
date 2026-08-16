@@ -4,13 +4,13 @@
 // brings the stack up and prints an admin code. Idempotent — an existing .env
 // is kept unless the user opts to overwrite.
 //
-//   bun .integration/install.ts
-//   docker run --rm -it -v "$PWD":/w -w /w oven/bun bun .integration/install.ts
+//   ./spotter install [single|cloud|ingest] [--no-tunnel]
 
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { createInterface } from 'node:readline/promises'
 import { $ } from 'bun'
+import { configure } from './tunnel'
 
 type Mode = 'single' | 'cloud' | 'ingest'
 
@@ -21,7 +21,9 @@ const rl = createInterface({ input: process.stdin, output: process.stdout })
 const DEPOT_IMAGE = 'ghcr.io/mksavin/spotter-depot:latest'
 
 const say = (msg = '') => console.log(msg)
-const step = (n: number, msg: string) => say(`\n[${n}] ${msg}`)
+// Counted, not hardcoded: which steps run depends on the mode.
+let stepNumber = 0
+const step = (msg: string) => say(`\n[${++stepNumber}] ${msg}`)
 
 const ask = async (question: string, fallback = ''): Promise<string> => {
   const suffix = fallback ? ` [${fallback}]` : ''
@@ -108,7 +110,7 @@ const fail = (msg: string): never => {
 }
 
 // 1. Docker
-step(1, 'Проверяю Docker…')
+step('Проверяю Docker…')
 try {
   await $`docker --version`.quiet()
   await $`docker compose version`.quiet()
@@ -121,16 +123,27 @@ try {
 }
 
 // 2. Mode
-step(2, 'Режим развёртывания')
-say('  1) single — всё на одной машине (проще всего)')
-say(
-  '  2) cloud  — облачный узел распределёнки (server + telegram + опц. pwa/email)',
-)
-say('  3) ingest — узел рядом с камерами (frigate + depot + forwarder)')
-const modeChoice = await ask('Выбор (1/2/3)', '1')
-const mode: Mode =
-  ({ '1': 'single', '2': 'cloud', '3': 'ingest' } as const)[modeChoice] ??
-  'single'
+const args = process.argv.slice(2)
+const noTunnel = args.includes('--no-tunnel')
+const [preselected] = args.filter((arg) => !arg.startsWith('--'))
+const isMode = (value: string): value is Mode =>
+  value === 'single' || value === 'cloud' || value === 'ingest'
+
+step('Режим развёртывания')
+let mode: Mode
+if (preselected && isMode(preselected)) {
+  mode = preselected
+} else {
+  say('  1) single — всё на одной машине (проще всего)')
+  say(
+    '  2) cloud  — облачный узел распределёнки (server + telegram + опц. pwa/email)',
+  )
+  say('  3) ingest — узел рядом с камерами (frigate + depot + forwarder)')
+  const modeChoice = await ask('Выбор (1/2/3)', '1')
+  mode =
+    ({ '1': 'single', '2': 'cloud', '3': 'ingest' } as const)[modeChoice] ??
+    'single'
+}
 const exampleByMode: Record<Mode, string> = {
   single: '.env.example',
   cloud: '.env.cloud.example',
@@ -140,7 +153,7 @@ const example = exampleByMode[mode]
 say(`  → режим: ${mode} (шаблон ${example})`)
 
 // 3. Seed .env (idempotent)
-step(3, 'Готовлю .env')
+step('Готовлю .env')
 if (existsSync('.env')) {
   const overwrite = await askYesNo(
     '.env уже существует. Перезаписать из шаблона? (n — оставить и выйти)',
@@ -148,7 +161,7 @@ if (existsSync('.env')) {
   )
   if (!overwrite) {
     say('  ✓ Оставляю текущий .env без изменений.')
-    say(`\nЗапусти стек вручную:  make ${mode}`)
+    say('\nЗапусти стек вручную:  ./spotter up')
     rl.close()
     process.exit(0)
   }
@@ -158,8 +171,11 @@ if (!existsSync(example))
 let env = await Bun.file(example).text()
 say(`  ✓ Скопировал ${example} → .env (пока в памяти)`)
 
+// The CLI reads this back instead of asking for a mode on every command.
+env = setEnv(env, 'SPOTTER_MODE', mode)
+
 // 4. Required values
-step(4, 'Обязательные параметры')
+step('Обязательные параметры')
 say('  S3-хранилище (любой S3-совместимый бэкенд):')
 env = setEnv(
   env,
@@ -194,18 +210,20 @@ if (mode === 'ingest') {
     await ask('FRIGATE_AUTH_USER', 'admin'),
   )
   env = setEnv(env, 'FRIGATE_AUTH_SECRET', await ask('FRIGATE_AUTH_SECRET'))
-  say('  Облачный Redis внутри VPN-туннеля:')
-  env = setEnv(
-    env,
-    'REDIS_REMOTE_URL',
-    await ask('REDIS_REMOTE_URL', 'redis://10.0.0.1:6379'),
-  )
+}
+
+// 4b. SSH tunnel to the cloud Redis (ingest only)
+if (mode === 'ingest' && !noTunnel) {
+  step('Канал до облачного узла (SSH-туннель)')
+  const url = await configure({ say, ask })
+  if (url) env = setEnv(env, 'REDIS_REMOTE_URL', url)
+  else say('    Настроишь позже: sudo ./spotter tunnel')
 }
 
 // 5. Transcoding acceleration (ingest runs the depot replicas)
 let useGpu = false
 if (mode === 'ingest') {
-  step(5, 'Ускорение перекодирования')
+  step('Ускорение перекодирования')
   say('  Проверяю GPU (это занимает несколько секунд)…')
   const gpu = await probeGpu()
   if (gpu.usable) {
@@ -221,9 +239,10 @@ if (mode === 'ingest') {
 }
 
 // 6. PWA / VAPID (opt-in)
+let wantPwa = false
 if (mode === 'single' || mode === 'cloud') {
-  step(6, 'PWA-фронтенд (опционально)')
-  const wantPwa = await askYesNo(
+  step('PWA-фронтенд (опционально)')
+  wantPwa = await askYesNo(
     'Включить PWA (Web Push)? Сгенерирую VAPID-пару',
     false,
   )
@@ -243,21 +262,24 @@ if (mode === 'single' || mode === 'cloud') {
       say('  ! Не удалось сгенерировать VAPID-пару.')
       say('    Заполни VAPID_* вручную позже — см. .env.')
     }
-    say('  Не забудь раскомментировать сервис spotter-pwa в профиле cloud.')
   }
 }
 
 // 7. Write .env
-step(7, 'Записываю .env')
+step('Записываю .env')
 await Bun.write('.env', env)
 say(
   '  ✓ .env готов. Проверь остальные значения при желании — там рабочие дефолты.',
 )
 
 // 8. Bring the stack up
-step(8, 'Поднимаю стек')
-// GPU=1 pulls in the overlay that reserves the card for the depot replicas.
-const upCommand = useGpu ? `make ${mode} GPU=1` : `make ${mode}`
+step('Поднимаю стек')
+// The GPU overlay is on unless opted out; PWA rides its compose profile.
+const upArgs = [
+  ...(mode === 'ingest' && !useGpu ? ['--no-gpu'] : []),
+  ...(wantPwa ? ['--pwa'] : []),
+]
+const upCommand = ['./spotter up', ...upArgs].join(' ')
 const bringUp = await askYesNo(`Запустить сейчас (${upCommand})?`, true)
 if (!bringUp) {
   say(`\nГотово. Когда будешь готов:  ${upCommand}`)
@@ -265,15 +287,14 @@ if (!bringUp) {
   process.exit(0)
 }
 try {
-  if (useGpu) await $`make ${mode} GPU=1`
-  else await $`make ${mode}`
+  await $`./spotter up ${upArgs}`
 } catch {
   fail(`${upCommand} завершился с ошибкой — смотри вывод выше.`)
 }
 
 // 9. Access code (single/cloud only)
 if (mode === 'single' || mode === 'cloud') {
-  step(9, 'Код доступа администратора')
+  step('Код доступа администратора')
   say('  Жду, пока server применит миграции…')
   await Bun.sleep(4000)
   try {

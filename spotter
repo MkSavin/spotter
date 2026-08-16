@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+# Thin launcher: all logic lives in the TypeScript CLI.
+set -e
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "spotter: bun is required — https://bun.sh" >&2
+  exit 1
+fi
+
+exec bun "$root/.integration/cli.ts" "$@"

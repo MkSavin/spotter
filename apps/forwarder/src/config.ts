@@ -10,7 +10,7 @@ import { applicationLogger } from './log'
 export type ForwarderConfig = {
   /** Local-side Redis (durable AOF, localhost) — never crosses the network. */
   localUrl: string
-  /** Remote-side Redis, reached over the fragile WAN hop (inside a VPN tunnel). */
+  /** Remote-side Redis, reached over the fragile WAN hop (via an SSH tunnel). */
   remoteUrl: string
 
   /** Source ids whose per-source request streams are mirrored remote → local. */

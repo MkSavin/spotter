@@ -58,7 +58,7 @@ flowchart TB
 
 ### Топология «ingest + cloud» (надёжный режим, распределённо)
 
-Сервисы разнесены на два узла, связанных VPN-туннелем. `forwarder` — единственный держатель
+Сервисы разнесены на два узла, связанных SSH-туннелем. `forwarder` — единственный держатель
 межсайтового канала: зеркалит стримы между `local-redis` (durable-буфер на ingest) и главным
 Redis в облаке и буферизует события при обрывах (`XACK`-после-успеха).
 
@@ -95,7 +95,7 @@ flowchart TB
     server <-. "Redis Streams" .-> rredis
     depot <-- "Redis Streams" --> lredis
     lredis <-. "XADD / XACK" .-> forwarder
-    forwarder <== "Redis Streams + VPN<br/>(store-and-forward)" ==> rredis
+    forwarder <== "Redis Streams + SSH<br/>(store-and-forward)" ==> rredis
     telegram <-. "Redis Streams" .-> rredis
 
     frigate -- "S3 API" --> S3
@@ -135,7 +135,7 @@ Telegram-локальный стейт и пресайнит медиа. Кон�
 одной машине** с единым Redis (dev, небольшие инсталляции). Надёжный —
 **распределённый**: сервисы разносятся на два узла, **ingest** (`frigate`/`depot` +
 локальный durable-Redis + `forwarder`) и **облачный** (главный Redis + `server` + `telegram`),
-связанные VPN-туннелем. `forwarder` — единственный компонент, держащий хрупкий
+связанные SSH-туннелем. `forwarder` — единственный компонент, держащий хрупкий
 межсайтовый канал, и буферизует события при обрывах (`XACK`-после-успеха).
 
 Распределённый режим решает проблему ненадёжного или ограниченного канала на
@@ -222,10 +222,10 @@ cd apps/telegram && bun start
 | `bun run sign:token`        | Создать код доступа (см. ниже)                         |
 | `bunx biome check --write`  | Линт + автоформат                                      |
 | `bun run docker:dev`        | Поднять dev-инфру (redis + mosquitto)                  |
-| `make single`               | Поднять весь прод-стек на одной машине (redis, mosquitto, frigate, depot, server, telegram, watchtower) |
-| `make ingest`               | Поднять прод-узел ingest (local-redis, mosquitto, frigate, depot×N, forwarder) |
-| `make cloud`                | Поднять прод-узел cloud (redis + server + telegram)    |
-| `make token`                | Выпустить код доступа admin (внутри контейнера)        |
+| `./spotter install`         | Мастер первичной настройки узла (режим, `.env`, запуск) |
+| `./spotter up`              | Поднять прод-стек узла в его режиме (`SPOTTER_MODE` из `.env`) |
+| `./spotter logs server`     | Логи одного сервиса                                    |
+| `./spotter token`           | Выпустить код доступа admin (внутри контейнера)        |
 
 ## Авторизация
 
@@ -279,10 +279,10 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 
 ## Развёртывание (Docker)
 
-> 📖 **Быстрый старт (3 шага) и пошаговая инструкция** для всех режимов
-> (разработка / единый узел / распределённо), автодеплой и VPN-туннель — в
-> [docs/deployment.md](docs/deployment.md). Самый быстрый путь — мастер:
-> `bun .integration/install.ts` (или в контейнере `oven/bun`).
+> 📖 **Установка** — [docs/deployment.md](docs/deployment.md) (мастер:
+> `./spotter install`). Канал между узлами —
+> [docs/tunnel.md](docs/tunnel.md), эксплуатация и авто-деплой —
+> [docs/operations.md](docs/operations.md).
 
 Образы публичные (`ghcr.io/mksavin/spotter-*`) — `docker login` не нужен.
 Длинные `docker compose …` спрятаны за `make` (запускается из корня репозитория,
@@ -291,26 +291,27 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 | Профиль | Команда | Что поднимает | Узлы |
 | --- | --- | --- | --- |
 | **development** | `bun run docker:dev` | `redis` + `mosquitto` (инфра; приложения — на хосте через `bun start`) | одна машина |
-| **production · single** | `make single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `server`, `telegram`, `watchtower` (без `forwarder`) | одна машина |
-| **production · ingest** | `make ingest` | `local-redis` (durable), `mosquitto`, `frigate`, `depot×N` (опц. GPU), `forwarder`, `watchtower` | ingest-узел |
-| **production · cloud** | `make cloud` | `redis` (главный durable-буфер) + `server` + `telegram` + `watchtower` | облачный узел |
+| **production · single** | `./spotter install single` | весь стек в контейнерах: `redis`, `mosquitto`, `frigate`, `depot`, `server`, `telegram`, `watchtower` (без `forwarder`) | одна машина |
+| **production · ingest** | `./spotter install ingest` | `local-redis` (durable), `mosquitto`, `frigate`, `depot×N` (GPU по умолчанию), `forwarder`, `watchtower` | ingest-узел |
+| **production · cloud** | `./spotter install cloud` | `redis` (главный durable-буфер) + `server` + `telegram` + `watchtower` | облачный узел |
+
+Режим узла живёт в `.env` как `SPOTTER_MODE`, поэтому дальше хватает
+`./spotter up` / `ps` / `logs` без указания режима.
 
 По умолчанию на прод-узле крутится `watchtower` — раз в сутки авто-обновляет
-`spotter-*` из реестра. Отключить: `make single WATCHTOWER=0`. `bun run docker:*`
-остаются для совместимости, но ведём через `make`.
+`spotter-*` из реестра. Отключить: `./spotter up --no-watchtower`.
 
 **Один узел (`single`)** — простейший прод: одна машина и ингестит с NVR, и ходит
 в Telegram, единый Redis, `forwarder` не нужен.
 
 **Распределённо (`ingest` + `cloud`)** — **две отдельные машины** (но обе можно
 поднять и на одной для проверки). На ingest-узле `forwarder` зеркалит стримы в
-удалённый Redis (`REDIS_REMOTE_URL`, через VPN-туннель между узлами) и обратно,
+удалённый Redis (`REDIS_REMOTE_URL`, через SSH-туннель между узлами) и обратно,
 буферизуя всё в `local-redis` при обрывах. Выбирай этот режим, когда аплинк на
 стороне ingest ненадёжен или ограничен.
 
-S3 задаётся через `.env` (любой S3-совместимый бэкенд). Для ограниченных/цензурируемых
-сетей в качестве туннеля — свой WireGuard, а при DPI-блокировке AmneziaWG или
-XRAY-VLESS; пошагово в [docs/deployment.md](docs/deployment.md#vpn-туннель-между-узлами-только-для-распределёнки).
+S3 задаётся через `.env` (любой S3-совместимый бэкенд). Канал до облачного Redis
+держит SSH-туннель под systemd — пошагово в [docs/tunnel.md](docs/tunnel.md).
 
 ## Структура репозитория
 
@@ -331,7 +332,7 @@ apps/telegram/src/db/  SQLite-схема и репозиторий (Drizzle): tg
 apps/{server,telegram}/drizzle/  Сгенерированные миграции Drizzle
 .deployment/compose/  Compose-профили: development, production.single, production.ingest, production.cloud
 .deployment/          Конфиги инфраструктуры (mosquitto, …)
-Makefile              Короткие алиасы над docker compose (make single/cloud/ingest/update/logs/ps/down/token)
+spotter, spotter.cmd  Команда управления узлом (запускают .integration/cli.ts)
 .env.example          Единый .env для single/dev (все сервисы, один файл)
 .env.cloud.example    Шаблон cloud-узла (server + telegram + опц. pwa/email)
 .env.ingest.example   Шаблон ingest-узла (frigate + depot + forwarder, NVR-креды)
@@ -419,7 +420,8 @@ protection), `GITHUB_TOKEN` (логин в ghcr.io).
 - [x] ~~Kafka~~ → Redis Streams (встроенный `Bun.RedisClient`, consumer groups)
 - [x] Локальный durable-буфер + `forwarder` (store-and-forward между узлами)
 - [x] Разнос compose на профили dev / single / ingest / cloud
-- [ ] VPN-туннель между узлами (XRAY-VLESS / AmneziaWG 2 для ограниченных сетей); устойчивый канал telegram↔Telegram
+- [x] Канал между узлами: SSH-туннель под systemd (`spotter-tunnel.service`)
+- [ ] Устойчивый канал telegram↔Telegram для ограниченных сетей
 - [ ] `frigate/events` → `frigate/reviews` (нативный батчинг уведомлений)
 - [x] Видео по кнопке (on-demand транскод клипа, edit-in-place на сообщении события)
 - [x] Разделение `spotter/server` (домен) + `telegram`-фронтенд (`spotter.delivery.*` / `spotter.command.*`); канал-адаптеры `vk`/`max`/`ntfy` — на будущее

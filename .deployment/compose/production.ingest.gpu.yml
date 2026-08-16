@@ -1,5 +1,5 @@
 # NVIDIA acceleration for the depot replicas — an overlay over
-# production.ingest.yml, applied by `make ingest GPU=1`.
+# production.ingest.yml, applied by default (opt out with `--no-gpu`).
 #
 # Needs the driver plus nvidia-container-toolkit on the host. Without them the
 # containers refuse to start, which is why this is opt-in: the base profile
