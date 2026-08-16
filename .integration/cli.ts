@@ -79,15 +79,26 @@ const composeArgs = (mode: Mode): string[] => {
   ]
 }
 
+/** Rewrites `KEY=value` in .env, keeping the rest of the file untouched. */
+const persistEnv = (key: string, value: string): void => {
+  const current = readFileSync(envFile, 'utf8')
+  const line = `${key}=${value}`
+  writeFileSync(
+    envFile,
+    new RegExp(`^${key}=.*$`, 'm').test(current)
+      ? current.replace(new RegExp(`^${key}=.*$`, 'm'), line)
+      : `${current}\n${line}\n`,
+  )
+}
+
 const compose = async (args: string[]): Promise<never> => {
   const mode = requireMode()
+  // Persisted, not just passed: compose reads it from .env on every later run,
+  // so a one-shot value would silently revert on the next `up`.
   const interval = flags.get('--watchtower-interval')
-  // Spread, not a bare object: .env({}) would wipe PATH and HOME for docker.
-  const env = { ...process.env }
-  if (interval) env.WATCHTOWER_INTERVAL = interval
+  if (interval) persistEnv('WATCHTOWER_INTERVAL', interval)
   const { exitCode } = await $`docker ${composeArgs(mode)} ${args}`
     .cwd(root)
-    .env(env)
     .nothrow()
   process.exit(exitCode)
 }
@@ -137,7 +148,7 @@ const help = (): void => {
     --email                  Поднять email-фронтенд (нужны SMTP_* в .env)
     --no-gpu                 Без NVIDIA (ingest; по умолчанию GPU включён)
     --no-watchtower          Без авто-обновления
-    --watchtower-interval=N  Интервал авто-обновления в секундах
+    --watchtower-interval=N  Интервал авто-обновления, сек (запишется в .env)
 `)
 }
 
@@ -254,15 +265,7 @@ switch (command) {
     })
     rl.close()
     if (!url) process.exit(1)
-    // Rewrite in place so the surrounding .env keeps its comments.
-    const current = readFileSync(envFile, 'utf8')
-    const line = `REDIS_REMOTE_URL=${url}`
-    writeFileSync(
-      envFile,
-      /^REDIS_REMOTE_URL=.*$/m.test(current)
-        ? current.replace(/^REDIS_REMOTE_URL=.*$/m, line)
-        : `${current}\n${line}\n`,
-    )
+    persistEnv('REDIS_REMOTE_URL', url)
     console.log('\n  ✓ REDIS_REMOTE_URL записан в .env')
     console.log('  Осталось перезапустить: ./spotter recreate')
     break
