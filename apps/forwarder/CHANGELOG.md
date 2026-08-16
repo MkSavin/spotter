@@ -1,5 +1,15 @@
 # @spotter/forwarder
 
+## 1.3.0
+
+### Minor Changes
+
+- b1fff5c: fix: ingest node visible in /status
+  
+  Heartbeats now cross the forwarder, and the forwarder reports itself, so
+  `/status` lists the ingest services instead of the cloud alone. The unknown
+  command handler no longer answers commands that exist.
+
 ## 1.2.1
 
 ### Patch Changes
