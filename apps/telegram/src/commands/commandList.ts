@@ -8,7 +8,8 @@ import type { SpotterCommand } from './framework/SpotterCommand'
 import { startCommand } from './general/startCommand'
 import { cameraListCommand } from './nvr/cameraListCommand'
 import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
-import { testPublishCommand } from './test/testPublishCommand'
+import { testDeliveryCommand } from './test/testDeliveryCommand'
+import { testMediaCommand } from './test/testMediaCommand'
 import { userDemoteCommand } from './user/userDemoteCommand'
 import { userPromoteCommand } from './user/userPromoteCommand'
 import { userRevokeCommand } from './user/userRevokeCommand'
@@ -28,5 +29,6 @@ export const commandRegistry: SpotterCommand[] = [
   eventInfoCommand,
   eventClearCommand,
   statusCommand,
-  testPublishCommand,
+  testDeliveryCommand,
+  testMediaCommand,
 ]

@@ -260,7 +260,7 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 | Стрим                              | Кто пишет | Кто читает      | Назначение                          |
 | ---------------------------------- | --------- | --------------- | ----------------------------------- |
 | `spotter.event`                    | frigate   | server          | Событие камеры (start/update/end)   |
-| `spotter.event.test_seed`          | telegram  | frigate         | Посев тестовых событий (`/test_publish`) |
+| `spotter.event.test_seed`          | telegram  | frigate         | Посев тестовых событий (`/test_delivery` — синтетика, `/test_media` — настоящее событие в NVR) |
 | `spotter.catalog.updated`          | frigate   | server, telegram | Снимок каталога камер/объектов       |
 | `spotter.media.request.<source>`   | server    | frigate         | Стейджинг медиа события: снимок (eager на `end`) / клип (по кнопке «Видео», `event.clip`) |
 | `spotter.media.staged`             | frigate   | depot           | Сырьё события застейджено в S3 (ключи) |

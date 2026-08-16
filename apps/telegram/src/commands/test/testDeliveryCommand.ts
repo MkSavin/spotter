@@ -4,13 +4,13 @@ import { timeout } from '../../helpers/timeout'
 import { argument } from '../../middlewares/command/argument'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
-class TestPublishCommand extends SpotterCommand {
-  readonly name = 'test_publish'
-  readonly description = 'Опубликовать тестовое событие (можно с id из NVR)'
+class TestDeliveryCommand extends SpotterCommand {
+  readonly name = 'test_delivery'
+  readonly description = 'Проверить доставку сообщений (без медиа)'
   readonly access = 'ADMIN' as const
 
   protected readonly matcher = argument.stringOptional
-  protected readonly signature = 'test_publish [код?]'
+  protected readonly signature = 'test_delivery [id?]'
 
   async handle(context: BotContext): Promise<void> {
     const { producer } = context
@@ -52,11 +52,11 @@ class TestPublishCommand extends SpotterCommand {
       `🏓 <b>Все тестовые события отправлены!</b> <code>${id}</code>
 
 <i>Событие синтетическое: в NVR его нет, поэтому кнопка «Видео» вернётся
-в исходное состояние — брать клип неоткуда. Чтобы проверить медиа, укажи
-реальный id: <code>/test_publish &lt;id&gt;</code></i>`,
+в исходное состояние — брать клип неоткуда. Чтобы проверить медиа целиком,
+выполни <code>/test_media</code>.</i>`,
       { parse_mode: 'HTML' },
     )
   }
 }
 
-export const testPublishCommand = new TestPublishCommand()
+export const testDeliveryCommand = new TestDeliveryCommand()

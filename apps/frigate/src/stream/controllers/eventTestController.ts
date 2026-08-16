@@ -5,6 +5,7 @@ import {
   type EventTestPayload,
   eventTestAction,
 } from '../actions/eventTestAction'
+import { realEventAction } from '../actions/realEventAction'
 
 export const eventTestController: StreamMessageController<CoreContext> = async (
   payload,
@@ -16,6 +17,27 @@ export const eventTestController: StreamMessageController<CoreContext> = async (
   const value = bufferToJson(message.value)
 
   if (!value) {
+    return
+  }
+
+  // `real` asks Frigate for an actual event, so the clip genuinely exists.
+  if (value.mode === 'real') {
+    const logger = baseLogger.sub('action', topic, 'real')
+    const result = await realEventAction(
+      context.config,
+      {
+        camera: value.camera,
+        label: value.label ?? 'person',
+        duration: Number(value.duration) || 10,
+      },
+      logger,
+    )
+    if (!result) return
+
+    for (const event of result.events) {
+      await publishEvent(event, producer)
+    }
+    logger.debug(`Real event ${result.eventId} sent to stream "spotter.event"`)
     return
   }
 

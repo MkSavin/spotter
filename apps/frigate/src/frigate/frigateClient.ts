@@ -11,6 +11,10 @@ export const frigateUrls = {
   latestFrame: '{host}/api/{camera}/latest.jpg',
   config: '{host}/api/config',
   version: '{host}/api/version',
+  // Manual events: real recordings, but no `frigate/events` MQTT update — the
+  // caller publishes the canonical event itself.
+  createEvent: '{host}/api/events/{camera}/{label}/create',
+  endEvent: '{host}/api/events/{id}/end',
 } as const
 
 /** Strips trailing slash / query noise from the configured host URL. */

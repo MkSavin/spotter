@@ -11,5 +11,5 @@ bot's "Видео обрабатывается…" button stayed that way foreve
 clear it. It now publishes a `MediaProcessed` with no keys, and the bot restores
 the "Видео" button instead of leaving the message stuck.
 
-The empty answer is what `test_publish` exposed — its synthetic ids exist in no
+The empty answer is what `test_delivery` exposed — its synthetic ids exist in no
 NVR — but the same path is hit by real events whose recordings have aged out.
