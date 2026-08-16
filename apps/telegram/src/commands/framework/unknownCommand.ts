@@ -17,14 +17,19 @@ export const registerUnknownCommand = (
     .on('message:entities:bot_command', async (context, next) => {
       const text = context.message.text ?? context.message.caption ?? ''
       // Only a command at the very start is an address to the bot.
-      const typed = text.match(/^\/([A-Za-z0-9_]+)/)?.[1]
+      const typed = text.match(/^\/([A-Za-z0-9_]+)/)?.[1]?.toLowerCase()
       if (!typed) return next()
+
+      // Handlers call next() after running, so a real command reaches this
+      // point too — staying silent for it is what makes this the *unknown*
+      // branch and not a second reply to every command.
+      if (registry.some((command) => command.name === typed)) return next()
 
       // Suggest only what this user may run: the reply must not leak
       // the existence of commands their role cannot see.
       const role = context.session.user.authorizedRole
       const guess = suggest(
-        typed.toLowerCase(),
+        typed,
         registry
           .filter((command) => isVisible(command.access, role))
           .map((command) => command.name),

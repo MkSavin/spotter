@@ -13,6 +13,7 @@
 import {
   catalogUpdatedStream,
   eventStreams,
+  heartbeatStream,
   mediaStreams,
 } from '@spotter/transport'
 
@@ -26,6 +27,9 @@ export const UP_STREAMS = [
   // presigns the S3 keys for Telegram.
   mediaStreams.mediaProcessed,
   mediaStreams.cameraProcessed,
+  // Liveness of the ingest-side services; without this `/status` only ever
+  // shows the cloud node.
+  heartbeatStream,
 ] as const
 
 /**

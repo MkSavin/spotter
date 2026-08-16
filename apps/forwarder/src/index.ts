@@ -3,6 +3,7 @@ import {
   connectRedis,
   RedisRegulator,
   StreamProducer,
+  startHeartbeat,
 } from '@spotter/transport'
 import { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
@@ -84,8 +85,17 @@ const run = async (): Promise<void> => {
     { ...baseOptions, group: config.group.down },
   )
 
+  // Published locally, not to the cloud: the UP bridge above carries it across,
+  // so a broken tunnel queues the beats instead of dropping them — and a beat
+  // that does arrive is itself proof the link works.
+  const stopHeartbeat = startHeartbeat(localProducer, {
+    service: 'forwarder',
+    version: information.version,
+  })
+
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
+    stopHeartbeat()
     await upHandle.stop()
     await downHandle.stop()
     localSubscriber.close()

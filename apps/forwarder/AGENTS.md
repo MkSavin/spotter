@@ -29,7 +29,8 @@ bun test
 - **UP (local → remote):** subscriber=local, producer=local (XACK/admin на источнике),
   handler публикует в remote. Стримы — `UP_STREAMS` ([streams.ts](src/streams.ts)):
   `spotter.event`, `spotter.catalog.updated`, `spotter.event.media_processed`,
-  `spotter.camera.frame_processed`.
+  `spotter.camera.frame_processed`, `spotter.heartbeat` (без него `/status` в облаке
+  видит только cloud-узел).
 - **DOWN (remote → local):** subscriber=remote, handler публикует в local. Стримы —
   `downStreams(sources)`: по паре `spotter.{media,camera}.request.<source>` на каждый
   сконфигурированный источник + `spotter.event.test_seed`.
@@ -43,6 +44,9 @@ bun test
 ## Особенности
 
 - forwarder **stateless**: ни БД, ни S3, ни парсинга — только зеркалирование.
+- Свой heartbeat шлёт в **локальный** Redis, а не в удалённый: UP-мост перенесёт его сам,
+  поэтому при обрыве канала удары копятся, а не теряются. Дошедший до облака удар —
+  доказательство живого канала, отдельная проверка связи не нужна.
 - Направление стрима определяется тем, **где он производится** (см. [streams.ts](src/streams.ts)) —
   это единственный источник правды; добавление нового стрима = одна строка в нужный список.
 - Новый канал/поток между узлами — правка `UP_STREAMS`/`downStreams`, не кода трубы.

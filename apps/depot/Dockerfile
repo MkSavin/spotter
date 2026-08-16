@@ -28,8 +28,6 @@ RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_REL
 
 FROM base AS release
 
-RUN apk update
-RUN apk upgrade
 RUN apk add --no-cache ffmpeg
 
 # Copy binary tooling
