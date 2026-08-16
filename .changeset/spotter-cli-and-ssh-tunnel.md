@@ -31,6 +31,12 @@ profiles, so `--pwa` and `--email` enable them instead of editing YAML by hand.
 `WATCHTOWER_INTERVAL` became `--watchtower-interval=N`; no operation needs an
 environment prefix any more.
 
+Watchtower moves to the maintained `nickfedor/watchtower` fork. The original
+`containrrr/watchtower` speaks Docker API 1.25, which current engines reject
+with `client version 1.25 is too old`, so auto-updates had silently stopped
+working. The fork keeps the same flags and the same
+`com.centurylinklabs.watchtower.enable` label, so nothing else changes.
+
 The deployment guide is split: `deployment.md` now covers installation only,
 with `tunnel.md` and `operations.md` holding the inter-node channel and the
 day-to-day operations.

@@ -127,7 +127,7 @@ const help = (): void => {
   spotter update                         Обновить образы и пересоздать
   spotter exec <сервис> <команда>        Команда внутри контейнера
   spotter tunnel                         Настроить канал до cloud (ingest, sudo)
-  spotter token                          Выпустить код доступа admin
+  spotter token [роль] [опции]           Код доступа: viewer|user|admin (умолч. admin)
   spotter compose <аргументы>            Любая docker compose команда
 
   Флаги:
@@ -243,9 +243,22 @@ switch (command) {
     break
   }
 
-  case 'token':
-    await $`docker exec spotter-server bun spotter sign admin`.cwd(root)
+  case 'token': {
+    const ROLES = ['viewer', 'user', 'admin']
+    // A leading non-flag word is the role; options may come without one.
+    const named = rest[0] && !rest[0].startsWith('-')
+    const role = named ? (rest[0] as string) : 'admin'
+    const extra = named ? rest.slice(1) : rest
+    if (!ROLES.includes(role)) {
+      console.error(`spotter: роль "${role}" — доступны: ${ROLES.join(' | ')}`)
+      process.exit(2)
+    }
+    // Remaining arguments go to the server CLI (-u, -b, -r).
+    await $`docker exec spotter-server bun spotter sign ${role} ${extra}`.cwd(
+      root,
+    )
     break
+  }
 
   case 'compose':
     await compose(rest)

@@ -8,17 +8,15 @@ import { tokensRepo } from './db/repository'
 import { parseRole } from './helpers/role'
 import { normalizeUsername } from './helpers/username'
 
-// Bundled, `import.meta.dir` is /app, so `../data` would escape to /data.
+// Anchored to the bundle, never above it: `../data` resolves to /data in the
+// image, which is root-owned and unwritable. In development the sources sit one
+// level deeper, so package.json marks the app root.
+const appRoot = existsSync(path.join(import.meta.dir, '..', 'package.json'))
+  ? path.join(import.meta.dir, '..')
+  : import.meta.dir
+
 const defaultDatabase =
-  process.env.DATABASE_PATH ??
-  path.join(
-    [
-      path.join(import.meta.dir, '..', 'data'),
-      path.join(process.cwd(), 'data'),
-    ].find((candidate) => existsSync(candidate)) ??
-      path.join(process.cwd(), 'data'),
-    'server.sqlite',
-  )
+  process.env.DATABASE_PATH ?? path.join(appRoot, 'data', 'server.sqlite')
 
 /** Generates a short URL-safe code (12 base64url chars from 9 random bytes). */
 const generateCode = (): string => {

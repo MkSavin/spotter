@@ -107,7 +107,7 @@ services:
   # alone). Daily by default; --cleanup drops old layers.
   # On by default; disable with `./spotter up --no-watchtower`.
   watchtower:
-    image: containrrr/watchtower
+    image: nickfedor/watchtower
     restart: unless-stopped
     command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}
     volumes:

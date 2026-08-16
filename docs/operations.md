@@ -12,6 +12,10 @@
 `--cleanup` подчищает старые слои). Смержил релиз → CI собрал → Watchtower
 выкатил.
 
+Используется форк `nickfedor/watchtower`: оригинальный `containrrr/watchtower`
+заброшен и говорит с Docker по API 1.25, который свежие движки отвергают
+(`client version 1.25 is too old`).
+
 Реже или чаще:
 
 ```bash
@@ -99,10 +103,18 @@ merge version-PR → release.yml → джоба на КАЖДОЕ приложе
 ### Выпустить код доступа
 
 ```bash
-./spotter token
-# или напрямую, с опциями:
-docker exec spotter-server bun spotter sign admin -b <bot_username>
+./spotter token                      # admin (по умолчанию)
+./spotter token viewer               # только просмотр
+./spotter token user                 # обычный пользователь
+./spotter token user -u ivan         # привязать к @ivan
+./spotter token admin -b spotter_bot # добавить deep-link на бота
+./spotter token viewer -r            # напечатать только код
 ```
+
+Роли: `viewer` (смотрит), `user` (смотрит и запрашивает медиа), `admin`
+(плюс управление доступом).
+
+Код одноразовый — пользователь погашает его командой `/login <код>`.
 
 ### Сгенерировать VAPID-пару для PWA
 

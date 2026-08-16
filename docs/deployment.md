@@ -88,7 +88,7 @@ sudo ./spotter install ingest
 | Остановить | `./spotter down` |
 | Статус | `./spotter ps` |
 | Логи | `./spotter logs server` |
-| Код доступа | `./spotter token` |
+| Код доступа | `./spotter token [viewer\|user\|admin]` |
 | Обновить | `./spotter update` |
 | Настроить канал до cloud | `sudo ./spotter tunnel` |
 
@@ -133,7 +133,8 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 | --- | --- |
 | `bun: command not found` | не поставлен bun (см. выше) |
 | `в .env нет SPOTTER_MODE` | не запускал `install` в этой папке |
-| Бот молчит | неверный `TELEGRAM_TOKEN` |
+| Бот молчит | неверный `TELEGRAM_TOKEN` или недоступен `api.telegram.org` |
+| `client version 1.25 is too old` | старый образ watchtower — `git pull` и `./spotter recreate` |
 | Нет видео в сообщениях | не заполнены `S3_*` или бакет недоступен |
 
 ---
