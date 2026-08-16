@@ -42,6 +42,10 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
   catalog?: Catalog
   /** Extra stream subscriptions (e.g. a test-seed controller). */
   controllers?: SinkController<TConfig>[]
+  /** Extras for `/status`, e.g. the NVR build behind this adapter. */
+  heartbeatDetails?: () =>
+    | Promise<Record<string, string>>
+    | Record<string, string>
 }
 
 /**
@@ -132,6 +136,7 @@ export const runSink = async <TConfig extends SinkConfig>(
   stopHeartbeat = startHeartbeat(producer, {
     service: information.name.replace(/^@spotter\//, ''),
     version: information.version,
+    details: options.heartbeatDetails,
   })
 
   const regulator = new RedisRegulator<SinkContext<TConfig>>()

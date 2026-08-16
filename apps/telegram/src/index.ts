@@ -4,6 +4,7 @@ import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import {
   connectRedis,
+  probeRedisVersion,
   type RegulatorHandle,
   StreamProducer,
   startHeartbeat,
@@ -142,6 +143,7 @@ const polling = async (): Promise<void> => {
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'telegram',
     version: information.version,
+    details: () => probeRedisVersion(producer),
   })
 
   await catalog.bootstrap(config.source, producer)

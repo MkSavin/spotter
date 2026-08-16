@@ -10,6 +10,7 @@ export const frigateUrls = {
   snapshot: '{host}/api/events/{id}/snapshot.jpg',
   latestFrame: '{host}/api/{camera}/latest.jpg',
   config: '{host}/api/config',
+  version: '{host}/api/version',
 } as const
 
 /** Strips trailing slash / query noise from the configured host URL. */

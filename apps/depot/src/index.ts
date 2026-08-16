@@ -14,6 +14,7 @@ import { cameraStagedController } from './controllers/cameraStagedController'
 import { mediaStagedController } from './controllers/mediaStagedController'
 import { temp } from './fs/temp'
 import { applicationLogger } from './log'
+import { probeDetails } from './probeDetails'
 
 const run = async (): Promise<void> => {
   applicationLogger.info(
@@ -64,6 +65,7 @@ const run = async (): Promise<void> => {
   stopHeartbeat = startHeartbeat(producer, {
     service: 'depot',
     version: information.version,
+    details: probeDetails,
   })
 
   transport = await new RedisRegulator<CoreContext>()

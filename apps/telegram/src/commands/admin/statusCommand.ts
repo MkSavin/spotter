@@ -14,13 +14,18 @@ const formatUptime = (seconds: number): string => {
 const staleFor = (at: number): string =>
   formatUptime(Math.round((Date.now() - at) / 1000))
 
+/** Detail keys are plain identifiers; these are their display labels. */
+const DETAIL_LABELS: Record<string, string> = {
+  acceleration: 'ускорение',
+}
+
 const renderService = (service: ServiceStatus): string => {
   const mark = service.online ? '✅' : '⚠️'
   const state = service.online
-    ? `up ${formatUptime(service.uptime)}`
+    ? `в работе ${formatUptime(service.uptime)}`
     : `молчит ${staleFor(service.at)}`
   const extras = Object.entries(service.details ?? {})
-    .map(([key, value]) => `${key} ${value}`)
+    .map(([key, value]) => `${DETAIL_LABELS[key] ?? key} ${value}`)
     .join(', ')
 
   return `${mark} <code>${service.service}</code> <b>${service.version}</b> — ${state}${

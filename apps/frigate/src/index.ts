@@ -5,6 +5,7 @@ import { FrigateCatalog } from './catalog/FrigateCatalog'
 import { resolveConfig } from './config'
 import { applicationLogger } from './log'
 import { FrigateMediaProvider } from './media/FrigateMediaProvider'
+import { probeDetails } from './probeDetails'
 import { constructSource } from './source/constructSource'
 import { eventTestController } from './stream/controllers/eventTestController'
 
@@ -30,6 +31,7 @@ runSink({
   controllers: [
     { stream: eventStreams.testSeed, controller: eventTestController },
   ],
+  heartbeatDetails: () => probeDetails(config),
 }).catch((error) => {
   applicationLogger.error(error)
   process.exit(1)

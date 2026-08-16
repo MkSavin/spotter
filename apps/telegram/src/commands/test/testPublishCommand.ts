@@ -6,7 +6,7 @@ import { SpotterCommand } from '../framework/SpotterCommand'
 
 class TestPublishCommand extends SpotterCommand {
   readonly name = 'test_publish'
-  readonly description = 'Опубликовать тестовое событие'
+  readonly description = 'Опубликовать тестовое событие (можно с id из NVR)'
   readonly access = 'ADMIN' as const
 
   protected readonly matcher = argument.stringOptional
@@ -49,7 +49,11 @@ class TestPublishCommand extends SpotterCommand {
     await timeout(700)
 
     await message.editText(
-      `🏓 <b>Все тестовые события отправлены!</b> <code>${id}</code>`,
+      `🏓 <b>Все тестовые события отправлены!</b> <code>${id}</code>
+
+<i>Событие синтетическое: в NVR его нет, поэтому кнопка «Видео» вернётся
+в исходное состояние — брать клип неоткуда. Чтобы проверить медиа, укажи
+реальный id: <code>/test_publish &lt;id&gt;</code></i>`,
       { parse_mode: 'HTML' },
     )
   }

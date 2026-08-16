@@ -4,6 +4,7 @@
 '@spotter/sink': patch
 '@spotter/server': patch
 '@spotter/depot': patch
+'@spotter/frigate': patch
 '@spotter/pwa': patch
 '@spotter/email': patch
 ---
@@ -23,3 +24,8 @@ running on the ingest node.
 A service that dies stops reporting rather than announcing it, so reports older
 than three intervals are shown as offline instead of vanishing — an outage stays
 visible in the output.
+
+Services also report what they run on: the frigate adapter probes the NVR build
+via `/api/version`, depot reports its ffmpeg and the active acceleration, and
+server and telegram report the Redis server version. Probes resolve once and
+swallow their own failures — a broken probe must not cost the heartbeat.

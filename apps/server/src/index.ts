@@ -1,6 +1,7 @@
 import process from 'node:process'
 import {
   connectRedis,
+  probeRedisVersion,
   type RegulatorHandle,
   StreamProducer,
   startHeartbeat,
@@ -45,6 +46,7 @@ const run = async (): Promise<void> => {
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'server',
     version: information.version,
+    details: () => probeRedisVersion(producer),
   })
 
   await catalog.bootstrap(config.source, producer)

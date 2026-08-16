@@ -27,14 +27,24 @@ export const startHeartbeat = (
   const startedAt = Date.now()
   const node = process.env.SPOTTER_MODE ?? 'single'
 
+  // Resolved once: these are build versions, not runtime state. A probe that
+  // fails must not cost the heartbeat itself.
+  let resolved: Record<string, string> | undefined
+  const collect = async (): Promise<Record<string, string> | undefined> => {
+    if (!details) return undefined
+    resolved ??= await Promise.resolve(details()).catch(() => ({}))
+    return Object.keys(resolved).length > 0 ? resolved : undefined
+  }
+
   const beat = async (): Promise<void> => {
+    const collected = await collect()
     const payload: Heartbeat = {
       service,
       version,
       node,
       uptime: Math.round((Date.now() - startedAt) / 1000),
       at: Date.now(),
-      ...(details ? { details: await details() } : {}),
+      ...(collected ? { details: collected } : {}),
     }
     // A failed heartbeat must never take the service down with it.
     await producer.publish(heartbeatStream, payload).catch(() => undefined)
