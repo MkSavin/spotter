@@ -122,10 +122,12 @@ const help = (): void => {
   spotter up                             Поднять узел
   spotter down                           Остановить узел
   spotter ps                             Статус контейнеров
-  spotter logs [сервис]                  Логи (по умолчанию — все)
+  spotter logs [сервис] [-f]             Логи целиком; -f — следить дальше
+  spotter restart [сервис]               Перезапустить (образ тот же)
   spotter recreate                       Пересоздать (после правки портов в .env)
-  spotter update                         Обновить образы и пересоздать
+  spotter update                         Скачать свежие образы и пересоздать
   spotter exec <сервис> <команда>        Команда внутри контейнера
+  spotter doctor                         Самодиагностика узла
   spotter tunnel                         Настроить канал до cloud (ingest, sudo)
   spotter token [роль] [опции]           Код доступа: viewer|user|admin (умолч. admin)
   spotter compose <аргументы>            Любая docker compose команда
@@ -172,6 +174,10 @@ switch (command) {
     await compose(['up', '-d', ...upFlags()])
     break
 
+  case 'restart':
+    await compose(['restart', ...rest.map(serviceName)])
+    break
+
   case 'recreate':
     await prepareData()
     await compose(['up', '-d', '--force-recreate', ...upFlags()])
@@ -195,8 +201,19 @@ switch (command) {
     break
 
   case 'logs': {
-    const [service] = rest
-    await compose(['logs', '-f', ...(service ? [serviceName(service)] : [])])
+    // Print and exit by default; docker's own flags (-f, --tail, --since) pass
+    // through, so `logs server -f` follows and `logs server --tail=50` trims.
+    const [first, ...extra] = rest
+    const service = first && !first.startsWith('-') ? first : undefined
+    const passthrough = service ? extra : rest
+    await compose([
+      'logs',
+      ...(passthrough.some((arg) => arg.startsWith('--tail'))
+        ? []
+        : ['--tail', 'all']),
+      ...passthrough,
+      ...(service ? [serviceName(service)] : []),
+    ])
     break
   }
 
@@ -207,6 +224,14 @@ switch (command) {
       process.exit(2)
     }
     await compose(['exec', serviceName(service), ...command])
+    break
+  }
+
+  case 'doctor': {
+    const mode = requireMode()
+    console.log(`\n  Проверяю узел (режим: ${mode})…`)
+    const { diagnose, report } = await import('./doctor')
+    process.exit(report(await diagnose(mode, composeArgs(mode))) ? 0 : 1)
     break
   }
 

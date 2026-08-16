@@ -26,12 +26,19 @@ export class FrigateCatalog implements Catalog {
     private readonly logger: Stenograph,
   ) {}
 
-  /** Memoized so `listCameras`/`listObjectTypes` share one `/api/config` hit. */
+  /**
+   * Memoized so `listCameras`/`listObjectTypes` share one `/api/config` hit.
+   * A failure is not cached — otherwise a Frigate that was briefly down would
+   * leave the catalog empty until the adapter restarts.
+   */
   private fetchConfig(): Promise<{
     cameras: string[]
     objects: string[]
   } | null> {
-    this.pending ??= this.loadConfig()
+    this.pending ??= this.loadConfig().then((result) => {
+      if (!result) this.pending = null
+      return result
+    })
     return this.pending
   }
 

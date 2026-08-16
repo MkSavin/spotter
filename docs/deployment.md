@@ -89,8 +89,14 @@ sudo ./spotter install ingest
 | Статус | `./spotter ps` |
 | Логи | `./spotter logs server` |
 | Код доступа | `./spotter token [viewer\|user\|admin]` |
-| Обновить | `./spotter update` |
+| Обновить до свежих образов | `./spotter update` |
+| Перезапустить | `./spotter restart [сервис]` |
+| Самодиагностика | `./spotter doctor` |
 | Настроить канал до cloud | `sudo ./spotter tunnel` |
+
+Три похожие команды различаются так: `restart` перезапускает на том же образе,
+`recreate` пересоздаёт контейнеры (нужно после правки портов и адресов в
+`.env`), `update` скачивает свежие образы и пересоздаёт.
 
 Полный список — `./spotter help`.
 
@@ -122,6 +128,17 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 
 ## Что-то пошло не так
 
+Сначала — самодиагностика. Она проходит по цепочке и называет сломанное звено:
+
+```bash
+./spotter doctor
+```
+
+Проверяет контейнеры, Redis, доступность Frigate, каталог камер, S3, Telegram
+API и канал до облака (на ingest). Для каждой проблемы печатает подсказку.
+
+Дальше — логи:
+
 ```bash
 ./spotter ps        # что поднялось
 ./spotter logs      # что пишут сервисы
@@ -134,7 +151,8 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 | `bun: command not found` | не поставлен bun (см. выше) |
 | `в .env нет SPOTTER_MODE` | не запускал `install` в этой папке |
 | Бот молчит | неверный `TELEGRAM_TOKEN` или недоступен `api.telegram.org` |
-| `client version 1.25 is too old` | старый образ watchtower — `git pull` и `./spotter recreate` |
+| «Список камер пока недоступен» | адаптер не достучался до Frigate — `./spotter doctor` на ingest |
+| `client version 1.25 is too old` | старый образ watchtower — `git pull` и `./spotter update` |
 | Нет видео в сообщениях | не заполнены `S3_*` или бакет недоступен |
 
 ---
