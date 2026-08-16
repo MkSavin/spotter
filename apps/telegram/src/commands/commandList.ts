@@ -1,6 +1,6 @@
-import { deploymentVersionCommand } from './admin/deploymentVersionCommand'
 import { eventClearCommand } from './admin/eventClearCommand'
 import { eventInfoCommand } from './admin/eventInfoCommand'
+import { statusCommand } from './admin/statusCommand'
 import { loginCommand } from './auth/loginCommand'
 import { logoutCommand } from './auth/logoutCommand'
 import { meCommand } from './auth/meCommand'
@@ -27,6 +27,6 @@ export const commandRegistry: SpotterCommand[] = [
   userDemoteCommand,
   eventInfoCommand,
   eventClearCommand,
-  deploymentVersionCommand,
+  statusCommand,
   testPublishCommand,
 ]

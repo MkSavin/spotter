@@ -1,6 +1,7 @@
 import {
   catalogUpdatedStream,
   deliveryStreams,
+  heartbeatStream,
   mediaStreams,
   RedisRegulator,
   type RegulatorHandle,
@@ -16,6 +17,7 @@ import { cameraFrameController } from './controllers/cameraFrameController'
 import { catalogController } from './controllers/catalogController'
 import { deliveryEventController } from './controllers/deliveryEventController'
 import { deliveryRecipientController } from './controllers/deliveryRecipientController'
+import { heartbeatController } from './controllers/heartbeatController'
 
 export const telegramTransport = async (
   bot: Bot<BotContext, BotApi>,
@@ -28,6 +30,7 @@ export const telegramTransport = async (
     .message(deliveryStreams.deliveryRecipient, deliveryRecipientController)
     .message(mediaStreams.cameraProcessed, cameraFrameController)
     .message(catalogUpdatedStream, catalogController)
+    .message(heartbeatStream, heartbeatController)
     .run(
       { ...context, logger, bot },
       {

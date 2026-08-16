@@ -4,6 +4,7 @@ import {
   mediaStreams,
   RedisRegulator,
   StreamProducer,
+  startHeartbeat,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'
@@ -42,8 +43,11 @@ const run = async (): Promise<void> => {
     ReturnType<RedisRegulator<CoreContext>['run']>
   > | null = null
 
+  let stopHeartbeat: (() => void) | null = null
+
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
+    stopHeartbeat?.()
     await transport?.stop()
     subscriber.close()
     producer.disconnect()
@@ -56,6 +60,11 @@ const run = async (): Promise<void> => {
 
   await producer.connect()
   await connectRedis(subscriber, { url: config.redis.url })
+
+  stopHeartbeat = startHeartbeat(producer, {
+    service: 'depot',
+    version: information.version,
+  })
 
   transport = await new RedisRegulator<CoreContext>()
     .message(mediaStreams.mediaStaged, mediaStagedController)

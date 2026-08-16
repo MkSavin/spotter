@@ -5,6 +5,7 @@ import {
   RedisRegulator,
   type StreamMessageController,
   StreamProducer,
+  startHeartbeat,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
@@ -91,12 +92,14 @@ export const runSink = async <TConfig extends SinkConfig>(
   await connectRedis(subscriber, { url: config.redis.url })
 
   let sourceHandle: SourceHandle | null = null
+  let stopHeartbeat: (() => void) | null = null
   let transport: Awaited<
     ReturnType<RedisRegulator<SinkContext<TConfig>>['run']>
   > | null = null
 
   const shutdown = async (signal: NodeJS.Signals) => {
     logger.info(`Shutting down due to ${signal}...`)
+    stopHeartbeat?.()
     await transport?.stop()
     await sourceHandle?.stop()
     subscriber.close()
@@ -125,6 +128,11 @@ export const runSink = async <TConfig extends SinkConfig>(
   if (catalog) {
     await publishCatalog(catalog, sourceId, producer, logger)
   }
+
+  stopHeartbeat = startHeartbeat(producer, {
+    service: information.name.replace(/^@spotter\//, ''),
+    version: information.version,
+  })
 
   const regulator = new RedisRegulator<SinkContext<TConfig>>()
 

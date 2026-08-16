@@ -3,8 +3,10 @@ import {
   connectRedis,
   type RegulatorHandle,
   StreamProducer,
+  startHeartbeat,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
+import information from '../package.json'
 import { CatalogCache } from './catalog/CatalogCache'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
@@ -49,6 +51,11 @@ const main = async (): Promise<void> => {
   await producer.connect()
   await connectRedis(subscriber, { url: config.redis.url })
 
+  const stopHeartbeat = startHeartbeat(producer, {
+    service: 'pwa',
+    version: information.version,
+  })
+
   await catalog.bootstrap(config.source, producer)
 
   let transport: RegulatorHandle | null = null
@@ -68,6 +75,7 @@ const main = async (): Promise<void> => {
 
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
+    stopHeartbeat()
     context.coalescer.stop()
     await transport?.stop()
     server?.stop()

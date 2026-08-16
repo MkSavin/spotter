@@ -3,8 +3,10 @@ import {
   connectRedis,
   type RegulatorHandle,
   StreamProducer,
+  startHeartbeat,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
+import information from '../package.json'
 import { CatalogCache } from './catalog/CatalogCache'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
@@ -42,6 +44,11 @@ const main = async (): Promise<void> => {
   await producer.connect()
   await connectRedis(subscriber, { url: config.redis.url })
 
+  const stopHeartbeat = startHeartbeat(producer, {
+    service: 'email',
+    version: information.version,
+  })
+
   // Fail fast if SMTP creds are wrong — better at boot than on the first event.
   await mailer.verify()
 
@@ -62,6 +69,7 @@ const main = async (): Promise<void> => {
 
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
+    stopHeartbeat()
     await transport?.stop()
     subscriber.close()
     producer.disconnect()

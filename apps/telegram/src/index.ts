@@ -6,9 +6,11 @@ import {
   connectRedis,
   type RegulatorHandle,
   StreamProducer,
+  startHeartbeat,
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import { Bot, session } from 'grammy'
+import information from '../package.json'
 import { registerClipCallback } from './callback/clipCallback'
 import { CatalogCache } from './catalog/CatalogCache'
 import { CommandBus } from './command/CommandBus'
@@ -26,6 +28,7 @@ import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
 import { logging } from './middlewares/bot/logging'
 import type { GlobalSession, UserSession } from './session'
+import { HeartbeatRegistry } from './status/HeartbeatRegistry'
 import { telegramTransport } from './transport/telegramTransport'
 
 let db: TelegramDatabase | undefined
@@ -121,6 +124,7 @@ const polling = async (): Promise<void> => {
   })
 
   const catalog = new CatalogCache(applicationLogger.sub('catalog'))
+  const heartbeats = new HeartbeatRegistry(applicationLogger.sub('heartbeat'))
 
   const subscriber = new RedisClient(config.redis.url)
   // Dedicated connection for the CommandBus reply poller.
@@ -134,6 +138,11 @@ const polling = async (): Promise<void> => {
   await producer.connect()
   await connectRedis(subscriber, { url: config.redis.url })
   await connectRedis(commandSubscriber, { url: config.redis.url })
+
+  const stopHeartbeat = startHeartbeat(producer, {
+    service: 'telegram',
+    version: information.version,
+  })
 
   await catalog.bootstrap(config.source, producer)
 
@@ -151,6 +160,7 @@ const polling = async (): Promise<void> => {
     logger: applicationLogger,
     db: database,
     catalog,
+    heartbeats,
     s3,
     producer,
     subscriber,
@@ -163,6 +173,7 @@ const polling = async (): Promise<void> => {
       applicationLogger.info(`Shutting down due to ${signal}...`)
       await coreContext.runner?.stop()
     }
+    stopHeartbeat()
     commandBus.stop()
     await transport?.stop()
     subscriber.close()
