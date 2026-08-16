@@ -47,6 +47,10 @@ ingest: ## Поднять ingest-узел (local-redis, mosquitto, frigate, depo
 up: data ## Внутренняя цель: docker compose up -d (без pull — up сам тянет отсутствующее)
 	$(COMPOSE) up -d $(UP_FLAGS)
 
+# Port bindings are baked in at creation, so a plain `up` keeps the old ones.
+recreate: data ## Пересоздать контейнеры узла (нужно после правки портов/bind в .env)
+	$(COMPOSE) up -d --force-recreate $(UP_FLAGS)
+
 update: data ## Ручное обновление узла: pull свежий :latest, пересоздать, подчистить слои
 	$(COMPOSE) pull
 	$(COMPOSE) up -d $(UP_FLAGS)
