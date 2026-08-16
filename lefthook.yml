@@ -1,0 +1,11 @@
+pre-commit:
+  jobs:
+    # Whole-repo check: tsc and bun test cover cross-package breakage that a
+    # staged-files-only run would miss. Fast enough (~2s) to stay in the hook.
+    - name: green
+      run: bun run green
+
+commit-msg:
+  jobs:
+    - name: commitlint
+      run: bunx commitlint --edit {1}
