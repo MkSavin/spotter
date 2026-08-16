@@ -1,6 +1,6 @@
 {
   "name": "@spotter/forwarder",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Bidirectional Redis Streams bridge between the home box and the VPS",
   "main": "index.js",
   "scripts": {
