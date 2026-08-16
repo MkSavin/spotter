@@ -46,7 +46,6 @@ const OWN_FLAGS = [
   '--no-tunnel',
   '--pwa',
   '--email',
-  '--watchtower-interval',
 ]
 
 const flags = new Map<string, string>()
@@ -93,10 +92,6 @@ const persistEnv = (key: string, value: string): void => {
 
 const compose = async (args: string[]): Promise<never> => {
   const mode = requireMode()
-  // Persisted, not just passed: compose reads it from .env on every later run,
-  // so a one-shot value would silently revert on the next `up`.
-  const interval = flags.get('--watchtower-interval')
-  if (interval) persistEnv('WATCHTOWER_INTERVAL', interval)
   const { exitCode } = await $`docker ${composeArgs(mode)} ${args}`
     .cwd(root)
     .nothrow()
@@ -139,6 +134,7 @@ const help = (): void => {
   spotter update                         Скачать свежие образы и пересоздать
   spotter exec <сервис> <команда>        Команда внутри контейнера
   spotter doctor                         Самодиагностика узла
+  spotter watchtower [секунды]           Интервал авто-обновления (без аргумента — показать)
   spotter tunnel                         Настроить канал до cloud (ingest, sudo)
   spotter token [роль] [опции]           Код доступа: viewer|user|admin (умолч. admin)
   spotter compose <аргументы>            Любая docker compose команда
@@ -148,7 +144,6 @@ const help = (): void => {
     --email                  Поднять email-фронтенд (нужны SMTP_* в .env)
     --no-gpu                 Без NVIDIA (ingest; по умолчанию GPU включён)
     --no-watchtower          Без авто-обновления
-    --watchtower-interval=N  Интервал авто-обновления, сек (запишется в .env)
 `)
 }
 
@@ -243,6 +238,34 @@ switch (command) {
     console.log(`\n  Проверяю узел (режим: ${mode})…`)
     const { diagnose, report } = await import('./doctor')
     process.exit(report(await diagnose(mode, composeArgs(mode))) ? 0 : 1)
+    break
+  }
+
+  case 'watchtower': {
+    const mode = requireMode()
+    const [value] = rest
+    if (!value) {
+      const current = readFileSync(envFile, 'utf8').match(
+        /^WATCHTOWER_INTERVAL=(.*)$/m,
+      )?.[1]
+      console.log(`\n  Интервал: ${current?.trim() || '86400'} сек`)
+      console.log('  Поменять: ./spotter watchtower <секунды>\n')
+      break
+    }
+    if (!/^\d+$/.test(value)) {
+      console.error('spotter: интервал — целое число секунд, например 3600')
+      process.exit(2)
+    }
+    persistEnv('WATCHTOWER_INTERVAL', value)
+    // Only this container is recreated: the interval is a container argument,
+    // fixed at creation, and the apps have no reason to restart with it.
+    const { exitCode } =
+      await $`docker ${composeArgs(mode)} up -d --force-recreate watchtower`
+        .cwd(root)
+        .nothrow()
+    if (exitCode === 0)
+      console.log(`\n  ✓ Проверка обновлений раз в ${value} сек`)
+    process.exit(exitCode)
     break
   }
 

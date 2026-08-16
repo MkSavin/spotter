@@ -43,7 +43,7 @@ class StatusCommand extends SpotterCommand {
 
     if (services.length === 0) {
       await context.replyWithHTML(
-        `🧩 <b>Состояние развёртывания</b>
+        `🧩 <b>Состояние инфраструктуры</b>
 
 Сервисы ещё не отчитались. Отчёты приходят раз в 30 секунд — если пусто дольше
 минуты, проверь связь между узлами.
@@ -65,7 +65,7 @@ class StatusCommand extends SpotterCommand {
     const offline = services.filter((service) => !service.online).length
 
     await context.replyWithHTML(
-      `🧩 <b>Состояние развёртывания</b>
+      `🧩 <b>Состояние инфраструктуры</b>
 
 ${blocks.join('\n\n')}
 

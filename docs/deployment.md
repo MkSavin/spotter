@@ -114,7 +114,6 @@ sudo ./spotter install ingest
 | `--email` | поднять рассылку на почту |
 | `--no-gpu` | не использовать видеокарту (ingest) |
 | `--no-watchtower` | не обновляться автоматически |
-| `--watchtower-interval=3600` | как часто проверять обновления, в секундах |
 
 Например:
 
@@ -123,6 +122,9 @@ sudo ./spotter install ingest
 ```
 
 PWA нужно ставить за HTTPS — иначе уведомления в браузере не работают.
+
+Как часто проверять обновления — отдельной командой: `./spotter watchtower 3600`
+(см. [operations.md](operations.md)).
 
 ---
 
