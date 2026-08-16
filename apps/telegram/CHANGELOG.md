@@ -1,5 +1,19 @@
 # @spotter/telegram
 
+## 1.4.0
+
+### Minor Changes
+
+- e0b21d8: feat: rollout notices for admins
+  
+  Telegram tracks the version of every service in SQLite and sends admins a silent
+  notice once a rollout settles. Versions persist, so a restart of the bot itself
+  reports nothing, and a service updated while the bot was down is still caught.
+
+### Patch Changes
+
+- 74369d7: fix: unknown command message and cli refactor
+
 ## 1.3.0
 
 ### Minor Changes
