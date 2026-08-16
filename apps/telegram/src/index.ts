@@ -20,6 +20,7 @@ import {
   registerCommands,
   syncCommandMenu,
 } from './commands/framework/registry'
+import { registerUnknownCommand } from './commands/framework/unknownCommand'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
 import { createDatabase, type TelegramDatabase } from './db/client'
@@ -193,6 +194,8 @@ const polling = async (): Promise<void> => {
   registerCommands(bot, commandRegistry)
   registerClipCallback(bot)
   bot.use(syncCommandMenu(commandRegistry))
+  // Last: whatever reaches here matched no command above.
+  registerUnknownCommand(bot, commandRegistry)
 
   applicationLogger.debug('Starting up...')
 
