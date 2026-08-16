@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
+import { mediaStreams } from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
 import type { SinkContext } from '../runtime/context'
 import { createMediaController } from './createMediaController'
@@ -91,7 +92,7 @@ describe('createMediaController', () => {
     expect(published).toHaveLength(0)
   })
 
-  test('publishes nothing when the NVR has no media', async () => {
+  test('answers with an empty result when the NVR has no media', async () => {
     globalThis.fetch = mock(
       async () => new Response('', { status: 404 }),
     ) as never
@@ -104,6 +105,9 @@ describe('createMediaController', () => {
       context,
     )
 
-    expect(published).toHaveLength(0)
+    // Silence would leave the bot's "processing" button stuck forever.
+    expect(published).toHaveLength(1)
+    expect(published[0]?.stream).toBe(mediaStreams.mediaProcessed)
+    expect(published[0]?.payload).toEqual({ eventId: 'e1' })
   })
 })
