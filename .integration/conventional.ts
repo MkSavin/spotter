@@ -107,6 +107,11 @@ const belongs = (file: string, dir: string): boolean =>
 
 const changesets = await Promise.all(
   conventionalCommits.map(async (commit) => {
+    const type = commit.meta.breaking
+      ? ('major' as const)
+      : commit.meta.changeType
+    if (!type) return undefined
+
     const affectedFiles = (
       await $`git diff-tree --no-commit-id --name-only ${commit.hash} -r`.text()
     )
@@ -126,9 +131,7 @@ const changesets = await Promise.all(
     return {
       releases: affectedPackages.map((entry) => ({
         name: entry.packageJson.name,
-        type: commit.meta.breaking
-          ? ('major' as const)
-          : (commit.meta.changeType ?? ('none' as const)),
+        type,
       })),
       summary: commit.message,
     }
@@ -136,6 +139,8 @@ const changesets = await Promise.all(
 )
 
 const pending = changesets.filter((entry) => entry !== undefined)
+
+console.log(`Releasable: ${pending.length} of ${conventionalCommits.length}`)
 
 if (!pending.length) {
   console.log('No changesets to create')
