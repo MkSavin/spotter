@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:full": "tsc --noEmit",
     "green": "tsc --noEmit && bun run test && biome check",
-    "prepare": "lefthook install",
+    "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && lefthook install || true",
     "sign:token": "bun apps/server/src/cli.ts sign",
     "changeset:conventional": "bun .integration/conventional.ts",
     "publish": "changeset git-tag",
