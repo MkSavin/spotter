@@ -53,6 +53,8 @@ const OWN_FLAGS = [
   '--no-gpu',
   '--no-watchtower',
   '--no-tunnel',
+  '--own-mqtt',
+  '--external-mqtt',
   '--pwa',
   '--email',
 ]
@@ -68,6 +70,10 @@ const takeFlags = (args: string[]): string[] =>
 
 const has = (flag: string): boolean => flags.has(flag)
 
+/** True when MQTT_BROKER points at the broker this compose file would start. */
+const ownsBroker = (): boolean =>
+  /^mqtts?:\/\/mosquitto[:/]?/.test(readEnv('MQTT_BROKER') ?? '')
+
 // The NVIDIA overlay is ingest-only and on by default — GPU transcoding is
 // several times faster, so opting out is the deliberate choice.
 const composeArgs = (mode: Mode): string[] => {
@@ -75,9 +81,10 @@ const composeArgs = (mode: Mode): string[] => {
   if (mode === 'ingest' && !has('--no-gpu'))
     files.push(path.join('.deployment', 'compose', 'production.ingest.gpu.yml'))
   // Optional frontends live behind compose profiles.
-  const profiles = (['pwa', 'email'] as const).filter((name) =>
-    has(`--${name}`),
-  )
+  const profiles: string[] = ['pwa', 'email'].filter((name) => has(`--${name}`))
+  // Read from .env, not from a flag: the broker choice is made once at install
+  // and must not need repeating on every `up`.
+  if (ownsBroker()) profiles.push('mqtt')
   return [
     'compose',
     '--project-directory',
@@ -148,7 +155,11 @@ const COMMANDS: Record<string, Command> = {
         fail(
           `неизвестный режим «${requested}» — доступны: ${MODES.join(' | ')}`,
         )
-      const passthrough = has('--no-tunnel') ? [...rest, '--no-tunnel'] : rest
+      // takeFlags() stripped these; the installer wants them back.
+      const forwarded = ['--no-tunnel', '--own-mqtt', '--external-mqtt'].filter(
+        has,
+      )
+      const passthrough = [...rest, ...forwarded]
       const { exitCode } = await $`bun .integration/install.ts ${passthrough}`
         .cwd(root)
         .nothrow()
@@ -332,6 +343,8 @@ ${NAMES.map((name) => `  ${left(name).padEnd(width)}  ${COMMANDS[name]?.about}`)
     --email                  Поднять email-фронтенд (нужны SMTP_* в .env)
     --no-gpu                 Без NVIDIA (ingest; по умолчанию GPU включён)
     --no-watchtower          Без авто-обновления
+    --own-mqtt               install: поставить свой MQTT-брокер, не спрашивая
+    --external-mqtt          install: использовать готовый брокер
 `)
 }
 

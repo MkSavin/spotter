@@ -80,6 +80,76 @@ const checkRedis = async (
   }
 }
 
+/**
+ * The event path starts here: Frigate publishes to a broker and the adapter
+ * reads it. A broker nobody publishes to looks exactly like a healthy one, so
+ * this checks reachability and whether anything is actually arriving.
+ */
+const checkMqtt = async (
+  composeArgs: string[],
+  broker: string,
+): Promise<Check[]> => {
+  const target = broker.replace(/^mqtts?:\/\//, '')
+  const [host = 'mosquitto', port = '1883'] = target.split(':')
+  const own = host === 'mosquitto'
+
+  // Probed from the adapter's container: that is the path it really uses.
+  // Bun opens the socket — `nc` is not guaranteed to exist in the image.
+  const reach = await inService(
+    composeArgs,
+    'spotter-frigate',
+    `bun -e 'Bun.connect({hostname:"${host}",port:${port},socket:{open(s){console.log("reachable");s.end()}}})` +
+      `.catch(()=>console.log("refused"));setTimeout(()=>process.exit(0),5000)'`,
+  )
+
+  if (!reach.out.includes('reachable')) {
+    return [
+      {
+        name: 'MQTT-брокер',
+        status: 'fail',
+        detail: `${host}:${port} недоступен из spotter-frigate`,
+        hint: own
+          ? 'свой брокер не поднялся — проверь MQTT_BROKER в .env и `./spotter ps`'
+          : 'проверь адрес в MQTT_BROKER и что брокер принимает подключения',
+      },
+    ]
+  }
+
+  const checks: Check[] = [
+    {
+      name: 'MQTT-брокер',
+      status: 'ok',
+      detail: `${host}:${port} доступен${own ? ' (свой)' : ' (внешний)'}`,
+    },
+  ]
+
+  // Only our own broker ships the CLI tools needed to listen in.
+  if (!own) return checks
+
+  const listen = await inService(
+    composeArgs,
+    'mosquitto',
+    'timeout 12 mosquitto_sub -t "frigate/#" -C 1 -v 2>&1 | head -c 200',
+  )
+
+  const heard =
+    listen.out.trim().length > 0 && !/error|refused/i.test(listen.out)
+  checks.push({
+    name: 'События от Frigate',
+    status: heard ? 'ok' : 'warn',
+    detail: heard
+      ? `идут (${listen.out.trim().split(/\s+/)[0]})`
+      : 'за 12 секунд ничего не пришло',
+    ...(heard
+      ? {}
+      : {
+          hint: 'если в кадре сейчас пусто — это норма; иначе проверь секцию mqtt в config.yml Frigate (host, port, topic_prefix: frigate)',
+        }),
+  })
+
+  return checks
+}
+
 const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
   const probe = await inService(
     composeArgs,
@@ -263,14 +333,22 @@ export const diagnose = async (
   const source = env.SOURCE_ID || 'frigate'
   const redisService = mode === 'ingest' ? 'local-redis' : 'redis'
 
+  // Our own broker only runs when MQTT_BROKER points at it.
+  const ownBroker = /^mqtts?:\/\/mosquitto[:/]?/.test(env.MQTT_BROKER ?? '')
+
   const expected =
     mode === 'ingest'
-      ? ['local-redis', 'mosquitto', 'spotter-frigate', 'spotter-forwarder']
+      ? [
+          'local-redis',
+          ...(ownBroker ? ['mosquitto'] : []),
+          'spotter-frigate',
+          'spotter-forwarder',
+        ]
       : mode === 'cloud'
         ? ['redis', 'spotter-server', 'spotter-telegram']
         : [
             'redis',
-            'mosquitto',
+            ...(ownBroker ? ['mosquitto'] : []),
             'spotter-frigate',
             'spotter-server',
             'spotter-telegram',
@@ -282,6 +360,13 @@ export const diagnose = async (
   ]
 
   if (mode === 'ingest' || mode === 'single') {
+    // Broker first: it is the first hop of the event path, and a silent one.
+    checks.push(
+      ...(await checkMqtt(
+        composeArgs,
+        env.MQTT_BROKER || 'mqtt://mosquitto:1883',
+      )),
+    )
     checks.push(...(await checkFrigate(composeArgs)))
   }
 

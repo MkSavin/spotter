@@ -17,11 +17,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # Own broker (OPTIONAL): only when the NVR has none of its own. Skipped with
+  # `--external-mqtt`, which points MQTT_BROKER at an existing broker instead.
   mosquitto:
+    profiles: [mqtt]
     image: eclipse-mosquitto:2
+    container_name: spotter-mosquitto
     restart: unless-stopped
     networks:
       - spotter
+      # Frigate publishes from its own compose project: joining `spotter-mqtt`
+      # reaches the broker by name, with no port opened on the host.
+      - mqtt
+    ports:
+      # Host port for an NVR that is not in Docker at all. Bound to the given
+      # address only, so the broker is not exposed wider than asked.
+      - '${MQTT_BIND:-127.0.0.1}:${MQTT_PORT:-1883}:1883'
     volumes:
       - ./.deployment/mosquitto/config:/mosquitto/config
       - ./.docker/mosquitto/data:/mosquitto/data
@@ -31,19 +42,20 @@ services:
     restart: unless-stopped
     networks:
       - spotter
+      # Reaches an own broker by name; harmless when the broker is external.
+      - mqtt
     environment:
       REDIS_URL: redis://local-redis:6379
       SOURCE_TYPE: frigate
-      MQTT_BROKER: mqtt://mosquitto:1883
     # Node-wide config (incl. FRIGATE_* NVR creds, held ONLY on this node) from
-    # the combined .env. Raw media is staged to S3, only keys travel onward.
+    # the combined .env. MQTT_BROKER lives there too — own broker or someone
+    # else's, the adapter does not care. Raw media is staged to S3, keys travel on.
     env_file:
       - ./.env
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
       - local-redis
-      - mosquitto
 
   spotter-depot-1:
     image: ghcr.io/mksavin/spotter-depot:latest
@@ -106,4 +118,9 @@ services:
 
 networks:
   spotter:
+    driver: bridge
+  # Fixed name so another compose project can join it:
+  #   networks: { spotter-mqtt: { external: true } }
+  mqtt:
+    name: spotter-mqtt
     driver: bridge

@@ -15,9 +15,11 @@ bun test
 Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
 [.env.ingest.example](../../.env.ingest.example) для ingest). Сервис читает `REDIS_URL`,
 `S3_*` (стейджинг сырья), `TZ`, `S3_STAGING_PREFIX`, `FRIGATE_REMOTE_URL` /
-`FRIGATE_AUTH_USER` / `FRIGATE_AUTH_SECRET`; `SOURCE_TYPE` (по умолч. `frigate`) и
-`MQTT_BROKER` compose задаёт inline через `environment:`; consumer-группа и `SOURCE_ID` —
-с дефолтами в коде. **Креды NVR (`FRIGATE_*`) живут ТОЛЬКО на узле с камерами** — в
+`FRIGATE_AUTH_USER` / `FRIGATE_AUTH_SECRET`, `MQTT_BROKER`; `SOURCE_TYPE` (по умолч.
+`frigate`) compose задаёт inline через `environment:`; consumer-группа и `SOURCE_ID` —
+с дефолтами в коде. `MQTT_BROKER` живёт в `.env`, а не в compose: брокер может быть
+своим (`mqtt://mosquitto:1883`, поднимается профилем `mqtt`) или готовым — адаптеру
+всё равно, но от этого зависит, стартует ли наш mosquitto. **Креды NVR (`FRIGATE_*`) живут ТОЛЬКО на узле с камерами** — в
 cloud-`.env` их выносить нельзя.
 
 ## Точка входа

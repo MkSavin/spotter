@@ -28,6 +28,46 @@ cd spotter
 - доступы к **S3** (любой S3-совместимый: MinIO, Selectel, Backblaze…)
 - **токен Telegram-бота** от [@BotFather](https://t.me/BotFather)
 - адрес и пароль твоего **NVR/Frigate**
+- ответ на вопрос: **есть ли у тебя MQTT-брокер?** (см. ниже)
+
+---
+
+## Про MQTT — это важно
+
+События приходят не из API Frigate, а через **MQTT**: Frigate сообщает о движении в брокер, Spotter читает оттуда. Без этой связи бот будет молчать, хотя все контейнеры зелёные.
+
+Мастер спросит, поставить свой брокер или использовать готовый.
+
+**Свой брокер** (по умолчанию). Тогда Frigate должен до него достучаться:
+
+- **Frigate в Docker** — подключи его к нашей сети. В его `docker-compose.yml`:
+
+  ```yaml
+  services:
+    frigate:
+      networks: [spotter-mqtt]
+  networks:
+    spotter-mqtt:
+      external: true
+  ```
+
+  Порт при этом не открывается наружу вообще.
+
+- **Frigate не в Docker** — мастер откроет порт на этой машине и подскажет адрес.
+
+**Готовый брокер.** Если у тебя уже есть MQTT (часто идёт вместе с Home Assistant) — просто укажи его адрес, свой мы не поднимем.
+
+В обоих случаях в `config.yml` самого Frigate нужна секция:
+
+```yaml
+mqtt:
+  enabled: true
+  host: mosquitto        # или IP машины, если Frigate не в Docker
+  port: 1883
+  topic_prefix: frigate
+```
+
+Проверить, что события доходят: `./spotter doctor` — там есть строка «События от Frigate».
 
 ---
 

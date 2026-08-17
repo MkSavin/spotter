@@ -125,6 +125,12 @@ try {
 // 2. Mode
 const args = process.argv.slice(2)
 const noTunnel = args.includes('--no-tunnel')
+// Undefined = ask; set = the answer was given on the command line.
+const externalMqtt = args.includes('--external-mqtt')
+  ? true
+  : args.includes('--own-mqtt')
+    ? false
+    : undefined
 const [preselected] = args.filter((arg) => !arg.startsWith('--'))
 const isMode = (value: string): value is Mode =>
   value === 'single' || value === 'cloud' || value === 'ingest'
@@ -210,6 +216,71 @@ if (mode === 'ingest') {
     await ask('FRIGATE_AUTH_USER', 'admin'),
   )
   env = setEnv(env, 'FRIGATE_AUTH_SECRET', await ask('FRIGATE_AUTH_SECRET'))
+}
+
+// 4a. MQTT broker — where Frigate publishes its events.
+if (mode === 'ingest' || mode === 'single') {
+  step('Брокер событий (MQTT)')
+  say('  Frigate шлёт события в MQTT-брокер, а Spotter их оттуда читает.')
+  say('  Если у твоего Frigate уже есть брокер (часто идёт с Home Assistant) —')
+  say('  укажи его. Если нет — поставим свой.')
+  say('')
+
+  const own =
+    externalMqtt === undefined
+      ? await askYesNo('Поставить свой брокер?', true)
+      : !externalMqtt
+
+  if (own) {
+    say('')
+    say('  Свой брокер. Frigate должен как-то до него достучаться:')
+    say('   • Frigate в Docker — подключи его к сети `spotter-mqtt`,')
+    say('     тогда адрес брокера для него `mosquitto:1883`, порт не нужен.')
+    say('   • Frigate не в Docker — откроем порт на этой машине.')
+    say('')
+
+    const inDocker = await askYesNo('Frigate запущен в Docker?', true)
+    if (inDocker) {
+      // Loopback keeps the port closed to the network; the shared docker
+      // network is how Frigate gets in.
+      env = setEnv(env, 'MQTT_BIND', '127.0.0.1')
+      say('')
+      say('  Добавь в compose своего Frigate:')
+      say('    networks: [spotter-mqtt]')
+      say('  и в самом низу файла:')
+      say('    networks:')
+      say('      spotter-mqtt:')
+      say('        external: true')
+      say('  В config.yml Frigate: mqtt.host = mosquitto, mqtt.port = 1883')
+    } else {
+      const bind = await ask(
+        'На каком адресе слушать (0.0.0.0 — на всех)',
+        '0.0.0.0',
+      )
+      const port = await ask('Порт', '1883')
+      env = setEnv(env, 'MQTT_BIND', bind)
+      env = setEnv(env, 'MQTT_PORT', port)
+      say('')
+      say(
+        `  В config.yml Frigate: mqtt.host = <IP этой машины>, mqtt.port = ${port}`,
+      )
+    }
+    // Points at the container by name — this is also what switches the
+    // `mqtt` compose profile on.
+    env = setEnv(env, 'MQTT_BROKER', 'mqtt://mosquitto:1883')
+  } else {
+    const host = await ask(
+      'Адрес готового брокера (host:port)',
+      'localhost:1883',
+    )
+    const url = /^mqtts?:\/\//.test(host) ? host : `mqtt://${host}`
+    env = setEnv(env, 'MQTT_BROKER', url)
+    say('')
+    say(
+      '  Свой брокер не поднимаем. Убедись, что Frigate публикует именно туда',
+    )
+    say('  (в его config.yml — секция mqtt, topic_prefix = frigate).')
+  }
 }
 
 // 4b. SSH tunnel to the cloud Redis (ingest only)
