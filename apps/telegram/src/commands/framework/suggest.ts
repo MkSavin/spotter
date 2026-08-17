@@ -13,10 +13,7 @@ const distance = (a: string, b: string): number => {
   return row[b.length] ?? 0
 }
 
-/**
- * Closest match to a mistyped name, or undefined when nothing is near enough.
- * Under a third of the word may differ: a typo still matches, a wrong word does not.
- */
+/** Closest match to a typo. Under a third of the word may differ. */
 export const suggest = (
   input: string,
   candidates: string[],

@@ -3,10 +3,7 @@ import type { Stenograph } from 'stenograph'
 
 export type ServiceStatus = Heartbeat & { online: boolean }
 
-/**
- * Keeps the latest heartbeat per service. A service that stops reporting goes
- * stale rather than disappearing, so an outage stays visible in `/status`.
- */
+/** Latest heartbeat per service. Silence goes stale, not missing, so `/status` shows it. */
 export class HeartbeatRegistry {
   private readonly latest = new Map<string, Heartbeat>()
 

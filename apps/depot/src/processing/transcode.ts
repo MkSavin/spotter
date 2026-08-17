@@ -163,6 +163,22 @@ const activeImageQuality = resolveImageQuality(
 )
 const skipImageConversion = env.boolean('IMAGE_SKIP_CONVERSION', false)
 
+/**
+ * A build without the hardware encoder, or a driver that will not open. Retrying
+ * on the CPU is worth it; a broken input file is not.
+ */
+export const isEncoderUnavailable = (error: unknown): boolean =>
+  /encoder not found|unknown encoder|cannot load|capable devices|not supported|no device available|failed to initiali[sz]e/i.test(
+    String((error as Error)?.message ?? error),
+  )
+
+/** CPU fallback for when the configured hardware encoder is missing. */
+const cpuVideoPreset = resolveVideoPreset(
+  'cpu',
+  env.string('VIDEO_CODEC', 'h264'),
+  env.string('VIDEO_QUALITY', 'best'),
+)
+
 /** Transcodes a raw clip into the configured codec/quality, writing `processed`. */
 export const transcodeVideo = async (
   raw: BunFile,
@@ -182,16 +198,45 @@ export const transcodeVideo = async (
     return
   }
 
+  try {
+    await runFfmpeg(rawPath, processedPath, activeVideoPreset, logger)
+  } catch (error) {
+    if (
+      activeVideoPreset.name === cpuVideoPreset.name ||
+      !isEncoderUnavailable(error)
+    ) {
+      throw error
+    }
+    // Losing the clip is worse than losing the speed-up.
+    logger.warn(
+      `Preset ${activeVideoPreset.name} unavailable (${(error as Error).message}) — retrying on CPU`,
+    )
+    await runFfmpeg(rawPath, processedPath, cpuVideoPreset, logger)
+  }
+
+  logger.verbose('Processed video parameters', {
+    format: processed.type,
+    processed: { size: processed.size },
+    original: { size: raw.size },
+  })
+}
+
+const runFfmpeg = async (
+  rawPath: string,
+  processedPath: string,
+  preset: ProcessorPreset,
+  logger: Stenograph,
+): Promise<void> => {
   await new Promise<void>((resolve, reject) => {
-    logger.debug(`Using processing preset ${activeVideoPreset.name}`)
+    logger.debug(`Using processing preset ${preset.name}`)
     logger.verbose('Preset options:', {
-      input: activeVideoPreset.inputParameters,
-      output: activeVideoPreset.outputParameters,
+      input: preset.inputParameters,
+      output: preset.outputParameters,
     })
 
     const command = ffmpeg(rawPath)
-      .inputOption(activeVideoPreset.inputParameters)
-      .outputOptions(activeVideoPreset.outputParameters)
+      .inputOption(preset.inputParameters)
+      .outputOptions(preset.outputParameters)
       .noAudio()
       .format('mp4')
 
@@ -221,12 +266,6 @@ export const transcodeVideo = async (
       })
       .on('end', () => finish(() => resolve()))
       .save(processedPath)
-  })
-
-  logger.verbose('Processed video parameters', {
-    format: processed.type,
-    processed: { size: processed.size },
-    original: { size: raw.size },
   })
 }
 

@@ -71,8 +71,7 @@ export const createMediaController = <TConfig extends SinkConfig>(
       }
     }
 
-    // Nothing staged still gets an answer: a silent return leaves the bot's
-    // "processing" button stuck forever (e.g. the NVR 404s an unknown event).
+    // Silence would leave the bot's "processing" button stuck forever.
     if (!rawClipKey && !rawSnapshotKey) {
       logger.debug('Nothing staged for media request')
       await report('failed', 'Видео недоступно на регистраторе')

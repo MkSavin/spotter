@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7-labs
 
-FROM oven/bun:1.3.14-alpine AS base
+# Debian, not alpine: alpine's ffmpeg is built without NVENC.
+FROM oven/bun:1.3.14-slim AS base
 
 ARG APP_RELATIVE_PATH
 
@@ -28,7 +29,10 @@ RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_REL
 
 FROM base AS release
 
-RUN apk add --no-cache ffmpeg
+# No CUDA runtime needed: the encoders use the host driver from the gpu overlay.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy binary tooling
 COPY --from=bundle /app/node_modules/@img ./node_modules/@img

@@ -70,27 +70,21 @@ const takeFlags = (args: string[]): string[] =>
 
 const has = (flag: string): boolean => flags.has(flag)
 
-/**
- * True when the broker is ours to start. Decided by MQTT_NETWORK_EXTERNAL, not
- * by the host name: someone else's broker is very often called `mosquitto` too,
- * and starting a second one collides on the port.
- */
+/** Whether to start our broker. By the flag, not the name — theirs is often `mosquitto` too. */
 const ownsBroker = (): boolean => {
   const broker = readEnv('MQTT_BROKER') ?? ''
   if (readEnv('MQTT_NETWORK_EXTERNAL') === 'true') return false
   return !broker || /^mqtts?:\/\/mosquitto[:/]?/.test(broker)
 }
 
-// The NVIDIA overlay is ingest-only and on by default — GPU transcoding is
-// several times faster, so opting out is the deliberate choice.
+// GPU is on by default: transcoding is several times faster.
 const composeArgs = (mode: Mode): string[] => {
   const files = [path.join('.deployment', 'compose', `production.${mode}.yml`)]
   if (mode === 'ingest' && !has('--no-gpu'))
     files.push(path.join('.deployment', 'compose', 'production.ingest.gpu.yml'))
   // Optional frontends live behind compose profiles.
   const profiles: string[] = ['pwa', 'email'].filter((name) => has(`--${name}`))
-  // Read from .env, not from a flag: the broker choice is made once at install
-  // and must not need repeating on every `up`.
+  // From .env, not a flag: chosen once at install, not repeated every `up`.
   if (ownsBroker()) profiles.push('mqtt')
   return [
     'compose',
@@ -141,6 +135,10 @@ const INFRA = ['redis', 'local-redis', 'mosquitto', 'watchtower']
 const serviceName = (name: string): string =>
   INFRA.includes(name) || name.startsWith('spotter-') ? name : `spotter-${name}`
 
+/** Prefixes service names but leaves docker's own flags untouched. */
+const services = (args: string[]): string[] =>
+  args.map((arg) => (arg.startsWith('-') ? arg : serviceName(arg)))
+
 const upFlags = (): string[] =>
   has('--no-watchtower') ? ['--scale', 'watchtower=0'] : []
 
@@ -175,23 +173,35 @@ const COMMANDS: Record<string, Command> = {
   },
 
   up: {
-    about: 'Поднять узел',
-    run: async () => {
+    usage: '[сервис]',
+    about: 'Поднять узел целиком; с именем — только этот сервис',
+    run: async (rest) => {
       await prepareData()
-      await compose(['up', '-d', ...upFlags()])
+      await compose(['up', '-d', ...upFlags(), ...services(rest)])
     },
   },
 
-  down: { about: 'Остановить узел', run: () => compose(['down']) },
+  down: {
+    usage: '[сервис]',
+    about: 'Остановить узел целиком; с именем — только этот сервис',
+    // `down <service>` removes the container; stopping one is `stop`.
+    run: (rest) =>
+      rest.length > 0
+        ? compose(['stop', ...services(rest)])
+        : compose(['down']),
+  },
 
-  ps: { about: 'Статус контейнеров', run: () => compose(['ps']) },
+  ps: {
+    usage: '[сервис]',
+    about: 'Статус контейнеров',
+    run: (rest) => compose(['ps', ...services(rest)]),
+  },
 
   logs: {
     usage: '[сервис] [-f]',
     about: 'Логи целиком; -f — следить дальше',
     run: (rest) => {
-      // Print and exit by default; docker's own flags (-f, --tail, --since) pass
-      // through, so `logs server -f` follows and `logs server --tail=50` trims.
+      // Print and exit by default; docker's own flags pass through.
       const [first, ...extra] = rest
       const service = first && !first.startsWith('-') ? first : undefined
       const passthrough = service ? extra : rest
@@ -209,25 +219,37 @@ const COMMANDS: Record<string, Command> = {
   restart: {
     usage: '[сервис]',
     about: 'Перезапустить (образ тот же)',
-    run: (rest) => compose(['restart', ...rest.map(serviceName)]),
+    run: (rest) => compose(['restart', ...services(rest)]),
   },
 
   recreate: {
+    usage: '[сервис]',
     about: 'Пересоздать (после правки портов в .env)',
-    run: async () => {
+    run: async (rest) => {
       await prepareData()
-      await compose(['up', '-d', '--force-recreate', ...upFlags()])
+      await compose([
+        'up',
+        '-d',
+        '--force-recreate',
+        ...upFlags(),
+        ...services(rest),
+      ])
     },
   },
 
   update: {
+    usage: '[сервис]',
     about: 'Скачать свежие образы и пересоздать',
-    run: async () => {
+    run: async (rest) => {
       const mode = requireMode()
+      const targets = services(rest)
       await prepareData()
-      await $`docker ${composeArgs(mode)} pull`.cwd(root)
-      await $`docker ${composeArgs(mode)} up -d ${upFlags()}`.cwd(root)
-      await $`docker image prune -f`.cwd(root)
+      await $`docker ${composeArgs(mode)} pull ${targets}`.cwd(root)
+      await $`docker ${composeArgs(mode)} up -d ${upFlags()} ${targets}`.cwd(
+        root,
+      )
+      // Pruning after a partial update would drop images still in use.
+      if (targets.length === 0) await $`docker image prune -f`.cwd(root)
     },
   },
 
@@ -268,8 +290,7 @@ const COMMANDS: Record<string, Command> = {
       if (!/^\d+$/.test(value))
         fail('интервал — целое число секунд, например 3600')
       persistEnv('WATCHTOWER_INTERVAL', value)
-      // Only this container is recreated: the interval is a container argument,
-      // fixed at creation, and the apps have no reason to restart with it.
+      // Only this container: the interval is fixed at creation time.
       const { exitCode } =
         await $`docker ${composeArgs(mode)} up -d --force-recreate watchtower`
           .cwd(root)
@@ -289,8 +310,7 @@ const COMMANDS: Record<string, Command> = {
         input: process.stdin,
         output: process.stdout,
       })
-      // Always closed: an open readline keeps stdin alive and the process
-      // hangs after the error instead of exiting.
+      // An open readline keeps stdin alive and hangs the process.
       const url = await configure({
         say: (msg = '') => console.log(msg),
         ask: async (question, fallback = '') => {
@@ -393,11 +413,15 @@ if (!command) {
   process.exit(2)
 }
 
+// No `usage` = takes nothing. Dropping args silently is how `down frigate` killed the node.
+if (!command.usage && rest.length > 0) {
+  fail(`«${name}» не принимает аргументов — лишнее: ${rest.join(' ')}`)
+}
+
 try {
   await command.run(rest)
 } catch (error) {
-  // Without this a thrown error ends the process with no output at all —
-  // the command just appears to do nothing.
+  // Otherwise a throw ends the process with no output at all.
   console.error(`\n  spotter: ${name} не выполнена`)
   console.error(`  ${(error as Error).message ?? error}\n`)
   process.exit(1)

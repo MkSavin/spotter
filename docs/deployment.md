@@ -126,6 +126,7 @@ sudo ./spotter install ingest
 | Поднять | `./spotter up` |
 | Остановить | `./spotter down` |
 | Статус | `./spotter ps` |
+| Только один сервис | добавь его имя: `./spotter down frigate`, `./spotter up frigate` |
 | Логи | `./spotter logs server` |
 | Код доступа | `./spotter token [viewer\|user\|admin]` |
 | Обновить до свежих образов | `./spotter update` |

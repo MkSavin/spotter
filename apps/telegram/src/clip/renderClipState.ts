@@ -8,10 +8,7 @@ import {
 } from '../transport/view/eventKeyboard'
 import type { ClipOutcome } from './ClipTracker'
 
-/**
- * Repaints the clip button on every message of an event. Failures end with a
- * retry button, so a stuck clip is something the user can act on.
- */
+/** Repaints the clip button on every message of an event. */
 export const renderClipState = async (
   api: Api<RawApi>,
   db: TelegramDatabase,
@@ -34,8 +31,7 @@ export const renderClipState = async (
     ),
   )
 
-  // Editing to an identical markup is rejected by Telegram; that is not a
-  // problem worth logging as an error.
+  // Telegram rejects an identical markup; not worth an error.
   const failed = results.filter((result) => result.status === 'rejected')
   for (const result of failed)
     logger.debug(`Clip button repaint skipped: ${result.reason}`)

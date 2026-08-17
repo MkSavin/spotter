@@ -94,16 +94,11 @@ export const installService = async (setup: TunnelSetup): Promise<void> => {
 
   await run('daemon-reload')
   await run('enable', 'spotter-tunnel')
-  // `enable --now` leaves an already-running service on its old unit file;
-  // restart is what actually picks up a changed host, port or key.
+  // `enable --now` leaves a running service on its old unit file.
   await run('restart', 'spotter-tunnel')
 }
 
-/**
- * True once the cloud Redis answers through the tunnel. An open socket is not
- * enough: right after a restart the old ssh may still hold the port while
- * forwarding nowhere, so this waits for an actual PONG.
- */
+/** Waits for a real PONG: after a restart the old ssh may still hold the port. */
 export const verify = async (bridge: string): Promise<boolean> => {
   for (let attempt = 0; attempt < 10; attempt++) {
     const answered = await new Promise<boolean>((resolve) => {

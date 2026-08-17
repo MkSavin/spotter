@@ -5,10 +5,7 @@ import {
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 
-/**
- * Consumes `spotter.media.progress`: moves the clip button through its stages
- * so a waiting user sees the pipeline working rather than a frozen spinner.
- */
+/** Consumes `spotter.media.progress`: moves the clip button through its stages. */
 export const mediaProgressController: StreamMessageController<
   TransportContext
 > = async (payload, context): Promise<void> => {

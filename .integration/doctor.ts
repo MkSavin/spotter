@@ -70,21 +70,37 @@ const checkContainers = async (
 const checkRedis = async (
   composeArgs: string[],
   service: string,
-): Promise<Check> => {
+): Promise<Check[]> => {
   const { ok, out } = await inService(composeArgs, service, 'redis-cli ping')
-  return {
-    name: 'Redis',
-    status: ok && out.includes('PONG') ? 'ok' : 'fail',
-    detail: ok && out.includes('PONG') ? 'отвечает' : out || 'нет ответа',
-    hint: ok ? undefined : `./spotter logs ${service}`,
+  const alive = ok && out.includes('PONG')
+  const checks: Check[] = [
+    {
+      name: 'Redis',
+      status: alive ? 'ok' : 'fail',
+      detail: alive ? 'отвечает' : out || 'нет ответа',
+      hint: ok ? undefined : `./spotter logs ${service}`,
+    },
+  ]
+
+  if (!alive) return checks
+
+  // Without overcommit a background save can fail, losing buffered events.
+  const overcommit = (
+    await $`sysctl -n vm.overcommit_memory`.quiet().nothrow().text()
+  ).trim()
+  if (overcommit && overcommit !== '1') {
+    checks.push({
+      name: 'vm.overcommit_memory',
+      status: 'warn',
+      detail: `${overcommit} — фоновое сохранение Redis может не пройти`,
+      hint: 'sysctl vm.overcommit_memory=1 (и строку в /etc/sysctl.conf, чтобы пережило перезагрузку)',
+    })
   }
+
+  return checks
 }
 
-/**
- * The event path starts here: Frigate publishes to a broker and the adapter
- * reads it. A broker nobody publishes to looks exactly like a healthy one, so
- * this checks reachability and whether anything is actually arriving.
- */
+/** A broker nobody publishes to looks healthy, so this also listens for events. */
 const checkMqtt = async (
   composeArgs: string[],
   broker: string,
@@ -93,8 +109,7 @@ const checkMqtt = async (
   const target = broker.replace(/^mqtts?:\/\//, '')
   const [host = 'mosquitto', port = '1883'] = target.split(':')
 
-  // Probed from the adapter's container: that is the path it really uses.
-  // Bun opens the socket — `nc` is not guaranteed to exist in the image.
+  // From the adapter's container — the path it really uses. `nc` may be absent.
   const reach = await inService(
     composeArgs,
     'spotter-frigate',
@@ -333,9 +348,7 @@ export const diagnose = async (
   const source = env.SOURCE_ID || 'frigate'
   const redisService = mode === 'ingest' ? 'local-redis' : 'redis'
 
-  // Our own broker only runs when MQTT_BROKER points at it.
-  // Someone else's broker is often called `mosquitto` too, so the network flag
-  // decides, not the host name.
+  // By the flag, not the name — someone else's broker is often `mosquitto` too.
   const ownBroker =
     env.MQTT_NETWORK_EXTERNAL !== 'true' &&
     (!env.MQTT_BROKER || /^mqtts?:\/\/mosquitto[:/]?/.test(env.MQTT_BROKER))
@@ -360,7 +373,7 @@ export const diagnose = async (
 
   const checks: Check[] = [
     ...(await checkContainers(composeArgs, expected)),
-    await checkRedis(composeArgs, redisService),
+    ...(await checkRedis(composeArgs, redisService)),
   ]
 
   if (mode === 'ingest' || mode === 'single') {

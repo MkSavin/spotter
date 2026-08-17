@@ -19,10 +19,7 @@ export const renderRollout = (changes: RolloutChange[]): string => {
   return `🚀 <b>Выкачено обновление</b>\n\n${blocks.join('\n\n')}`
 }
 
-/**
- * Tells admins a rollout landed. Silent on purpose: this is a background fact,
- * not something to wake anyone for.
- */
+/** Tells admins a rollout landed. Silent: not worth waking anyone for. */
 export const notifyRollout = async (
   api: Api<RawApi>,
   db: TelegramDatabase,

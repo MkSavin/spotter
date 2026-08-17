@@ -44,8 +44,7 @@ export const registerClipCallback = (bot: Bot<BotContext, BotApi>): void => {
 
     const logger = context.logger.sub('clip')
 
-    // Start the clock before the RPC: stage updates may arrive while it is
-    // still in flight, and an unknown clip would be ignored by the tracker.
+    // Before the RPC: stages may arrive while it is still in flight.
     context.clips.begin(eventId)
 
     try {
@@ -54,8 +53,7 @@ export const registerClipCallback = (bot: Bot<BotContext, BotApi>): void => {
         { eventId },
         context.session.user.recipientUuid,
       )
-      // A rejected request used to be logged and nothing else: the user kept
-      // staring at "processing" for a clip that was never going to come.
+      // Logging alone left the user staring at "processing" forever.
       if (!reply.ok) {
         logger.warn(`event.clip rejected for ${eventId}: ${reply.error}`)
         context.clips.fail(

@@ -18,11 +18,7 @@ type Options = {
   onRollout: (changes: RolloutChange[]) => unknown
 }
 
-/**
- * Turns heartbeats into rollout notices. Versions live in SQLite, so a service
- * that changed while the bot was down is still reported on the next heartbeat,
- * and a bot restart alone reports nothing.
- */
+/** Heartbeats into rollout notices. Versions persist, so a bot restart is silent. */
 export class RolloutWatcher {
   private readonly pending = new Map<string, RolloutChange>()
   private timer?: ReturnType<typeof setTimeout>
@@ -41,8 +37,7 @@ export class RolloutWatcher {
       beat.version,
     )
 
-    // Unchanged, or a service seen for the very first time: a fresh install
-    // would otherwise announce every service as an update.
+    // First sighting stays silent, or a fresh install reports as a rollout.
     if (previous === undefined || previous === beat.version) return
 
     this.logger.info(

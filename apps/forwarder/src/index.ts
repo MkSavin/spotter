@@ -85,9 +85,7 @@ const run = async (): Promise<void> => {
     { ...baseOptions, group: config.group.down },
   )
 
-  // Published locally, not to the cloud: the UP bridge above carries it across,
-  // so a broken tunnel queues the beats instead of dropping them — and a beat
-  // that does arrive is itself proof the link works.
+  // Local, not remote: the UP bridge carries it, so an outage queues beats.
   const stopHeartbeat = startHeartbeat(localProducer, {
     service: 'forwarder',
     version: information.version,

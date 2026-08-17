@@ -53,13 +53,7 @@ export const mediaProcessedSchema = z.object({
 })
 export type MediaProcessed = z.infer<typeof mediaProcessedSchema>
 
-/**
- * How far along an event's media is. Published to `spotter.media.progress` at
- * each step so a frontend can show real state instead of a frozen spinner.
- *
- * `staged` means the bytes left the NVR and transcoding began; `failed` ends the
- * wait with a reason. The terminal success is `mediaProcessed`, not a stage.
- */
+/** Progress of an event's media. Success is `mediaProcessed`, not a stage. */
 export const mediaStageSchema = z.enum(['fetching', 'staged', 'failed'])
 export type MediaStage = z.infer<typeof mediaStageSchema>
 

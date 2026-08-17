@@ -174,11 +174,7 @@ export const serviceVersionsRepo = {
   list: (db: TelegramDatabase): ServiceVersion[] =>
     db.select().from(serviceVersions).all(),
 
-  /**
-   * Stores the version and returns the one it replaced, or undefined when the
-   * service was never seen. Read and write share a transaction, so two
-   * heartbeats cannot both see the old value and report the rollout twice.
-   */
+  /** Stores the version, returns the replaced one. In a transaction: two heartbeats must not both report. */
   record: (
     db: TelegramDatabase,
     node: string,

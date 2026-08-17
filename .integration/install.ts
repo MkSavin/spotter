@@ -16,8 +16,7 @@ type Mode = 'single' | 'cloud' | 'ingest'
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
-// A thrown error would otherwise leave stdin open and the wizard would hang
-// silently instead of reporting what went wrong.
+// A throw would leave stdin open and hang the wizard silently.
 process.on('uncaughtException', (error) => {
   console.error(`\n✗ ${error.message}`)
   rl.close()
@@ -249,8 +248,7 @@ if (mode === 'ingest' || mode === 'single') {
 
     const inDocker = await askYesNo('Frigate запущен в Docker?', true)
     if (inDocker) {
-      // Loopback keeps the port closed to the network; the shared docker
-      // network is how Frigate gets in.
+      // Loopback keeps the port closed; Frigate comes in via the shared network.
       env = setEnv(env, 'MQTT_BIND', '127.0.0.1')
       say('')
       say('  Добавь в compose своего Frigate:')
@@ -273,8 +271,7 @@ if (mode === 'ingest' || mode === 'single') {
         `  В config.yml Frigate: mqtt.host = <IP этой машины>, mqtt.port = ${port}`,
       )
     }
-    // Points at the container by name — this is also what switches the
-    // `mqtt` compose profile on.
+    // By container name — this also switches the `mqtt` profile on.
     env = setEnv(env, 'MQTT_BROKER', 'mqtt://mosquitto:1883')
   } else {
     say('')
@@ -290,8 +287,7 @@ if (mode === 'ingest' || mode === 'single') {
       const port = await ask('Порт внутри сети', '1883')
       const network = await ask('Имя его docker-сети', 'mosquitto')
       env = setEnv(env, 'MQTT_BROKER', `mqtt://${service}:${port}`)
-      // Joining the broker's own network is what makes its name resolve;
-      // without it the adapter fails with getaddrinfo ESERVFAIL.
+      // Without joining its network the name fails to resolve (ESERVFAIL).
       env = setEnv(env, 'MQTT_NETWORK', network)
       env = setEnv(env, 'MQTT_NETWORK_EXTERNAL', 'true')
       say('')

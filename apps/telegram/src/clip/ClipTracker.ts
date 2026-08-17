@@ -12,11 +12,7 @@ type Options = {
   render: (eventId: string, outcome: ClipOutcome) => unknown
 }
 
-/**
- * Tracks clips the user is waiting for. Stages arrive from the ingest side and
- * repaint the button; if nothing arrives before the timeout, the wait ends with
- * a retry button instead of a spinner that never stops.
- */
+/** Tracks awaited clips; a timeout ends the wait with a retry button. */
 export class ClipTracker {
   private readonly waiting = new Map<
     string,
@@ -35,8 +31,7 @@ export class ClipTracker {
 
   /** A stage update arrived from the pipeline. */
   advance(eventId: string, stage: ClipStage): void {
-    // Only for clips this bot is actually waiting on: media also moves for
-    // events nobody asked about, and those must not paint a button.
+    // Media moves for events nobody asked about; those must not paint a button.
     if (!this.waiting.has(eventId)) return
     this.arm(eventId, stage)
     void this.options.render(eventId, { stage })
