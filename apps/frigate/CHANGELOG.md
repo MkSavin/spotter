@@ -1,5 +1,16 @@
 # @spotter/sink
 
+## 1.3.1
+
+### Patch Changes
+
+- 1cdbb9a: fix: MQTT broker is configurable, not hard-wired
+  
+  The broker address moved from compose into `.env`, so an existing broker can be used instead of ours. Our own mosquitto now lives behind the `mqtt` profile and joins the external `spotter-mqtt` network, which a Frigate container can join to reach it without opening a host port. The installer asks which of the two applies, and `doctor` checks that the broker is reachable and that events actually arrive.
+- a43b136: fix: join an existing broker's docker network
+  
+  Pointing `MQTT_BROKER` at a broker running in another compose project failed two ways: our own mosquitto still started and collided on port 1883, and the adapter could not resolve the broker's name (`getaddrinfo ESERVFAIL`) because it was not on that network. `MQTT_NETWORK` now names the broker's network to join, and whether we start a broker of our own is decided by `MQTT_NETWORK_EXTERNAL` rather than by the host name — someone else's broker is very often called `mosquitto` too.
+
 ## 1.3.0
 
 ### Minor Changes
