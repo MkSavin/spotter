@@ -1,6 +1,6 @@
 {
   "name": "@spotter/telegram",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Telegram frontend: delivery consumer, grammy bot, commands, auth",
   "main": "index.js",
   "scripts": {
