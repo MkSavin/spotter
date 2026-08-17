@@ -18,11 +18,18 @@ export const publishCatalog = async (
   sourceId: string,
   producer: StreamProducer,
   logger: Stenograph,
-): Promise<void> => {
+): Promise<boolean> => {
   const [cameras, objectTypes] = await Promise.all([
     catalog.listCameras(),
     catalog.listObjectTypes(),
   ])
+
+  // An empty snapshot would overwrite a good one and leave the bot saying
+  // "Список камер пока недоступен" until the adapter restarts.
+  if (cameras.length === 0) {
+    logger.warn(`Catalog for "${sourceId}" is empty — not publishing`)
+    return false
+  }
 
   const snapshot: CatalogSnapshot = {
     source: sourceId,
@@ -40,4 +47,5 @@ export const publishCatalog = async (
   logger.info(
     `Published catalog for "${sourceId}": ${cameras.length} cameras, ${objectTypes.length} object types`,
   )
+  return true
 }

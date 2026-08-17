@@ -1,4 +1,5 @@
 export * from './catalog/Catalog'
+export * from './catalog/keepCatalogPublished'
 export * from './catalog/publishCatalog'
 export * from './config/sinkConfig'
 export * from './helpers/publishEvent'

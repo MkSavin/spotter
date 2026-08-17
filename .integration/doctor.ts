@@ -166,31 +166,47 @@ const checkMqtt = async (
 }
 
 const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
+  // Parsed inside the container: truncating the JSON here cut `cameras` off and
+  // reported a healthy Frigate as broken.
+  const script = [
+    'const e = process.env;',
+    'const r = await fetch(e.FRIGATE_REMOTE_URL + "/api/config",',
+    '{headers:{Authorization:"Bearer " + e.FRIGATE_AUTH_SECRET}});',
+    'if(!r.ok){console.log("HTTP " + r.status);process.exit(0)}',
+    'const c = await r.json();',
+    'console.log("OK " + Object.keys(c.cameras ?? {}).length + " " + (c.version ?? "?"))',
+  ].join('')
+
   const probe = await inService(
     composeArgs,
     'spotter-frigate',
-    'wget -q -O- --timeout=10 ' +
-      '--header="Authorization: Bearer $FRIGATE_AUTH_SECRET" ' +
-      '"$FRIGATE_REMOTE_URL/api/config" 2>&1 | head -c 400',
+    `bun -e '${script}' 2>&1 | tail -c 200`,
   )
 
-  if (!probe.ok || !probe.out.includes('cameras')) {
+  const parsed = probe.out.match(/OK (\d+) (\S+)/)
+
+  if (!parsed) {
     return [
       {
         name: 'Frigate /api/config',
         status: 'fail',
         detail: probe.out.slice(0, 160) || 'нет ответа',
-        hint: 'проверь FRIGATE_REMOTE_URL и FRIGATE_AUTH_SECRET в .env',
+        hint: probe.out.includes('401')
+          ? 'проверь FRIGATE_AUTH_SECRET в .env'
+          : 'проверь FRIGATE_REMOTE_URL и FRIGATE_AUTH_SECRET в .env',
       },
     ]
   }
 
-  const count = (probe.out.match(/"[a-z0-9_-]+":\s*\{/gi) ?? []).length
+  const count = Number(parsed[1])
   return [
     {
       name: 'Frigate /api/config',
-      status: 'ok',
-      detail: `отвечает, камер в ответе: ~${count}`,
+      status: count > 0 ? 'ok' : 'warn',
+      detail: `Frigate ${parsed[2]}, камер: ${count}`,
+      ...(count > 0
+        ? {}
+        : { hint: 'в конфиге Frigate нет камер — бот не покажет список' }),
     },
   ]
 }

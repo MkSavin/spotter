@@ -10,7 +10,7 @@ import {
 import { RedisClient, S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { Catalog } from '../catalog/Catalog'
-import { publishCatalog } from '../catalog/publishCatalog'
+import { keepCatalogPublished } from '../catalog/keepCatalogPublished'
 import type { SinkConfig } from '../config/sinkConfig'
 import { publishEvent } from '../helpers/publishEvent'
 import { createCameraController } from '../media/createCameraController'
@@ -97,6 +97,7 @@ export const runSink = async <TConfig extends SinkConfig>(
 
   let sourceHandle: SourceHandle | null = null
   let stopHeartbeat: (() => void) | null = null
+  let stopCatalog: (() => void) | null = null
   let transport: Awaited<
     ReturnType<RedisRegulator<SinkContext<TConfig>>['run']>
   > | null = null
@@ -104,6 +105,7 @@ export const runSink = async <TConfig extends SinkConfig>(
   const shutdown = async (signal: NodeJS.Signals) => {
     logger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat?.()
+    stopCatalog?.()
     await transport?.stop()
     await sourceHandle?.stop()
     subscriber.close()
@@ -130,7 +132,7 @@ export const runSink = async <TConfig extends SinkConfig>(
   })
 
   if (catalog) {
-    await publishCatalog(catalog, sourceId, producer, logger)
+    stopCatalog = keepCatalogPublished(catalog, sourceId, producer, logger)
   }
 
   stopHeartbeat = startHeartbeat(producer, {
