@@ -1,5 +1,23 @@
 # @spotter/depot
 
+## 1.2.8
+
+### Patch Changes
+
+- f6ff724: fix: retry transient media failures instead of acking them away
+  
+  A failed transcode was indistinguishable from a broken clip: `mediaStagedAction` caught every error, returned empty, and the controller published `media_processed` — so the regulator acked. An S3 blip or a not-yet-visible staged object therefore lost the media for good, bypassing the PEL/reaper/DLQ machinery entirely. S3 reads/writes and ffmpeg timeouts now raise `TransientError` and propagate, leaving the entry pending for the reaper; only genuinely broken media (bad codec, unreadable input) still reports a final miss. Clip and snapshot are judged independently, so a permanent failure of one does not hold back the other.
+  
+  The dead-letter boundary was also off by one: `deliveries > maxDeliveries` granted a sixth attempt against a documented budget of five, which for a transcode is a wasted full run.
+- f6ff724: refactor: read config through resolveConfig and cover the untested paths
+  
+  `transcode.ts` read eleven env vars at module scope, so the values froze at import time, skipped the redacted startup dump and could not be swapped in tests — which is why the largest file in the repo had the thinnest coverage. They now belong to `config.video`/`config.image` and arrive as an argument.
+  
+  Test coverage follows the same reasoning: `CommandBus` (RPC correlation, timeout, replies addressed to another replica, junk on the stream) had none despite driving the whole "Видео" button flow, so its timeouts became injectable and it is now covered. The frigate test-seed controller's id/timestamp derivation moved into a pure `resolveEventTestPayload`, and the dead-letter boundary gained a test that pins the exact threshold.
+- Updated dependencies [f6ff724]
+- Updated dependencies [f6ff724]
+  - @spotter/transport@1.5.2
+
 ## 1.2.7
 
 ### Patch Changes
