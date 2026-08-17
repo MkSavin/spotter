@@ -73,8 +73,10 @@ export const createMediaController = <TConfig extends SinkConfig>(
 
     // Silence would leave the bot's "processing" button stuck forever.
     if (!rawClipKey && !rawSnapshotKey) {
-      logger.debug('Nothing staged for media request')
-      await report('failed', 'Видео недоступно на регистраторе')
+      logger.warn('Nothing staged for media request')
+      // Usually not final: the NVR finishes writing a clip seconds after the
+      // event ends, so a retry a little later often succeeds.
+      await report('failed', 'Видео ещё не готово — попробуй через полминуты')
       await producer.publish(mediaStreams.mediaProcessed, {
         eventId: request.eventId,
       })

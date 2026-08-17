@@ -40,7 +40,8 @@ export const stageMedia = async (
   const response = await fetch(fetchRequest, { method: 'GET' })
 
   if (!response.ok) {
-    logger.debug(`Media not available (status ${response.status}) for ${key}`)
+    // Warn, not debug: this is why a requested clip never arrives.
+    logger.warn(`Media not available (status ${response.status}) for ${key}`)
     return false
   }
 

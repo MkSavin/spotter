@@ -32,6 +32,17 @@ export const deliveryEventAction = async (
   // action === 'media' — attach transcoded media to the existing messages.
   const messages = eventMessagesRepo.find(db, eventId)
 
+  // Nothing came back — the NVR has no clip for this event. Only the button
+  // changes; editing the text would fail on a message that already has a photo.
+  if (!clipKey && !snapshotKey) {
+    context.clips.fail(
+      eventId,
+      'Видео ещё не готово — попробуй через полминуты',
+    )
+    logger.debug(`deliveryEvent (media) had nothing to attach for ${eventId}`)
+    return
+  }
+
   // The media edit below repaints the button, so the wait is over either way.
   context.clips.complete(eventId)
 
@@ -60,19 +71,5 @@ export const deliveryEventAction = async (
       : undefined
     await actualizeEventMedia(eventId, messages, photo, keyboard, context)
     logger.debug(`deliveryEvent (media/snapshot) processed for ${eventId}`)
-    return
   }
-
-  // Nothing came back (the NVR no longer has this event). Restore the button
-  // instead of leaving it stuck on "processing".
-  if (shouldOfferClip(event)) {
-    await actualizeSentMessages(
-      eventId,
-      messages,
-      caption,
-      context,
-      videoButtonKeyboard(eventId),
-    )
-  }
-  logger.debug(`deliveryEvent (media) had nothing to attach for ${eventId}`)
 }
