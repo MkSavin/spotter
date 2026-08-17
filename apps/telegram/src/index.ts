@@ -3,6 +3,7 @@ import { hydrateApi, hydrateContext } from '@grammyjs/hydrate'
 import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import {
+  CatalogCache,
   connectRedis,
   probeRedisVersion,
   type RegulatorHandle,
@@ -13,7 +14,6 @@ import { RedisClient, S3Client } from 'bun'
 import { Bot, session } from 'grammy'
 import information from '../package.json'
 import { registerClipCallback } from './callback/clipCallback'
-import { CatalogCache } from './catalog/CatalogCache'
 import { ClipTracker } from './clip/ClipTracker'
 import { renderClipState } from './clip/renderClipState'
 import { CommandBus } from './command/CommandBus'

@@ -12,6 +12,13 @@ import type { Stenograph } from 'stenograph'
 const COMMAND_TIMEOUT_MS = 30_000
 const POLL_BLOCK_MS = 2_000
 
+export type CommandBusOptions = {
+  /** How long `send` waits for a correlated reply before giving up. */
+  timeoutMs?: number
+  /** How long each XREAD blocks; shorten it to keep tests quick. */
+  pollBlockMs?: number
+}
+
 /**
  * Sends domain-mutating commands from telegram to server and awaits the
  * correlated reply on `spotter.command.reply`.
@@ -24,6 +31,8 @@ const POLL_BLOCK_MS = 2_000
 export class CommandBus {
   private readonly instanceId: string
   private readonly pending = new Map<string, (reply: CommandReply) => void>()
+  private readonly timeoutMs: number
+  private readonly pollBlockMs: number
   private replyOffset = '$'
   private running = false
 
@@ -31,8 +40,11 @@ export class CommandBus {
     private readonly producer: StreamProducer,
     private readonly subscriber: RedisClient,
     private readonly logger: Stenograph,
+    options: CommandBusOptions = {},
   ) {
     this.instanceId = randomBytes(8).toString('hex')
+    this.timeoutMs = options.timeoutMs ?? COMMAND_TIMEOUT_MS
+    this.pollBlockMs = options.pollBlockMs ?? POLL_BLOCK_MS
   }
 
   /** Start the background reply poller. Call once after Redis connects. */
@@ -49,7 +61,7 @@ export class CommandBus {
   }
 
   /**
-   * Publishes `kind` with `args` and waits up to 30 s for the server reply.
+   * Publishes `kind` with `args` and waits `timeoutMs` for the server reply.
    * Throws on timeout or if the server returns ok=false with an error.
    */
   async send(
@@ -71,11 +83,9 @@ export class CommandBus {
       const timer = setTimeout(() => {
         this.pending.delete(requestId)
         reject(
-          new Error(
-            `Command "${kind}" timed out after ${COMMAND_TIMEOUT_MS}ms`,
-          ),
+          new Error(`Command "${kind}" timed out after ${this.timeoutMs}ms`),
         )
-      }, COMMAND_TIMEOUT_MS)
+      }, this.timeoutMs)
 
       this.pending.set(requestId, (reply) => {
         clearTimeout(timer)
@@ -96,7 +106,7 @@ export class CommandBus {
           'COUNT',
           '100',
           'BLOCK',
-          String(POLL_BLOCK_MS),
+          String(this.pollBlockMs),
           'STREAMS',
           deliveryStreams.commandReply,
           this.replyOffset,

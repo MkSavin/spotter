@@ -1,11 +1,11 @@
 import {
+  catalogController,
   catalogUpdatedStream,
   deliveryStreams,
   RedisRegulator,
   type RegulatorHandle,
 } from '@spotter/transport'
 import type { CoreContext, TransportContext } from '../context'
-import { catalogController } from './controllers/catalogController'
 import { deliveryEventController } from './controllers/deliveryEventController'
 
 export const pwaTransport = async (

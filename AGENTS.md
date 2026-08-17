@@ -116,6 +116,12 @@ const handle = await new RedisRegulator<Context>()
 (с полями `reason`/`deliveries`/`originalId` + оригинальный `value`) и `XACK`-ает оригинал — чтобы
 битое сообщение не крутилось в PEL вечно. DLQ не подрезается: разбирай вручную (`XRANGE <stream>.dead - +`).
 
+**Транзиентные vs окончательные ошибки:** ретрай работает только если обработчик **бросает**.
+Проглоченная ошибка = `XACK` = потеря. Поэтому в depot сбои S3 и таймаут ffmpeg завёрнуты в
+`TransientError` ([apps/depot/src/processing/TransientError.ts](apps/depot/src/processing/TransientError.ts))
+и пробрасываются наружу — запись остаётся в PEL и уходит к reaper'у. Окончательный брак
+(битый кодек, нечитаемое медиа) логируется и отвечает пустым результатом: ретраить нечего.
+
 ### Паттерн Controller → Action
 - **Controller** (`*Controller.ts`): парсит сырьё (`bufferToJson(message.value)`), ранний `return` на мусоре,
   строит типизированный payload, делает работу, публикует ответ через `producer.publish`. **Без** бизнес-логики.
@@ -134,7 +140,9 @@ import { defaultLogger } from 'stenograph'
 const logger = defaultLogger.sub('depot')              // в src/log.ts каждого сервиса
 const sub = logger.sub('action', topic, event.id)      // контекстный саб-логгер на запрос
 ```
-Уровни: `error`, `warn`, `info`, `verbose`, `debug`. В тестах глушим вывод: `defaultLogger.disable()`.
+Уровни: `error`, `warn`, `info`, `verbose`, `debug`. В тестах вывод глушится **сам** —
+`stenograph` вызывает `defaultLogger.disable()` при `NODE_ENV=test` (bun выставляет его
+автоматически), так что руками в тестах это писать не нужно.
 
 ### Тесты
 - Runner — `bun:test`. Файлы colocated рядом с кодом: `foo.ts` + `foo.test.ts`.
@@ -143,19 +151,26 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 
 ## Данные (SQLite + Drizzle)
 
-БД **разделена** между server и telegram (каждая со своим `schema.ts` / `client.ts`
-(`createDatabase` + WAL + миграции на старте) / `repository.ts`, принимающим `db` первым аргументом):
+БД **разделена**: доменная — у server, у каждого фронтенда своя локальная (каждая со своим
+`schema.ts` / `client.ts` (`createDatabase` + WAL + миграции на старте) / `repository.ts`,
+принимающим `db` первым аргументом). Перекрёстных записей нет — чужой домен мутируется
+только через `command.request`.
 
 - **server** ([apps/server/src/db/](apps/server/src/db/)) — домен: `recipients` (uuid PK, роль,
   `tg_user_id?`/`username?`), `access_tokens` (одноразовые коды), `events` (снапшот NVR без message-id).
 - **telegram** ([apps/telegram/src/db/](apps/telegram/src/db/)) — Telegram-локальный стейт:
   `tg_chats`, `tg_bindings` (составной PK `(tg_user_id, tg_chat_id)`, `recipient_uuid` + кэш роли),
-  `event_messages` (составной PK `(event_id, tg_chat_id)`, `message_id`).
+  `event_messages` (составной PK `(event_id, tg_chat_id)`, `message_id`),
+  `service_versions` (версии сервисов из heartbeat — для `/status` и уведомления о раскатке).
+- **pwa** ([apps/pwa/src/db/](apps/pwa/src/db/)) — `push_subscriptions`, `notified_events` (дедуп), `recent_events` (лента).
+- **email** ([apps/email/src/db/](apps/email/src/db/)) — `notified_events` (дедуп-леджер).
 
 - Доступ к БД — **только через repository**, не дёргай drizzle из бизнес-логики/команд.
 - `bun:sqlite` синхронный → функции репозитория возвращают значения, не промисы (`await` над ними безопасен).
 - После правок `schema.ts` — `bunx drizzle-kit generate` в нужном сервисе (миграции в его `drizzle/`, применяются на старте).
-- БД-файл задаётся `DATABASE_PATH` (по умолчанию `./data/server.sqlite` / `./data/telegram.sqlite`, относительно cwd).
+- БД-файл задаётся `DATABASE_PATH` (по умолчанию `./data/<сервис>.sqlite` — `server` / `telegram` /
+  `pwa` / `email`, относительно cwd). Дефолт в коде, в общий `.env` не выносится: одно значение
+  на все сервисы столкнуло бы их в один файл.
 
 ## Стиль кода (Biome)
 

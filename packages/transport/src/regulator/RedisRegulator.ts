@@ -214,7 +214,9 @@ export class RedisRegulator<Context extends BaseContext> {
         )
 
         for (const { id, deliveries } of pending) {
-          if (deliveries > maxDeliveries) {
+          // `deliveries` counts attempts already made, so `>=` diverts the entry
+          // once it has burned its budget rather than granting one extra run.
+          if (deliveries >= maxDeliveries) {
             await deadLetter(stream, id, deliveries)
             continue
           }

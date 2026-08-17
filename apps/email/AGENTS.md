@@ -32,7 +32,7 @@ presign байтов кадра. Сервис **полностью опцион�
 [src/transport/emailTransport.ts](src/transport/emailTransport.ts)):
 
 - `spotter.delivery.event` → `deliveryEventController`
-- `spotter.catalog.updated` → `catalogController`
+- `spotter.catalog.updated` → `catalogController` (общий, из `@spotter/transport` — как и `CatalogCache`)
 
 ## Поток доставки
 

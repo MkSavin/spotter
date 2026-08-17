@@ -1,7 +1,6 @@
-import type { StreamProducer } from '@spotter/transport'
+import type { CatalogCache, StreamProducer } from '@spotter/transport'
 import type { RedisClient, S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
-import type { CatalogCache } from './catalog/CatalogCache'
 import type { Config } from './config'
 import type { EmailDatabase } from './db/client'
 import type { SmtpGateway } from './mail/SmtpGateway'

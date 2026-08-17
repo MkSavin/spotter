@@ -1,5 +1,8 @@
-import { renderEvent, type SpotterEvent } from '@spotter/transport'
-import type { CatalogCache } from '../catalog/CatalogCache'
+import {
+  type CatalogCache,
+  renderEvent,
+  type SpotterEvent,
+} from '@spotter/transport'
 
 export type NotificationPayload = {
   title: string

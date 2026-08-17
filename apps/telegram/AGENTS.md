@@ -18,7 +18,7 @@ bun test
 - `spotter.delivery.event` → `deliveryEventController`
 - `spotter.delivery.recipient` → `deliveryRecipientController`
 - `spotter.camera.frame_processed` → `cameraFrameController`
-- `spotter.catalog.updated` → `catalogController`
+- `spotter.catalog.updated` → `catalogController` (общий, из `@spotter/transport` — как и `CatalogCache`)
 
 ## Поток доставки
 

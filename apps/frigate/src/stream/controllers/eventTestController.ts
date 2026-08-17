@@ -2,8 +2,8 @@ import { publishEvent } from '@spotter/sink'
 import { bufferToJson, type StreamMessageController } from '@spotter/transport'
 import type { CoreContext } from '../../context'
 import {
-  type EventTestPayload,
   eventTestAction,
+  resolveEventTestPayload,
 } from '../actions/eventTestAction'
 import { realEventAction } from '../actions/realEventAction'
 
@@ -41,23 +41,7 @@ export const eventTestController: StreamMessageController<CoreContext> = async (
     return
   }
 
-  const unix = Date.now()
-
-  const eventId =
-    value.eventId ?? `${unix}-${Math.random().toString(36).slice(2)}`
-
-  const rawTimestamp =
-    typeof value.eventId === 'string'
-      ? value.eventId.split('-').at(0)
-      : undefined
-
-  const timestamp = rawTimestamp ? Number.parseFloat(rawTimestamp) : undefined
-
-  const actionPayload: EventTestPayload = {
-    eventId,
-    type: value.type ?? 'start',
-    timestamp: timestamp && !Number.isNaN(timestamp) ? timestamp : unix,
-  }
+  const actionPayload = resolveEventTestPayload(value)
 
   const logger = baseLogger.sub('action', topic, actionPayload.eventId)
 

@@ -1,5 +1,6 @@
 import process from 'node:process'
 import {
+  CatalogCache,
   connectRedis,
   probeRedisVersion,
   type RegulatorHandle,
@@ -8,7 +9,6 @@ import {
 } from '@spotter/transport'
 import { RedisClient, S3Client } from 'bun'
 import information from '../package.json'
-import { CatalogCache } from './catalog/CatalogCache'
 import { resolveConfig } from './config'
 import type { ServerContext } from './context'
 import { createDatabase, type ServerDatabase } from './db/client'

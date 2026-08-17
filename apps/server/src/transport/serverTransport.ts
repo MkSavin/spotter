@@ -1,4 +1,5 @@
 import {
+  catalogController,
   catalogUpdatedStream,
   deliveryStreams,
   eventStreams,
@@ -7,7 +8,6 @@ import {
   type RegulatorHandle,
 } from '@spotter/transport'
 import type { ServerContext } from '../context'
-import { catalogController } from './controllers/catalogController'
 import { commandController } from './controllers/commandController'
 import { eventController } from './controllers/eventController'
 import { eventMediaController } from './controllers/eventMediaController'

@@ -1,12 +1,18 @@
+import type { Stenograph } from 'stenograph'
+import type { StreamProducer } from '../regulator/RedisRegulator'
 import {
   type Catalog,
   type CatalogEntry,
   catalogKey,
-  type StreamProducer,
   safeParseCatalog,
-} from '@spotter/transport'
-import type { Stenograph } from 'stenograph'
+} from '../schema/catalog'
 
+/**
+ * Read-only cache of camera/object display labels, kept in sync from
+ * `spotter.catalog.<source>`. Every delivery frontend needs the same
+ * `code → label` resolution, so it lives here rather than in each service —
+ * consumers stay free of NVR knowledge.
+ */
 export class CatalogCache {
   private readonly cache = new Map<string, Catalog>()
 
@@ -19,17 +25,22 @@ export class CatalogCache {
     )
   }
 
+  /** Loads the last snapshot published before this consumer started. */
   async bootstrap(source: string, producer: StreamProducer): Promise<void> {
     try {
       const raw = (await producer.send('GET', [catalogKey(source)])) as
         | string
         | null
+
       if (!raw) {
         this.logger.debug(`No catalog snapshot stored yet for "${source}"`)
         return
       }
+
       const snapshot = safeParseCatalog(JSON.parse(raw))
-      if (snapshot) this.apply(snapshot)
+      if (snapshot) {
+        this.apply(snapshot)
+      }
     } catch (error) {
       this.logger.warn(`Failed to bootstrap catalog for "${source}"`, error)
     }

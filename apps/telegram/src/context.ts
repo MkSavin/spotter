@@ -1,7 +1,7 @@
 import type { HydrateApiFlavor, HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
-import type { StreamProducer } from '@spotter/transport'
+import type { CatalogCache, StreamProducer } from '@spotter/transport'
 import type { AbortSignal } from 'abort-controller'
 import type { RedisClient, S3Client } from 'bun'
 import type {
@@ -13,7 +13,6 @@ import type {
 } from 'grammy'
 import type { Message } from 'grammy/types'
 import type { Stenograph } from 'stenograph'
-import type { CatalogCache } from './catalog/CatalogCache'
 import type { ClipTracker } from './clip/ClipTracker'
 import type { CommandBus } from './command/CommandBus'
 import type { Config } from './config'

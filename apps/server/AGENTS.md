@@ -29,7 +29,7 @@ env при необходимости). NVR-кредов **нет** — серв
 
 - `spotter.event` → `eventController`
 - `spotter.event.media_processed` → `eventMediaController`
-- `spotter.catalog.updated` → `catalogController`
+- `spotter.catalog.updated` → `catalogController` (общий, из `@spotter/transport` — как и `CatalogCache`)
 - `spotter.command.request` → `commandController`
 
 ## Поток событий и медиа

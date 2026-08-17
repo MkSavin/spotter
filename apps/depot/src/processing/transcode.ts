@@ -1,8 +1,8 @@
-import { env } from '@spotter/transport'
 import type { BunFile } from 'bun'
 import ffmpeg from 'fluent-ffmpeg'
 import sharp from 'sharp'
 import type { Stenograph } from 'stenograph'
+import type { ImageConfig, VideoConfig } from '../config'
 
 type PresetAcceleration = 'cpu' | 'vaapi' | 'videotoolbox' | 'cuda'
 type PresetCodec = 'h264' | 'hevc'
@@ -126,22 +126,6 @@ const resolveVideoPreset = (
   }
 }
 
-const activeVideoPreset = resolveVideoPreset(
-  env.string('VIDEO_ACCELERATION', 'cpu'),
-  env.string('VIDEO_CODEC', 'h264'),
-  env.string('VIDEO_QUALITY', 'best'),
-  env.number('VIDEO_DEVICE', 0),
-)
-
-const skipVideoConversion = env.boolean('VIDEO_SKIP_CONVERSION', false)
-
-/**
- * Hard cap on a single ffmpeg run. A stuck encode never releases the message,
- * and once it idles past REDIS_RECLAIM_MIN_IDLE_MS the reaper would re-dispatch
- * a duplicate transcode — so keep this comfortably below that idle threshold.
- */
-const videoTimeoutMs = env.number('VIDEO_TIMEOUT_MS', 120000)
-
 const resolveImageQuality = (quality: PresetQuality | string): number => {
   switch (quality) {
     case 'best':
@@ -157,11 +141,6 @@ const resolveImageQuality = (quality: PresetQuality | string): number => {
       return 80
   }
 }
-
-const activeImageQuality = resolveImageQuality(
-  env.string('IMAGE_QUALITY', 'best'),
-)
-const skipImageConversion = env.boolean('IMAGE_SKIP_CONVERSION', false)
 
 /** Thrown when ffmpeg fails; carries what the retry decision needs. */
 export class TranscodeError extends Error {
@@ -184,11 +163,8 @@ export const shouldRetryOnCpu = (error: unknown): boolean =>
   error instanceof TranscodeError && !error.timedOut && error.frames === 0
 
 /** CPU fallback for when the configured hardware encoder is missing. */
-const cpuVideoPreset = resolveVideoPreset(
-  'cpu',
-  env.string('VIDEO_CODEC', 'h264'),
-  env.string('VIDEO_QUALITY', 'best'),
-)
+const cpuFallbackPreset = (video: VideoConfig): ProcessorPreset =>
+  resolveVideoPreset('cpu', video.codec, video.quality)
 
 /** Reports transcoding completeness, already rounded to tens. */
 export type ProgressReporter = (percent: number) => void
@@ -197,6 +173,7 @@ export type ProgressReporter = (percent: number) => void
 export const transcodeVideo = async (
   raw: BunFile,
   processed: BunFile,
+  video: VideoConfig,
   logger: Stenograph,
   onProgress?: ProgressReporter,
 ): Promise<void> => {
@@ -207,32 +184,45 @@ export const transcodeVideo = async (
     throw new Error('Clip files is not assigned correctly')
   }
 
-  if (skipVideoConversion) {
+  if (video.skipConversion) {
     logger.debug('Conversion skipped due to configuration flag')
     await processed.write(await raw.arrayBuffer())
     return
   }
 
+  const preset = resolveVideoPreset(
+    video.acceleration,
+    video.codec,
+    video.quality,
+    video.device,
+  )
+  const fallback = cpuFallbackPreset(video)
+
   try {
     await runFfmpeg(
       rawPath,
       processedPath,
-      activeVideoPreset,
+      preset,
+      video.timeoutMs,
       logger,
       onProgress,
     )
   } catch (error) {
-    if (
-      activeVideoPreset.name === cpuVideoPreset.name ||
-      !shouldRetryOnCpu(error)
-    ) {
+    if (preset.name === fallback.name || !shouldRetryOnCpu(error)) {
       throw error
     }
     // Losing the clip is worse than losing the speed-up.
     logger.warn(
-      `Preset ${activeVideoPreset.name} failed (${(error as Error).message}) — retrying on CPU`,
+      `Preset ${preset.name} failed (${(error as Error).message}) — retrying on CPU`,
     )
-    await runFfmpeg(rawPath, processedPath, cpuVideoPreset, logger, onProgress)
+    await runFfmpeg(
+      rawPath,
+      processedPath,
+      fallback,
+      video.timeoutMs,
+      logger,
+      onProgress,
+    )
   }
 
   logger.verbose('Processed video parameters', {
@@ -250,6 +240,7 @@ const runFfmpeg = async (
   rawPath: string,
   processedPath: string,
   preset: ProcessorPreset,
+  timeoutMs: number,
   logger: Stenograph,
   onProgress?: ProgressReporter,
 ): Promise<void> => {
@@ -285,13 +276,13 @@ const runFfmpeg = async (
       finish(() =>
         reject(
           new TranscodeError(
-            `ffmpeg timed out after ${videoTimeoutMs}ms`,
+            `ffmpeg timed out after ${timeoutMs}ms`,
             frames,
             true,
           ),
         ),
       )
-    }, videoTimeoutMs)
+    }, timeoutMs)
 
     command
       .on('error', (error) =>
@@ -319,6 +310,7 @@ const runFfmpeg = async (
 export const transcodeImage = async (
   raw: BunFile,
   processed: BunFile,
+  image: ImageConfig,
   logger: Stenograph,
   // Images convert in one shot; the parameter only keeps the two kinds alike.
   _onProgress?: ProgressReporter,
@@ -330,14 +322,14 @@ export const transcodeImage = async (
     throw new Error('Image files is not assigned correctly')
   }
 
-  if (skipImageConversion) {
+  if (image.skipConversion) {
     logger.debug('Conversion skipped due to configuration flag')
     await processed.write(await raw.arrayBuffer())
     return
   }
 
   const output = await sharp(rawPath)
-    .jpeg({ quality: activeImageQuality })
+    .jpeg({ quality: resolveImageQuality(image.quality) })
     .toFile(processedPath)
 
   logger.verbose('Processed image parameters', {

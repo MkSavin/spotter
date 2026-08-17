@@ -13,8 +13,10 @@ bun test
 ```
 Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
 [.env.ingest.example](../../.env.ingest.example) для ingest). Сервис читает `REDIS_URL`,
-`S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`, `DIRECTORY_CLEANUP`, `VIDEO_*`, `IMAGE_QUALITY`;
-consumer-группа (`spotter-depot`) — с дефолтом в коде.
+`S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`, `DIRECTORY_CLEANUP`, `VIDEO_*`, `IMAGE_*`;
+consumer-группа (`spotter-depot`) — с дефолтом в коде. Всё это собирается в
+[src/config.ts](src/config.ts) (`config.video` / `config.image`) и приходит в `transcode.ts`
+аргументом — напрямую `env` в обработке не читается.
 
 > Сервис горизонтально масштабируется: запускают несколько инстансов (`depot-1`, `depot-2`)
 > в **одной** consumer-группе (`spotter-depot`) с **разными** `REDIS_CLIENT_ID` — Redis раскидывает
@@ -43,8 +45,12 @@ mediaStagedController ──▶ mediaStagedAction ──▶ processStaged(video/
                                        transcode.ts (ffmpeg/sharp)
 ```
 
-- Клип и снимок обрабатываются параллельно (`Promise.all`) и **независимо ловят ошибки**
-  (одна упавшая ветка не валит всю обработку — возвращает `undefined`).
+- Клип и снимок обрабатываются параллельно и **независимо ловят ошибки**: окончательный
+  брак одной ветки не мешает доставить вторую (вернётся `undefined` по этой ветке).
+- **Транзиентный** сбой (S3 недоступен, ключ ещё не виден, таймаут ffmpeg) — это
+  `TransientError`, и он **пробрасывается наружу**: регулятор не делает `XACK`, запись
+  остаётся в PEL, reaper повторит. Не заворачивай такие ошибки в `catch` — проглоченная
+  ошибка означает потерю медиа навсегда.
 - `processStaged` ([src/processing/processStaged.ts](src/processing/processStaged.ts)) — общая логика:
   скачать из S3 по `rawKey` → транскодировать (`transcode.ts`) → положить результат в S3,
   вернуть **ключ** (`processedPath`, `filePrefix`). URL/токены NVR не фигурируют.
@@ -72,8 +78,9 @@ mediaStagedController ──▶ mediaStagedAction ──▶ processStaged(video/
   карте. База одна для всех стадий — нативные бинарники sharp собираются под конкретный libc и
   на чужом не загрузятся.
 - Если аппаратного кодировщика нет, `transcodeVideo` **повторяет попытку на CPU**
-  (`isEncoderUnavailable` отличает отсутствие кодировщика от битого входа — второе на CPU
-  упадёт так же, только медленнее). Потерять ускорение лучше, чем потерять клип.
+  (`shouldRetryOnCpu` судит по числу выданных кадров: 0 кадров = умер на устройстве, CPU может
+  справиться; кадры пошли или таймаут = виноват вход, на CPU упадёт так же, только медленнее).
+  Потерять ускорение лучше, чем потерять клип.
 
 ## Особенности
 

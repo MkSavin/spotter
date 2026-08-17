@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import type { DeliveryEvent, SpotterEvent } from '@spotter/transport'
+import {
+  CatalogCache,
+  type DeliveryEvent,
+  type SpotterEvent,
+} from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
-import { CatalogCache } from '../../catalog/CatalogCache'
 import type { TransportContext } from '../../context'
 import { createDatabase } from '../../db/client'
 import { notifiedEventsRepo, recentEventsRepo } from '../../db/repository'

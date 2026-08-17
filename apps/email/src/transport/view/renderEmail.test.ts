@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import type { SpotterEvent } from '@spotter/transport'
+import { CatalogCache, type SpotterEvent } from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
-import { CatalogCache } from '../../catalog/CatalogCache'
 import type { Config } from '../../config'
 import type { CoreContext } from '../../context'
 import { renderEmail } from './renderEmail'

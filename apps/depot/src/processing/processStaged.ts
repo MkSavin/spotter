@@ -1,8 +1,10 @@
 import path from 'node:path'
 import Bun, { type BunFile } from 'bun'
 import type { CoreContext } from '../context'
+import { TransientError, transient } from './TransientError'
 import {
   type ProgressReporter,
+  TranscodeError,
   transcodeImage,
   transcodeVideo,
 } from './transcode'
@@ -19,12 +21,10 @@ const kinds = {
   video: {
     extension: 'mp4',
     contentType: 'video/mp4',
-    transcode: transcodeVideo,
   },
   image: {
     extension: 'jpg',
     contentType: 'image/jpeg',
-    transcode: transcodeImage,
   },
 } as const
 
@@ -43,21 +43,25 @@ export const processStaged = async (
     return undefined
   }
 
-  const { s3, directory, filePrefix, processedPath } = context
-  const { extension, contentType, transcode } = kinds[kind]
+  const { s3, directory, filePrefix, processedPath, config } = context
+  const { extension, contentType } = kinds[kind]
 
   const logger = context.logger.sub('staged', kind)
 
   const rawObject = s3.file(rawKey)
 
-  if (!(await rawObject.exists())) {
-    throw new Error(`Staged object not found in s3: ${rawKey}`)
+  // Staging and transcoding race: the object may not be visible yet, so a miss
+  // is retryable rather than a verdict on the media.
+  if (!(await transient('s3 head', () => rawObject.exists()))) {
+    throw new TransientError(`Staged object not found in s3: ${rawKey}`)
   }
 
-  const rawBuffer = await rawObject.arrayBuffer()
+  const rawBuffer = await transient('s3 get', () => rawObject.arrayBuffer())
 
+  // Also retryable: an empty read usually means the upload is still in flight.
+  // If it really is a zero-byte object the DLQ bounds the retries.
   if (rawBuffer.byteLength === 0) {
-    throw new Error(`Staged object is empty: ${rawKey}`)
+    throw new TransientError(`Staged object is empty: ${rawKey}`)
   }
 
   const hash = Bun.hash(rawKey)
@@ -73,14 +77,29 @@ export const processStaged = async (
 
   logger.debug(`Processing staged ${kind} from ${rawKey}`)
 
-  await transcode(raw, processed, logger, onProgress)
+  if (kind === 'video') {
+    try {
+      await transcodeVideo(raw, processed, config.video, logger, onProgress)
+    } catch (error) {
+      // A killed encode says the box was too slow or too busy, not that the
+      // clip is bad — worth one more delivery.
+      if (error instanceof TranscodeError && error.timedOut) {
+        throw new TransientError(error.message, error)
+      }
+      throw error
+    }
+  } else {
+    await transcodeImage(raw, processed, config.image, logger, onProgress)
+  }
 
   const processedKey = path.join(
     processedPath,
     `${filePrefix}-${hash}.${extension}`,
   )
 
-  await s3.file(processedKey).write(processed, { type: contentType })
+  await transient('s3 put', () =>
+    s3.file(processedKey).write(processed, { type: contentType }),
+  )
 
   logger.debug(`Uploaded processed ${kind} to s3://${processedKey}`)
 

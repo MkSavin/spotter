@@ -238,6 +238,39 @@ describe('RedisRegulator reclaim', () => {
     ])
   })
 
+  test('diverts exactly at maxDeliveries, retrying the attempt below it', async () => {
+    const subscriber = stagedSubscriber([])
+    const handler = handlerMock()
+
+    // The boundary itself: 3 attempts spent against a budget of 3 is poison,
+    // while 2 still deserves one more run.
+    const producerClient = new FakeRedis()
+      .on('XPENDING', () => [
+        ['20-0', 'c', 999999, 3],
+        ['21-0', 'c', 999999, 2],
+      ])
+      .on('XRANGE', () => [entry('20-0', { id: 'spent' })])
+      .on('XCLAIM', () => [entry('21-0', { id: 'last-chance' })])
+
+    const handle = await new RedisRegulator()
+      .message('spotter.event', handler)
+      .run(buildContext(subscriber, producerClient), {
+        group: 'g',
+        consumer: 'c',
+        maxDeliveries: 3,
+        reaperIntervalMs: 999999,
+      })
+    handles.push(handle)
+
+    const dead = producerClient.callsOf('XADD')
+    expect(dead).toHaveLength(1)
+    expect(dead[0][0]).toBe('spotter.event.dead')
+    expect(dead[0]).toContain('{"id":"spent"}')
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler.mock.calls[0][0].message.value).toBe('{"id":"last-chance"}')
+  })
+
   test('ignores BUSYGROUP when the consumer group already exists', async () => {
     const subscriber = stagedSubscriber([])
     const producerClient = new FakeRedis().on('XGROUP', () => {

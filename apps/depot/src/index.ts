@@ -65,7 +65,7 @@ const run = async (): Promise<void> => {
   stopHeartbeat = startHeartbeat(producer, {
     service: 'depot',
     version: information.version,
-    details: probeDetails,
+    details: () => probeDetails(config),
   })
 
   transport = await new RedisRegulator<CoreContext>()

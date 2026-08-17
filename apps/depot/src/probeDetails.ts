@@ -1,10 +1,12 @@
-import { env } from '@spotter/transport'
 import { $ } from 'bun'
+import type { CoreConfig } from './config'
 
 /** ffmpeg build and the active acceleration, shown next to the version. */
-export const probeDetails = async (): Promise<Record<string, string>> => {
+export const probeDetails = async (
+  config: CoreConfig,
+): Promise<Record<string, string>> => {
   const details: Record<string, string> = {
-    acceleration: env.string('VIDEO_ACCELERATION', 'cpu'),
+    acceleration: config.video.acceleration,
   }
 
   const banner = await $`ffmpeg -version`

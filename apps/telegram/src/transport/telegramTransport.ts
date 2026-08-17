@@ -1,4 +1,5 @@
 import {
+  catalogController,
   catalogUpdatedStream,
   deliveryStreams,
   heartbeatStream,
@@ -14,7 +15,6 @@ import type {
   TransportContext,
 } from '../context'
 import { cameraFrameController } from './controllers/cameraFrameController'
-import { catalogController } from './controllers/catalogController'
 import { deliveryEventController } from './controllers/deliveryEventController'
 import { deliveryRecipientController } from './controllers/deliveryRecipientController'
 import { heartbeatController } from './controllers/heartbeatController'

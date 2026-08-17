@@ -128,7 +128,7 @@ Telegram-локальный стейт и пресайнит медиа. Кон�
 | **`apps/depot`**   | Медиа-процессор. Берёт сырое медиа из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат обратно в S3. NVR не знает. |
 | **`apps/forwarder`** | Двунаправленный мост Redis Streams local↔remote (store-and-forward). Нужен только в распределённом деплое — см. [Развёртывание](#развёртывание-docker). |
 | **`packages/sink`** | Фреймворк адаптера: порты `Source`/`MediaProvider`/`Catalog`, рантайм `runSink` (стейджинг в S3, публикация событий/каталога). |
-| **`packages/transport`** | Общие абстракции транспорта: `RedisRegulator`, `StreamProducer`, `env`, `resolveRedisConfig`, `bufferToJson`, контракты `SpotterEvent` / медиа-пайплайна / каталога. |
+| **`packages/transport`** | Общие абстракции транспорта: `RedisRegulator`, `StreamProducer`, `env`, `resolveRedisConfig`, `bufferToJson`, контракты `SpotterEvent` / медиа-пайплайна / каталога, общий `CatalogCache` + `catalogController` для всех фронтендов. |
 | **`packages/stenograph`** | Структурированный логгер с контекстными саб-логгерами.                                     |
 
 **Топология деплоя.** Архитектура рассчитана на два сценария. Простой — **всё на
@@ -248,10 +248,12 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 
 ## Redis Streams
 
-Каждый стрим читается своей consumer-группой (`spotter-server` / `spotter-telegram` /
-`spotter-depot` / `spotter-frigate`). Доставка — at-least-once: `XACK` после успешной
-обработки, зависшие записи перезабираются `XAUTOCLAIM` (reaper). Группы создаются с позиции
-`$` — на рестарте старое не пересылается.
+Каждый стрим читается своей consumer-группой — по одной на сервис (`spotter-server`,
+`spotter-telegram`, `spotter-depot`, `spotter-frigate`, а также `spotter-pwa`,
+`spotter-email`, `spotter-forwarder`, `spotter-test`). Доставка — at-least-once: `XACK` после успешной
+обработки, зависшие записи перезабираются reaper'ом (`XPENDING IDLE` → `XCLAIM`). Группы
+создаются с позиции `$` — на рестарте старое не пересылается. Запись, не осилившая
+`REDIS_MAX_DELIVERIES` попыток, уходит в `<stream>.dead`.
 
 Медиа-пайплайн абстрактен: server шлёт запрос в per-source стрим, адаптер стейджит
 сырьё в S3, depot транскодит по ключу. По сети ходят только S3-ключи. Домен (server)
@@ -272,6 +274,8 @@ bun apps/server/src/cli.ts sign admin -b <bot_username>
 | `spotter.delivery.recipient`       | server    | telegram        | Изменение роли/отзыв получателя       |
 | `spotter.command.request`          | telegram  | server          | Домен-мутирующая команда (RPC)        |
 | `spotter.command.reply`            | server    | telegram        | Ответ на команду (корреляция по requestId) |
+| `spotter.media.progress`           | frigate, depot | telegram   | Стадия готовности клипа (`fetching`/`staged`/`failed`) — двигает кнопку «Видео» |
+| `spotter.heartbeat`                | все сервисы | telegram      | Версия и признаки живости сервиса (`/status`, уведомление о раскатке) |
 | `frigate/events` *(MQTT)*          | Frigate   | frigate         | Сырые события Frigate                 |
 
 В распределённом деплое эти стримы зеркалируются между локальным и удалённым Redis

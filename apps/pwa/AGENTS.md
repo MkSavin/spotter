@@ -40,7 +40,6 @@ apps/pwa/
     transport/               # RedisRegulator: delivery.event + catalog.updated
     render/                  # payload нотификации + форма feed-записи
     db/                      # SQLite/drizzle: push_subscriptions, notified_events, recent_events
-    catalog/CatalogCache.ts  # лейблы из spotter.catalog.<source> (как email)
   web/                       # Vite + React 19 + shadcn/ui + Tailwind v4 → web/dist
     src/{sw.ts, lib, hooks, components/ui, components, pages, styles}
 ```
@@ -54,7 +53,7 @@ Redis-подключения (`subscriber`, `producer`); бутстрапит к
 [src/transport/pwaTransport.ts](src/transport/pwaTransport.ts)):
 
 - `spotter.delivery.event` → `deliveryEventController` → `pushEventAction`
-- `spotter.catalog.updated` → `catalogController`
+- `spotter.catalog.updated` → `catalogController` (общий, из `@spotter/transport` — как и `CatalogCache`)
 
 ## Поток доставки
 

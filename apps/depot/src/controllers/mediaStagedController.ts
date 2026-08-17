@@ -33,6 +33,9 @@ export const mediaStagedController: StreamMessageController<
 
   logger.verbose('Action contents:', staged)
 
+  // A transient failure propagates out of the action: the regulator skips the
+  // XACK, so the entry stays pending and the reaper retries it. Only a
+  // permanent failure returns empty and is reported as final below.
   const result = await mediaStagedAction(staged, { ...context, logger })
 
   if (!result) {

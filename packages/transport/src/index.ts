@@ -1,3 +1,5 @@
+export * from './catalog/CatalogCache'
+export * from './catalog/catalogController'
 export * from './config/redis'
 export * from './helpers/bufferToJson'
 export * from './helpers/connectRedis'
