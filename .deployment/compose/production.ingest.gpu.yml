@@ -7,35 +7,25 @@
 #
 # Also set VIDEO_ACCELERATION=cuda in .env, otherwise ffmpeg stays on the CPU
 # and the reserved GPU sits idle.
-services:
-  spotter-depot-1:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    devices:
-      - /dev/nvidia-caps:/dev/nvidia-caps
-      - /dev/nvidia0:/dev/nvidia0
-      - /dev/nvidiactl:/dev/nvidiactl
-      - /dev/nvidia-modeset:/dev/nvidia-modeset
-      - /dev/nvidia-uvm:/dev/nvidia-uvm
-      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+#
+# Device list mirrors Frigate's documented setup — the combination it ships is
+# known to work on the same hardware.
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+  devices:
+    - /dev/nvidia-caps:/dev/nvidia-caps
+    - /dev/nvidia0:/dev/nvidia0
+    - /dev/nvidiactl:/dev/nvidiactl
+    - /dev/nvidia-modeset:/dev/nvidia-modeset
+    - /dev/nvidia-uvm:/dev/nvidia-uvm
+    - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
 
-  spotter-depot-2:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    devices:
-      - /dev/nvidia-caps:/dev/nvidia-caps
-      - /dev/nvidia0:/dev/nvidia0
-      - /dev/nvidiactl:/dev/nvidiactl
-      - /dev/nvidia-modeset:/dev/nvidia-modeset
-      - /dev/nvidia-uvm:/dev/nvidia-uvm
-      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+services:
+  spotter-depot-1: *gpu
+  spotter-depot-2: *gpu

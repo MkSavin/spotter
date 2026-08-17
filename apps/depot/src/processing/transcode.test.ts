@@ -1,47 +1,49 @@
 import { describe, expect, test } from 'bun:test'
-import { isEncoderUnavailable } from './transcode'
+import { shouldRetryOnCpu, TranscodeError } from './transcode'
 
-describe('isEncoderUnavailable', () => {
-  test('recognises a build without the hardware encoder', () => {
-    // What alpine's ffmpeg actually says for hevc_nvenc.
+describe('shouldRetryOnCpu', () => {
+  test('retries when ffmpeg died before the first frame', () => {
+    // Both hardware failures look like this: the encoder is missing, or it is
+    // there but the device will not open. Either way the CPU may succeed.
     expect(
-      isEncoderUnavailable(
-        new Error(
-          'ffmpeg exited with code 8: Error opening output files: Encoder not found',
+      shouldRetryOnCpu(
+        new TranscodeError(
+          'ffmpeg exited with code 8: Encoder not found',
+          0,
+          false,
         ),
       ),
     ).toBe(true)
-    expect(isEncoderUnavailable(new Error('Unknown encoder hevc_nvenc'))).toBe(
-      true,
-    )
-  })
-
-  test('recognises a driver that will not open', () => {
     expect(
-      isEncoderUnavailable(new Error('No NVENC capable devices found')),
-    ).toBe(true)
-    expect(
-      isEncoderUnavailable(new Error('Cannot load libnvidia-encode.so.1')),
-    ).toBe(true)
-  })
-
-  test('leaves a broken input alone', () => {
-    // Retrying these on the CPU would fail the same way, only slower.
-    expect(
-      isEncoderUnavailable(
-        new Error('Invalid data found when processing input'),
+      shouldRetryOnCpu(
+        new TranscodeError(
+          'ffmpeg exited with code 255: Conversion failed!',
+          0,
+          false,
+        ),
       ),
+    ).toBe(true)
+  })
+
+  test('gives up once frames were produced', () => {
+    // Encoding had started, so the device works — the input is at fault and
+    // the CPU would hit the same wall.
+    expect(
+      shouldRetryOnCpu(new TranscodeError('Invalid data found', 42, false)),
     ).toBe(false)
-    expect(isEncoderUnavailable(new Error('No such file or directory'))).toBe(
+  })
+
+  test('gives up on a timeout', () => {
+    // The CPU is slower, so a clip that already ran out of time will not make it.
+    expect(
+      shouldRetryOnCpu(new TranscodeError('ffmpeg timed out', 0, true)),
+    ).toBe(false)
+  })
+
+  test('gives up on anything that is not a transcode failure', () => {
+    expect(shouldRetryOnCpu(new Error('Clip files is not assigned'))).toBe(
       false,
     )
-    expect(
-      isEncoderUnavailable(new Error('ffmpeg timed out after 120000ms')),
-    ).toBe(false)
-  })
-
-  test('survives a non-Error value', () => {
-    expect(isEncoderUnavailable('Encoder not found')).toBe(true)
-    expect(isEncoderUnavailable(undefined)).toBe(false)
+    expect(shouldRetryOnCpu(undefined)).toBe(false)
   })
 })

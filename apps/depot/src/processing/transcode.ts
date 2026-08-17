@@ -163,14 +163,25 @@ const activeImageQuality = resolveImageQuality(
 )
 const skipImageConversion = env.boolean('IMAGE_SKIP_CONVERSION', false)
 
+/** Thrown when ffmpeg fails; carries what the retry decision needs. */
+export class TranscodeError extends Error {
+  constructor(
+    message: string,
+    readonly frames: number,
+    readonly timedOut: boolean,
+  ) {
+    super(message)
+  }
+}
+
 /**
- * A build without the hardware encoder, or a driver that will not open. Retrying
- * on the CPU is worth it; a broken input file is not.
+ * Whether a failed hardware transcode is worth retrying on the CPU. Judged by
+ * how far ffmpeg got, not by its wording: no frames means it died on the device
+ * and the CPU may well succeed, while a timeout or a mid-stream failure points
+ * at the input and would fail again, only slower.
  */
-export const isEncoderUnavailable = (error: unknown): boolean =>
-  /encoder not found|unknown encoder|cannot load|capable devices|not supported|no device available|failed to initiali[sz]e/i.test(
-    String((error as Error)?.message ?? error),
-  )
+export const shouldRetryOnCpu = (error: unknown): boolean =>
+  error instanceof TranscodeError && !error.timedOut && error.frames === 0
 
 /** CPU fallback for when the configured hardware encoder is missing. */
 const cpuVideoPreset = resolveVideoPreset(
@@ -203,13 +214,13 @@ export const transcodeVideo = async (
   } catch (error) {
     if (
       activeVideoPreset.name === cpuVideoPreset.name ||
-      !isEncoderUnavailable(error)
+      !shouldRetryOnCpu(error)
     ) {
       throw error
     }
     // Losing the clip is worse than losing the speed-up.
     logger.warn(
-      `Preset ${activeVideoPreset.name} unavailable (${(error as Error).message}) — retrying on CPU`,
+      `Preset ${activeVideoPreset.name} failed (${(error as Error).message}) — retrying on CPU`,
     )
     await runFfmpeg(rawPath, processedPath, cpuVideoPreset, logger)
   }
@@ -227,6 +238,8 @@ const runFfmpeg = async (
   preset: ProcessorPreset,
   logger: Stenograph,
 ): Promise<void> => {
+  let frames = 0
+
   await new Promise<void>((resolve, reject) => {
     logger.debug(`Using processing preset ${preset.name}`)
     logger.verbose('Preset options:', {
@@ -253,13 +266,24 @@ const runFfmpeg = async (
     const timer = setTimeout(() => {
       command.kill('SIGKILL')
       finish(() =>
-        reject(new Error(`ffmpeg timed out after ${videoTimeoutMs}ms`)),
+        reject(
+          new TranscodeError(
+            `ffmpeg timed out after ${videoTimeoutMs}ms`,
+            frames,
+            true,
+          ),
+        ),
       )
     }, videoTimeoutMs)
 
     command
-      .on('error', (error) => finish(() => reject(error)))
+      .on('error', (error) =>
+        finish(() =>
+          reject(new TranscodeError((error as Error).message, frames, false)),
+        ),
+      )
       .on('progress', (progress) => {
+        frames = progress.frames ?? frames
         logger.verbose(
           `Progress: ${progress.percent ?? 0}% / 100% (${progress.frames})`,
         )
