@@ -1,5 +1,16 @@
 # @spotter/email
 
+## 0.1.3
+
+### Patch Changes
+
+- f6ff724: refactor: share CatalogCache and catalogController from transport
+  
+  The catalog controller was byte-identical in telegram, pwa and email, and four near-identical `CatalogCache` copies had already started drifting apart in comments and helpers. Both now live in `@spotter/transport`, where the rest of the catalog contract already sits, so a change to label resolution is one edit instead of four.
+- Updated dependencies [f6ff724]
+- Updated dependencies [f6ff724]
+  - @spotter/transport@1.5.2
+
 ## 0.1.2
 
 ### Patch Changes

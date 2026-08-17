@@ -1,6 +1,6 @@
 {
   "name": "@spotter/server",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Headless domain service: event persistence, media orchestration, auth, command RPC",
   "main": "index.js",
   "scripts": {
