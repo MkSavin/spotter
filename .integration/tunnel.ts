@@ -32,7 +32,15 @@ export const isRoot = (): boolean => process.getuid?.() === 0
 /** Public key for the node, created on first run. */
 export const ensureKey = async (): Promise<string> => {
   if (!existsSync(KEY)) {
-    await $`ssh-keygen -t ed25519 -N ${''} -f ${KEY} -C spotter-tunnel`.quiet()
+    const result =
+      await $`ssh-keygen -t ed25519 -N ${''} -f ${KEY} -C spotter-tunnel`
+        .quiet()
+        .nothrow()
+    if (result.exitCode !== 0) {
+      throw new Error(
+        `ssh-keygen: ${result.stderr.toString().trim() || 'не удалось создать ключ'}`,
+      )
+    }
   }
   return (await $`cat ${KEY}.pub`.text()).trim()
 }
@@ -71,24 +79,51 @@ WantedBy=multi-user.target
 
 export const installService = async (setup: TunnelSetup): Promise<void> => {
   await Bun.write(UNIT, unitFile(setup))
-  await $`systemctl daemon-reload`.quiet()
-  await $`systemctl enable --now spotter-tunnel`.quiet()
+
+  const run = async (...args: string[]): Promise<void> => {
+    const result = await $`systemctl ${args}`.quiet().nothrow()
+    if (result.exitCode !== 0) {
+      // Bare `.quiet()` would swallow this and the command would just stop.
+      throw new Error(
+        `systemctl ${args.join(' ')}: ${
+          result.stderr.toString().trim() || `код ${result.exitCode}`
+        }`,
+      )
+    }
+  }
+
+  await run('daemon-reload')
+  await run('enable', 'spotter-tunnel')
+  // `enable --now` leaves an already-running service on its old unit file;
+  // restart is what actually picks up a changed host, port or key.
+  await run('restart', 'spotter-tunnel')
 }
 
-/** True once the tunnel accepts connections on the bridge address. */
+/**
+ * True once the cloud Redis answers through the tunnel. An open socket is not
+ * enough: right after a restart the old ssh may still hold the port while
+ * forwarding nowhere, so this waits for an actual PONG.
+ */
 export const verify = async (bridge: string): Promise<boolean> => {
   for (let attempt = 0; attempt < 10; attempt++) {
-    try {
-      const socket = await Bun.connect({
+    const answered = await new Promise<boolean>((resolve) => {
+      Bun.connect({
         hostname: bridge,
         port: 6379,
-        socket: { data() {} },
-      })
-      socket.end()
-      return true
-    } catch {
-      await Bun.sleep(1000)
-    }
+        socket: {
+          open: (socket) => socket.write('PING\r\n'),
+          data: (socket, data) => {
+            socket.end()
+            resolve(data.toString().includes('PONG'))
+          },
+          error: () => resolve(false),
+          close: () => resolve(false),
+        },
+      }).catch(() => resolve(false))
+      setTimeout(() => resolve(false), 3000)
+    })
+    if (answered) return true
+    await Bun.sleep(1000)
   }
   return false
 }
@@ -135,7 +170,12 @@ export const configure = async ({
   }
 
   say('  Поднимаю службу…')
-  await installService(setup)
+  try {
+    await installService(setup)
+  } catch (error) {
+    say(`  ! Не удалось поставить службу: ${(error as Error).message}`)
+    return undefined
+  }
   if (!(await verify(bridge))) {
     say('  ! Служба поставлена, но порт не отвечает.')
     say('    Смотри: systemctl status spotter-tunnel')

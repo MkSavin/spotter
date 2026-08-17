@@ -70,9 +70,16 @@ const takeFlags = (args: string[]): string[] =>
 
 const has = (flag: string): boolean => flags.has(flag)
 
-/** True when MQTT_BROKER points at the broker this compose file would start. */
-const ownsBroker = (): boolean =>
-  /^mqtts?:\/\/mosquitto[:/]?/.test(readEnv('MQTT_BROKER') ?? '')
+/**
+ * True when the broker is ours to start. Decided by MQTT_NETWORK_EXTERNAL, not
+ * by the host name: someone else's broker is very often called `mosquitto` too,
+ * and starting a second one collides on the port.
+ */
+const ownsBroker = (): boolean => {
+  const broker = readEnv('MQTT_BROKER') ?? ''
+  if (readEnv('MQTT_NETWORK_EXTERNAL') === 'true') return false
+  return !broker || /^mqtts?:\/\/mosquitto[:/]?/.test(broker)
+}
 
 // The NVIDIA overlay is ingest-only and on by default — GPU transcoding is
 // several times faster, so opting out is the deliberate choice.
@@ -282,6 +289,8 @@ const COMMANDS: Record<string, Command> = {
         input: process.stdin,
         output: process.stdout,
       })
+      // Always closed: an open readline keeps stdin alive and the process
+      // hangs after the error instead of exiting.
       const url = await configure({
         say: (msg = '') => console.log(msg),
         ask: async (question, fallback = '') => {
@@ -289,8 +298,7 @@ const COMMANDS: Record<string, Command> = {
           const answer = (await rl.question(`  ${question}${suffix}: `)).trim()
           return answer || fallback
         },
-      })
-      rl.close()
+      }).finally(() => rl.close())
       if (!url) process.exit(1)
       persistEnv('REDIS_REMOTE_URL', url)
       console.log('\n  ✓ REDIS_REMOTE_URL записан в .env')
@@ -385,4 +393,12 @@ if (!command) {
   process.exit(2)
 }
 
-await command.run(rest)
+try {
+  await command.run(rest)
+} catch (error) {
+  // Without this a thrown error ends the process with no output at all —
+  // the command just appears to do nothing.
+  console.error(`\n  spotter: ${name} не выполнена`)
+  console.error(`  ${(error as Error).message ?? error}\n`)
+  process.exit(1)
+}

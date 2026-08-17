@@ -124,8 +124,10 @@ services:
 networks:
   spotter:
     driver: bridge
-  # Fixed name so another compose project can join it:
-  #   networks: { spotter-mqtt: { external: true } }
+  # The broker's network. Own broker: this is ours, `spotter-mqtt`, and another
+  # compose project can join it with `{ spotter-mqtt: { external: true } }`.
+  # Someone else's broker: set MQTT_NETWORK to its network name and MQTT_NETWORK_EXTERNAL
+  # to true — spotter-frigate then joins that network and resolves the broker by name.
   mqtt:
-    name: spotter-mqtt
-    driver: bridge
+    name: ${MQTT_NETWORK:-spotter-mqtt}
+    external: ${MQTT_NETWORK_EXTERNAL:-false}

@@ -88,10 +88,10 @@ const checkRedis = async (
 const checkMqtt = async (
   composeArgs: string[],
   broker: string,
+  own: boolean,
 ): Promise<Check[]> => {
   const target = broker.replace(/^mqtts?:\/\//, '')
   const [host = 'mosquitto', port = '1883'] = target.split(':')
-  const own = host === 'mosquitto'
 
   // Probed from the adapter's container: that is the path it really uses.
   // Bun opens the socket — `nc` is not guaranteed to exist in the image.
@@ -334,7 +334,11 @@ export const diagnose = async (
   const redisService = mode === 'ingest' ? 'local-redis' : 'redis'
 
   // Our own broker only runs when MQTT_BROKER points at it.
-  const ownBroker = /^mqtts?:\/\/mosquitto[:/]?/.test(env.MQTT_BROKER ?? '')
+  // Someone else's broker is often called `mosquitto` too, so the network flag
+  // decides, not the host name.
+  const ownBroker =
+    env.MQTT_NETWORK_EXTERNAL !== 'true' &&
+    (!env.MQTT_BROKER || /^mqtts?:\/\/mosquitto[:/]?/.test(env.MQTT_BROKER))
 
   const expected =
     mode === 'ingest'
@@ -365,6 +369,7 @@ export const diagnose = async (
       ...(await checkMqtt(
         composeArgs,
         env.MQTT_BROKER || 'mqtt://mosquitto:1883',
+        ownBroker,
       )),
     )
     checks.push(...(await checkFrigate(composeArgs)))

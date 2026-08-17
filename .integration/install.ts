@@ -16,6 +16,14 @@ type Mode = 'single' | 'cloud' | 'ingest'
 
 const rl = createInterface({ input: process.stdin, output: process.stdout })
 
+// A thrown error would otherwise leave stdin open and the wizard would hang
+// silently instead of reporting what went wrong.
+process.on('uncaughtException', (error) => {
+  console.error(`\n✗ ${error.message}`)
+  rl.close()
+  process.exit(1)
+})
+
 // Probing with the depot image itself: it is needed anyway, so nothing extra
 // is pulled, and it tests the very container that will run in production.
 const DEPOT_IMAGE = 'ghcr.io/mksavin/spotter-depot:latest'
@@ -269,12 +277,36 @@ if (mode === 'ingest' || mode === 'single') {
     // `mqtt` compose profile on.
     env = setEnv(env, 'MQTT_BROKER', 'mqtt://mosquitto:1883')
   } else {
-    const host = await ask(
-      'Адрес готового брокера (host:port)',
-      'localhost:1883',
-    )
-    const url = /^mqtts?:\/\//.test(host) ? host : `mqtt://${host}`
-    env = setEnv(env, 'MQTT_BROKER', url)
+    say('')
+    say('  Готовый брокер. Если он в Docker — укажи имя контейнера и его сеть,')
+    say('  тогда обойдёмся без портов на хосте. Посмотреть сети можно так:')
+    say('    docker network ls')
+    say('')
+
+    const inDocker = await askYesNo('Брокер запущен в Docker?', true)
+
+    if (inDocker) {
+      const service = await ask('Имя контейнера брокера', 'mosquitto')
+      const port = await ask('Порт внутри сети', '1883')
+      const network = await ask('Имя его docker-сети', 'mosquitto')
+      env = setEnv(env, 'MQTT_BROKER', `mqtt://${service}:${port}`)
+      // Joining the broker's own network is what makes its name resolve;
+      // without it the adapter fails with getaddrinfo ESERVFAIL.
+      env = setEnv(env, 'MQTT_NETWORK', network)
+      env = setEnv(env, 'MQTT_NETWORK_EXTERNAL', 'true')
+      say('')
+      say(`  Подключим spotter-frigate к сети «${network}».`)
+      say(`  Если сеть называется иначе — поправь MQTT_NETWORK в .env.`)
+    } else {
+      const host = await ask('Адрес брокера (host:port)', '172.17.0.1:1883')
+      const url = /^mqtts?:\/\//.test(host) ? host : `mqtt://${host}`
+      env = setEnv(env, 'MQTT_BROKER', url)
+      say('')
+      say('  Учти: 127.0.0.1 внутри контейнера — это сам контейнер, а не')
+      say('  машина. Для брокера на этом же хосте бери адрес docker0 (обычно')
+      say('  172.17.0.1).')
+    }
+
     say('')
     say(
       '  Свой брокер не поднимаем. Убедись, что Frigate публикует именно туда',
