@@ -4,6 +4,7 @@
 FROM oven/bun:1.3.14-slim AS base
 
 ARG APP_RELATIVE_PATH
+ARG APP_PACKAGE_NAME
 
 ENV APP_NAME="$(jq -r .name ./${APP_RELATIVE_PATH}/package.json)"
 
@@ -13,12 +14,14 @@ FROM base AS install
 
 # Scopes the install cache per arch.
 ARG TARGETARCH
+# Without the filter every image also installs the pwa toolchain.
+ARG APP_PACKAGE_NAME
 
 COPY package.json bun.lock ./
 COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
 RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun-$TARGETARCH,sharing=locked \
-    bun install --frozen-lockfile
+    bun install --frozen-lockfile --filter "$APP_PACKAGE_NAME"
 
 FROM base AS bundle
 

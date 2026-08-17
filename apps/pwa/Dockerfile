@@ -5,16 +5,19 @@
 FROM oven/bun:1.3.14 AS bundle
 
 ARG APP_RELATIVE_PATH
+ARG APP_PACKAGE_NAME
 WORKDIR /app
 
 # Scopes the install cache per arch.
 ARG TARGETARCH
+# Keeps the other apps' dependencies out of the frontend build.
+ARG APP_PACKAGE_NAME
 
 COPY package.json bun.lock ./
 COPY --parents apps/**/package.json ./
 COPY --parents packages/**/package.json ./
 RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun-$TARGETARCH,sharing=locked \
-    bun install --frozen-lockfile
+    bun install --frozen-lockfile --filter "$APP_PACKAGE_NAME"
 
 COPY . .
 

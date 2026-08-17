@@ -115,7 +115,7 @@ for (const entry of selected) {
   // A local tag holds one arch only, so the manifest goes straight to ghcr.
   const outputArgs = noPublish ? ['--output=type=cacheonly'] : ['--push']
 
-  await $`docker buildx build --platform ${platform} -f ${entry.relativePath}/Dockerfile ${rootDir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} ${tagArgs} ${outputArgs}`
+  await $`docker buildx build --platform ${platform} -f ${entry.relativePath}/Dockerfile ${rootDir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} --build-arg APP_PACKAGE_NAME=${entry.name} ${tagArgs} ${outputArgs}`
 }
 
 console.log('Images successfully built.')
