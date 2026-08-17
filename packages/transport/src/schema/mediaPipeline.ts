@@ -62,6 +62,8 @@ export const mediaProgressSchema = z.object({
   stage: mediaStageSchema,
   /** Short human-readable cause, only for `failed`. */
   reason: z.string().optional(),
+  /** Transcoding completeness, 0-100. Only sent while `staged`. */
+  percent: z.number().int().min(0).max(100).optional(),
 })
 export type MediaProgress = z.infer<typeof mediaProgressSchema>
 

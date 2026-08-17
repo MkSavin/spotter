@@ -19,7 +19,7 @@ export const renderClipState = async (
   const markup =
     'failed' in outcome
       ? videoRetryKeyboard(eventId)
-      : videoProcessingKeyboard(outcome.stage)
+      : videoProcessingKeyboard(outcome.stage, outcome.percent)
 
   const messages = eventMessagesRepo.find(db, eventId)
 

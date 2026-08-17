@@ -2,6 +2,7 @@ import {
   eventCode,
   type MediaProcessed,
   type MediaStaged,
+  mediaStreams,
 } from '@spotter/transport'
 import type { CoreContext } from '../context'
 import { processStaged } from '../processing/processStaged'
@@ -25,8 +26,24 @@ export const mediaStagedAction = async (
       filePrefix: `event-${eventCode(eventId)}`,
     }
 
+    // Progress is a nicety: a broken publish must not fail the transcode.
+    const reportProgress = (percent: number): void => {
+      void context.producer
+        .publish(mediaStreams.mediaProgress, {
+          eventId,
+          stage: 'staged',
+          percent,
+        })
+        .catch(() => undefined)
+    }
+
     const [clipKey, snapshotKey] = await Promise.all([
-      processStaged('video', rawClipKey, processingContext).catch((error) => {
+      processStaged(
+        'video',
+        rawClipKey,
+        processingContext,
+        reportProgress,
+      ).catch((error) => {
         context.logger.error(error)
         return undefined
       }),

@@ -4,7 +4,9 @@ import type { ClipStage } from '../transport/view/eventKeyboard'
 /** Give up on a clip after this long and let the user try again. */
 export const CLIP_TIMEOUT_MS = 5 * 60_000
 
-export type ClipOutcome = { stage: ClipStage } | { failed: string }
+export type ClipOutcome =
+  | { stage: ClipStage; percent?: number }
+  | { failed: string }
 
 type Options = {
   timeoutMs?: number
@@ -16,7 +18,11 @@ type Options = {
 export class ClipTracker {
   private readonly waiting = new Map<
     string,
-    { stage: ClipStage; timer: ReturnType<typeof setTimeout> }
+    {
+      stage: ClipStage
+      percent?: number
+      timer: ReturnType<typeof setTimeout>
+    }
   >()
 
   constructor(
@@ -30,11 +36,14 @@ export class ClipTracker {
   }
 
   /** A stage update arrived from the pipeline. */
-  advance(eventId: string, stage: ClipStage): void {
+  advance(eventId: string, stage: ClipStage, percent?: number): void {
     // Media moves for events nobody asked about; those must not paint a button.
-    if (!this.waiting.has(eventId)) return
-    this.arm(eventId, stage)
-    void this.options.render(eventId, { stage })
+    const current = this.waiting.get(eventId)
+    if (!current) return
+    // Repeated percentages would spend an API call painting the same button.
+    if (current.stage === stage && current.percent === percent) return
+    this.arm(eventId, stage, percent)
+    void this.options.render(eventId, { stage, percent })
   }
 
   /** The pipeline gave up; tell the user why. */
@@ -48,7 +57,7 @@ export class ClipTracker {
     this.finish(eventId)
   }
 
-  private arm(eventId: string, stage: ClipStage): void {
+  private arm(eventId: string, stage: ClipStage, percent?: number): void {
     clearTimeout(this.waiting.get(eventId)?.timer)
     // Each stage restarts the clock: progress means it is still alive.
     const timer = setTimeout(() => {
@@ -56,7 +65,7 @@ export class ClipTracker {
       this.fail(eventId, 'Видео готовилось слишком долго')
     }, this.options.timeoutMs ?? CLIP_TIMEOUT_MS)
     timer.unref?.()
-    this.waiting.set(eventId, { stage, timer })
+    this.waiting.set(eventId, { stage, percent, timer })
   }
 
   /** Drops the wait; returns false when there was nothing to drop. */

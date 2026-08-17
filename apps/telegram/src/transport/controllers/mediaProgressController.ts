@@ -23,5 +23,5 @@ export const mediaProgressController: StreamMessageController<
     return
   }
 
-  context.clips.advance(progress.eventId, progress.stage)
+  context.clips.advance(progress.eventId, progress.stage, progress.percent)
 }

@@ -27,11 +27,21 @@ export const STAGE_LABELS = {
 
 export type ClipStage = keyof typeof STAGE_LABELS
 
+/** Percent turns the transcoding label into a progress one. */
+const stageLabel = (stage: ClipStage, percent?: number): string =>
+  stage === 'staged' && percent !== undefined
+    ? `⏳ Конвертируется… ${percent}%`
+    : STAGE_LABELS[stage]
+
 /** Disabled-looking keyboard shown while the clip is being prepared. */
 export const videoProcessingKeyboard = (
   stage: ClipStage = 'requested',
+  percent?: number,
 ): InlineKeyboard =>
-  new InlineKeyboard().text(STAGE_LABELS[stage], `${CLIP_PREFIX}${CLIP_WAIT}`)
+  new InlineKeyboard().text(
+    stageLabel(stage, percent),
+    `${CLIP_PREFIX}${CLIP_WAIT}`,
+  )
 
 /** Offers another go after a clip failed or took too long. */
 export const videoRetryKeyboard = (eventId: string): InlineKeyboard =>

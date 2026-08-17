@@ -190,11 +190,15 @@ const cpuVideoPreset = resolveVideoPreset(
   env.string('VIDEO_QUALITY', 'best'),
 )
 
+/** Reports transcoding completeness, already rounded to tens. */
+export type ProgressReporter = (percent: number) => void
+
 /** Transcodes a raw clip into the configured codec/quality, writing `processed`. */
 export const transcodeVideo = async (
   raw: BunFile,
   processed: BunFile,
   logger: Stenograph,
+  onProgress?: ProgressReporter,
 ): Promise<void> => {
   const rawPath = raw.name
   const processedPath = processed.name
@@ -210,7 +214,13 @@ export const transcodeVideo = async (
   }
 
   try {
-    await runFfmpeg(rawPath, processedPath, activeVideoPreset, logger)
+    await runFfmpeg(
+      rawPath,
+      processedPath,
+      activeVideoPreset,
+      logger,
+      onProgress,
+    )
   } catch (error) {
     if (
       activeVideoPreset.name === cpuVideoPreset.name ||
@@ -222,7 +232,7 @@ export const transcodeVideo = async (
     logger.warn(
       `Preset ${activeVideoPreset.name} failed (${(error as Error).message}) — retrying on CPU`,
     )
-    await runFfmpeg(rawPath, processedPath, cpuVideoPreset, logger)
+    await runFfmpeg(rawPath, processedPath, cpuVideoPreset, logger, onProgress)
   }
 
   logger.verbose('Processed video parameters', {
@@ -232,13 +242,20 @@ export const transcodeVideo = async (
   })
 }
 
+/** Rounds down to tens and clamps; ffmpeg can report past 100 or below zero. */
+export const toProgressStep = (percent: number): number =>
+  Math.min(100, Math.max(0, Math.floor(percent / 10) * 10))
+
 const runFfmpeg = async (
   rawPath: string,
   processedPath: string,
   preset: ProcessorPreset,
   logger: Stenograph,
+  onProgress?: ProgressReporter,
 ): Promise<void> => {
   let frames = 0
+  // Only steps forward are reported: ffmpeg repeats and sometimes rewinds.
+  let reported = -1
 
   await new Promise<void>((resolve, reject) => {
     logger.debug(`Using processing preset ${preset.name}`)
@@ -287,6 +304,11 @@ const runFfmpeg = async (
         logger.verbose(
           `Progress: ${progress.percent ?? 0}% / 100% (${progress.frames})`,
         )
+        if (progress.percent === undefined) return
+        const step = toProgressStep(progress.percent)
+        if (step <= reported) return
+        reported = step
+        onProgress?.(step)
       })
       .on('end', () => finish(() => resolve()))
       .save(processedPath)
@@ -298,6 +320,8 @@ export const transcodeImage = async (
   raw: BunFile,
   processed: BunFile,
   logger: Stenograph,
+  // Images convert in one shot; the parameter only keeps the two kinds alike.
+  _onProgress?: ProgressReporter,
 ): Promise<void> => {
   const rawPath = raw.name
   const processedPath = processed.name

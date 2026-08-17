@@ -113,6 +113,41 @@ describe('ClipTracker', () => {
     expect(painted).toEqual([])
   })
 
+  test('paints transcoding progress as it moves', () => {
+    const clips = tracker()
+    clips.begin('e1')
+    clips.advance('e1', 'staged', 10)
+    clips.advance('e1', 'staged', 40)
+
+    expect(painted).toEqual([
+      { eventId: 'e1', outcome: { stage: 'staged', percent: 10 } },
+      { eventId: 'e1', outcome: { stage: 'staged', percent: 40 } },
+    ])
+  })
+
+  test('skips a repeated percentage', () => {
+    const clips = tracker()
+    clips.begin('e1')
+    clips.advance('e1', 'staged', 20)
+    clips.advance('e1', 'staged', 20)
+
+    // Repainting an identical button would spend an API call for nothing.
+    expect(painted).toHaveLength(1)
+  })
+
+  test('progress restarts the clock', async () => {
+    const clips = tracker(50)
+    clips.begin('e1')
+    clips.advance('e1', 'staged', 10)
+    await tick(30)
+    clips.advance('e1', 'staged', 20)
+    await tick(30)
+
+    // A long transcode stays alive as long as percentages keep arriving.
+    expect(clips.size).toBe(1)
+    expect(painted).toHaveLength(2)
+  })
+
   test('tracks several clips at once', () => {
     const clips = tracker()
     clips.begin('e1')

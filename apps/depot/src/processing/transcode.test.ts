@@ -1,5 +1,19 @@
 import { describe, expect, test } from 'bun:test'
-import { shouldRetryOnCpu, TranscodeError } from './transcode'
+import { shouldRetryOnCpu, TranscodeError, toProgressStep } from './transcode'
+
+describe('toProgressStep', () => {
+  test('rounds down to tens', () => {
+    expect(toProgressStep(47.31450109264421)).toBe(40)
+    expect(toProgressStep(9.9)).toBe(0)
+    expect(toProgressStep(70)).toBe(70)
+  })
+
+  test('clamps what ffmpeg reports out of range', () => {
+    // Percent is derived from a duration estimate, so it can overshoot.
+    expect(toProgressStep(104)).toBe(100)
+    expect(toProgressStep(-3)).toBe(0)
+  })
+})
 
 describe('shouldRetryOnCpu', () => {
   test('retries when ffmpeg died before the first frame', () => {

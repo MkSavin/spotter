@@ -1,7 +1,11 @@
 import path from 'node:path'
 import Bun, { type BunFile } from 'bun'
 import type { CoreContext } from '../context'
-import { transcodeImage, transcodeVideo } from './transcode'
+import {
+  type ProgressReporter,
+  transcodeImage,
+  transcodeVideo,
+} from './transcode'
 
 export type StagedKind = 'video' | 'image'
 
@@ -33,6 +37,7 @@ export const processStaged = async (
   kind: StagedKind,
   rawKey: string | undefined,
   context: ProcessStagedContext,
+  onProgress?: ProgressReporter,
 ): Promise<string | undefined> => {
   if (!rawKey) {
     return undefined
@@ -68,7 +73,7 @@ export const processStaged = async (
 
   logger.debug(`Processing staged ${kind} from ${rawKey}`)
 
-  await transcode(raw, processed, logger)
+  await transcode(raw, processed, logger, onProgress)
 
   const processedKey = path.join(
     processedPath,
