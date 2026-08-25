@@ -49,9 +49,11 @@ export const actualizeEventMedia = async (
         markup,
       )
     } catch (naiveError) {
+      // Expected on this deployment: Telegram often cannot fetch the presigned
+      // URL itself, so the accurate path uploads the bytes. Only the reason is
+      // logged — the error object expands into a grammY source dump.
       logger.debug(
-        'editMessageMedia (naive) failed, retrying accurate',
-        naiveError,
+        `editMessageMedia (naive) failed, retrying accurate: ${(naiveError as Error)?.message}`,
       )
       await bot.api.editMessageMedia(
         chatId,
