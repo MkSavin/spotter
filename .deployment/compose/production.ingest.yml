@@ -57,6 +57,9 @@ services:
     depends_on:
       - local-redis
 
+  # Two clip workers grind through long transcodes; a third is reserved for
+  # snapshots and camera frames (DEPOT_LANE=snapshots), so a burst of videos
+  # never delays the photo that makes a notification informative.
   spotter-depot-1:
     image: ghcr.io/mksavin/spotter-depot:latest
     restart: unless-stopped
@@ -65,6 +68,7 @@ services:
     environment:
       REDIS_URL: redis://local-redis:6379
       REDIS_CLIENT_ID: '@spotter/depot-1'
+      DEPOT_LANE: clips
     # Replica id stays inline above; shared config comes from the combined .env.
     env_file:
       - ./.env
@@ -81,7 +85,24 @@ services:
     environment:
       REDIS_URL: redis://local-redis:6379
       REDIS_CLIENT_ID: '@spotter/depot-2'
+      DEPOT_LANE: clips
     # Replica id stays inline above; shared config comes from the combined .env.
+    env_file:
+      - ./.env
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    depends_on:
+      - local-redis
+
+  spotter-depot-snapshots:
+    image: ghcr.io/mksavin/spotter-depot:latest
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://local-redis:6379
+      REDIS_CLIENT_ID: '@spotter/depot-snapshots'
+      DEPOT_LANE: snapshots
     env_file:
       - ./.env
     labels:

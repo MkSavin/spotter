@@ -9,6 +9,7 @@ import information from '../package.json'
 import { applicationLogger } from './log'
 
 const cleanupStrategies = ['file-processed', 'process-exited'] as const
+const lanes = ['all', 'snapshots', 'clips'] as const
 const accelerations = ['cpu', 'vaapi', 'videotoolbox', 'cuda'] as const
 const codecs = ['h264', 'hevc'] as const
 const qualities = ['best', 'good', 'normal', 'bad', 'awful'] as const
@@ -32,8 +33,20 @@ export type ImageConfig = {
   skipConversion: boolean
 }
 
+/**
+ * Which staged streams this replica consumes.
+ *
+ * `snapshots` keeps a worker free for the fast, user-visible media while
+ * `clips` grinds through long transcodes on another. `all` (the default) is the
+ * single-node behaviour.
+ */
+export type Lane = (typeof lanes)[number]
+
 export type CoreConfig = {
   redis: RedisConfig
+
+  /** Staged streams this replica subscribes to. */
+  lane: Lane
 
   s3: {
     host: string
@@ -56,6 +69,7 @@ export const resolveConfig = (): CoreConfig => {
       group: 'spotter-depot',
       clientId: information.name,
     }),
+    lane: env.enum('DEPOT_LANE', lanes, 'all'),
     s3: {
       host: env.string('S3_HOST', ''),
       accessKey: env.string('S3_ACCESS', ''),

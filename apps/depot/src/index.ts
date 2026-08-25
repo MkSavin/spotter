@@ -68,30 +68,45 @@ const run = async (): Promise<void> => {
     details: () => probeDetails(config),
   })
 
-  transport = await new RedisRegulator<CoreContext>()
-    .message(mediaStreams.mediaStaged, mediaStagedController)
-    .message(mediaStreams.cameraStaged, cameraStagedController)
-    .run(
-      {
-        directory: {
-          temp: tempDir,
-        },
-        logger: applicationLogger,
-        config,
-        s3,
-        subscriber,
-        producer,
+  // Camera frames ride the snapshot lane: both are quick and user-facing, so
+  // neither should queue behind a clip transcode.
+  const regulator = new RedisRegulator<CoreContext>()
+
+  if (config.lane !== 'clips') {
+    regulator
+      .message(mediaStreams.mediaStaged, mediaStagedController)
+      .message(mediaStreams.cameraStaged, cameraStagedController)
+  }
+
+  if (config.lane !== 'snapshots') {
+    regulator.message(mediaStreams.mediaStagedClip, mediaStagedController)
+  }
+
+  applicationLogger.info(
+    `Consuming lane "${config.lane}": ${regulator.streams.join(', ')}`,
+  )
+
+  transport = await regulator.run(
+    {
+      directory: {
+        temp: tempDir,
       },
-      {
-        group: config.redis.group,
-        consumer: config.redis.consumer,
-        blockMs: config.redis.blockMs,
-        count: config.redis.count,
-        reclaimMinIdleMs: config.redis.reclaimMinIdleMs,
-        reaperIntervalMs: config.redis.reaperIntervalMs,
-        maxDeliveries: config.redis.maxDeliveries,
-      },
-    )
+      logger: applicationLogger,
+      config,
+      s3,
+      subscriber,
+      producer,
+    },
+    {
+      group: config.redis.group,
+      consumer: config.redis.consumer,
+      blockMs: config.redis.blockMs,
+      count: config.redis.count,
+      reclaimMinIdleMs: config.redis.reclaimMinIdleMs,
+      reaperIntervalMs: config.redis.reaperIntervalMs,
+      maxDeliveries: config.redis.maxDeliveries,
+    },
+  )
 
   applicationLogger.info('Application successfully started up')
 }

@@ -11,8 +11,10 @@ describe('videoProcessingKeyboard', () => {
     )
   })
 
-  test('shows a bare label until the first percentage arrives', () => {
-    expect(label(videoProcessingKeyboard('staged'))).toBe('⏳ Конвертируется…')
+  test('reads "queued" until the first percentage arrives', () => {
+    // No percent yet means depot has not started the job — ffmpeg reports one
+    // as soon as it does, so "converting" would be a lie while it waits.
+    expect(label(videoProcessingKeyboard('staged'))).toBe('⏳ В очереди…')
   })
 
   test('ignores a percentage on the earlier stages', () => {

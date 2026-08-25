@@ -116,8 +116,19 @@ export type CameraProcessed = z.infer<typeof cameraProcessedSchema>
 export const mediaStreams = {
   /** `spotter.media.request.<source>` — event media requests, per source. */
   mediaRequest: (source: string): string => `spotter.media.request.${source}`,
-  /** `spotter.media.staged` — raw event media staged in S3. */
+  /**
+   * `spotter.media.staged` — raw event *snapshot* staged in S3.
+   *
+   * Split from clips on purpose: a clip transcode occupies a worker for
+   * minutes, and while every depot read one stream a burst of clips starved
+   * the snapshots, which are what makes a notification informative. Routing by
+   * stream (rather than filtering after the read) is what lets a depot replica
+   * subscribe to snapshots only — a consumer never sees a stream it did not
+   * register.
+   */
   mediaStaged: 'spotter.media.staged',
+  /** `spotter.media.staged.clip` — raw event clip staged in S3 (slow lane). */
+  mediaStagedClip: 'spotter.media.staged.clip',
   /** `spotter.event.media_processed` — transcoded event media in S3. */
   mediaProcessed: 'spotter.event.media_processed',
   /** `spotter.media.progress` — how far along an event's media is. */

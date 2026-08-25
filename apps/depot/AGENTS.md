@@ -13,14 +13,15 @@ bun test
 ```
 Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
 [.env.ingest.example](../../.env.ingest.example) для ingest). Сервис читает `REDIS_URL`,
-`S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`, `DIRECTORY_CLEANUP`, `VIDEO_*`, `IMAGE_*`;
+`S3_HOST/ACCESS/SECRET/BUCKET`, `TZ`, `DIRECTORY_CLEANUP`, `VIDEO_*`, `IMAGE_*`, `DEPOT_LANE`;
 consumer-группа (`spotter-depot`) — с дефолтом в коде. Всё это собирается в
 [src/config.ts](src/config.ts) (`config.video` / `config.image`) и приходит в `transcode.ts`
 аргументом — напрямую `env` в обработке не читается.
 
-> Сервис горизонтально масштабируется: запускают несколько инстансов (`depot-1`, `depot-2`)
-> в **одной** consumer-группе (`spotter-depot`) с **разными** `REDIS_CLIENT_ID` — Redis раскидывает
-> сообщения стрима между консьюмерами одной группы (по одному получателю на сообщение).
+> Сервис горизонтально масштабируется: запускают несколько инстансов (`depot-1`, `depot-2`,
+> `depot-snapshots`) в **одной** consumer-группе (`spotter-depot`) с **разными**
+> `REDIS_CLIENT_ID` — Redis раскидывает сообщения стрима между консьюмерами одной группы
+> (по одному получателю на сообщение). Кто какие стримы читает — задаёт `DEPOT_LANE` (ниже).
 > В compose `REDIS_CLIENT_ID` каждой реплики задаётся inline через `environment:`,
 > а общий `.env` подключается через `env_file`.
 
@@ -31,8 +32,24 @@ consumer-группа (`spotter-depot`) — с дефолтом в коде. В�
 temp-каталог через `temp('spotter-depot-media-')`, регистрирует контроллеры в `RedisRegulator`
 (группа `spotter-depot`):
 
-- `spotter.media.staged` → `mediaStagedController`
+- `spotter.media.staged` → `mediaStagedController` (снапшоты событий)
+- `spotter.media.staged.clip` → `mediaStagedController` (клипы)
 - `spotter.camera.staged` → `cameraStagedController`
+
+Набор стримов зависит от `DEPOT_LANE` (`all` — по умолчанию, `snapshots`, `clips`):
+
+| `DEPOT_LANE` | Слушает |
+| ------------ | ------- |
+| `all`        | всё перечисленное выше |
+| `snapshots`  | `media.staged` + `camera.staged` |
+| `clips`      | `media.staged.clip` |
+
+Зачем разделение: транскод клипа занимает воркер минутами, и пока все реплики читали один
+стрим, пачка видео задерживала снапшоты — а именно снапшот делает уведомление информативным.
+Маршрутизация сделана **на уровне стримов**, а не фильтром после чтения: консьюмер не получает
+сообщений из стрима, на который не подписан, — иначе снапшот-реплика вытягивала бы клипы из
+общей группы и молча их роняла. На ingest-узле — две реплики `clips` и одна `snapshots`
+(GPU-оверлей резервирует карту только клиповым: снапшот-лейн работает через sharp, без ffmpeg).
 
 ## Поток обработки
 

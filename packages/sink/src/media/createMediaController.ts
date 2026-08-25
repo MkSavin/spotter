@@ -83,14 +83,30 @@ export const createMediaController = <TConfig extends SinkConfig>(
       return
     }
 
-    await producer.publish(mediaStreams.mediaStaged, {
-      eventId: request.eventId,
-      source: sourceId,
-      rawClipKey,
-      rawSnapshotKey,
-    })
-    await report('staged')
+    // Clips go to their own stream so a slow transcode cannot starve snapshots.
+    // A request carries one kind in practice (snapshot eagerly, clip on demand),
+    // but a mixed one is split so neither kind waits on the other.
+    const staged: Array<[string, Record<string, unknown>]> = []
 
-    logger.info(`Staged media published to "${mediaStreams.mediaStaged}"`)
+    if (rawSnapshotKey) {
+      staged.push([
+        mediaStreams.mediaStaged,
+        { eventId: request.eventId, source: sourceId, rawSnapshotKey },
+      ])
+    }
+
+    if (rawClipKey) {
+      staged.push([
+        mediaStreams.mediaStagedClip,
+        { eventId: request.eventId, source: sourceId, rawClipKey },
+      ])
+    }
+
+    for (const [stream, payload] of staged) {
+      await producer.publish(stream, payload)
+      logger.info(`Staged media published to "${stream}"`)
+    }
+
+    await report('staged')
   }
 }

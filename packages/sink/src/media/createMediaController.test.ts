@@ -70,14 +70,24 @@ describe('createMediaController', () => {
       'staging/frigate-home/event-e1-clip.mp4',
       'staging/frigate-home/event-e1-snapshot.jpg',
     ])
+    // Each kind goes to its own stream: a depot replica subscribed to snapshots
+    // only must never be handed a clip to transcode.
     const staged = published.find(
       (entry) => entry.stream === mediaStreams.mediaStaged,
     )
     expect(staged?.payload).toEqual({
       eventId: 'e1',
       source: 'frigate-home',
-      rawClipKey: 'staging/frigate-home/event-e1-clip.mp4',
       rawSnapshotKey: 'staging/frigate-home/event-e1-snapshot.jpg',
+    })
+
+    const stagedClip = published.find(
+      (entry) => entry.stream === mediaStreams.mediaStagedClip,
+    )
+    expect(stagedClip?.payload).toEqual({
+      eventId: 'e1',
+      source: 'frigate-home',
+      rawClipKey: 'staging/frigate-home/event-e1-clip.mp4',
     })
 
     // The frontend follows these to move the "processing" button along.
@@ -86,6 +96,44 @@ describe('createMediaController', () => {
         .filter((entry) => entry.stream === mediaStreams.mediaProgress)
         .map((entry) => (entry.payload as { stage: string }).stage),
     ).toEqual(['fetching', 'staged'])
+  })
+
+  test('a snapshot-only request never touches the clip stream', async () => {
+    globalThis.fetch = mock(
+      async () => new Response(new Uint8Array([1, 2, 3])),
+    ) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(provider)
+
+    // The eager path: server asks for a snapshot on every ended event. It must
+    // stay off the clip lane, which is where the slow transcodes queue up.
+    await controller(
+      message({ eventId: 'e2', source: 'frigate-home', want: ['snapshot'] }),
+      context,
+    )
+
+    const streams = published.map((entry) => entry.stream)
+    expect(streams).toContain(mediaStreams.mediaStaged)
+    expect(streams).not.toContain(mediaStreams.mediaStagedClip)
+  })
+
+  test('a clip-only request never touches the snapshot stream', async () => {
+    globalThis.fetch = mock(
+      async () => new Response(new Uint8Array([1, 2, 3])),
+    ) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(provider)
+
+    await controller(
+      message({ eventId: 'e3', source: 'frigate-home', want: ['clip'] }),
+      context,
+    )
+
+    const streams = published.map((entry) => entry.stream)
+    expect(streams).toContain(mediaStreams.mediaStagedClip)
+    expect(streams).not.toContain(mediaStreams.mediaStaged)
   })
 
   test('ignores requests addressed to a different source', async () => {

@@ -22,7 +22,9 @@ export const videoButtonKeyboard = (eventId: string): InlineKeyboard =>
 export const STAGE_LABELS = {
   requested: '⏳ Запрошено…',
   fetching: '⏳ Скачивается с камеры…',
-  staged: '⏳ Конвертируется…',
+  // Staged but no percent yet: depot has not picked the job up, so the honest
+  // word is "queued" — ffmpeg reports a percent the moment it starts.
+  staged: '⏳ В очереди…',
 } as const
 
 export type ClipStage = keyof typeof STAGE_LABELS

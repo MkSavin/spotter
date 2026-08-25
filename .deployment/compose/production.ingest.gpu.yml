@@ -29,3 +29,6 @@ x-gpu: &gpu
 services:
   spotter-depot-1: *gpu
   spotter-depot-2: *gpu
+  # The snapshot lane is sharp/JPEG only — no ffmpeg, so no GPU reservation.
+  # Claiming one would idle a device and, on a single-GPU host, starve the clip
+  # workers that actually need it.
