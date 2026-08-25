@@ -1,6 +1,6 @@
 {
   "name": "@spotter/sink",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Framework for NVR adapters: Source + MediaProvider + Catalog + runtime",
   "main": "src/index.ts",
   "scripts": {
