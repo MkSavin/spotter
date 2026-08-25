@@ -81,8 +81,9 @@ export const actualizeEventMedia = async (
     .filter((entry): entry is EventMessage => Boolean(entry))
 
   // Persist the chats that succeeded before propagating: on retry they count as
-  // already-supplied, so only the failed chats are re-attempted.
-  eventMessagesRepo.set(db, eventId, affected)
+  // already-supplied, so only the failed chats are re-attempted. Merged, never
+  // replaced — a wipe here would re-send to chats that already got the media.
+  eventMessagesRepo.record(db, eventId, affected)
 
   if (failed) {
     logger.warn(`Some chats failed for ${eventId}; leaving pending for retry`)

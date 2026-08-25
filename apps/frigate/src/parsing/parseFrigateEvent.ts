@@ -19,7 +19,10 @@ export const parseFrigateEvent = (contents: any): SpotterEvent => {
 
   // Frigate sometimes emits buggy zero-movement events — skip them.
   // https://github.com/blakeblackshear/frigate/discussions/9974
-  if (event.position_changes === 0) {
+  // Only mid-life updates: dropping `start`/`end` would break the lifecycle —
+  // without a `start` the frontend never learns the message id and re-sends the
+  // event on every later delivery.
+  if (type === 'update' && event.position_changes === 0) {
     throw new Error('Event has no position changes, skipping due to suspicion')
   }
 

@@ -66,8 +66,26 @@ describe('parseFrigateEvent', () => {
     expect(() => parseFrigateEvent(frigate({ label: undefined }))).toThrow()
   })
 
-  test('throws on buggy events with no position changes', () => {
-    expect(() => parseFrigateEvent(frigate({ position_changes: 0 }))).toThrow()
+  test('throws on buggy updates with no position changes', () => {
+    expect(() =>
+      parseFrigateEvent({
+        ...frigate({ position_changes: 0 }),
+        type: 'update',
+      }),
+    ).toThrow()
+  })
+
+  test('keeps lifecycle events even with no position changes', () => {
+    // A dropped `start` leaves the frontend without a message id, so every later
+    // delivery re-sends the event as a new message. Frigate genuinely reports
+    // position_changes: 0 on `new`, so the guard must not apply there.
+    for (const type of ['new', 'start', 'end']) {
+      const event = parseFrigateEvent({
+        ...frigate({ position_changes: 0 }),
+        type,
+      })
+      expect(event.type).toBe(type === 'end' ? 'end' : 'start')
+    }
   })
 
   test('throws on empty / malformed input', () => {

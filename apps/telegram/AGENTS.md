@@ -49,6 +49,10 @@ Telegram-локальный стейт — **никакого домена/ро�
 - `tg_chats (id PK)` — авторизованные чаты (получают уведомления через supplySubscribers).
 - `tg_bindings ((tg_user_id, tg_chat_id) PK, recipient_uuid, username?, role)` — маппинг uuid↔chat + кэш роли для сессии (роль — копия, истина в server).
 - `event_messages ((event_id, tg_chat_id) PK, message_id)` — какой message-id отправлен в какой чат (для edits и медиа-ответов).
+  Пишется **только через `record` (upsert-слияние)**, никогда не перезаписывается целиком: при
+  частичном или полном провале доставки список успешных чатов обязан пережить ретрай, иначе
+  повторная доставка не увидит уже отправленное сообщение и пришлёт дубль. Удаление — точечное,
+  через `forget(eventId, chatIds)`.
 - `service_versions ((node, service) PK, version, seen_at)` — последняя виденная версия каждого сервиса; нужна, чтобы выкат детектился и после рестарта самого бота.
 
 После правок `schema.ts` — `bunx drizzle-kit generate` (миграции в `apps/telegram/drizzle/`).

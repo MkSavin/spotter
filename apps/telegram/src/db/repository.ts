@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { TelegramDatabase } from './client'
 import {
@@ -147,26 +147,47 @@ export const eventMessagesRepo = {
       .where(eq(eventMessages.eventId, eventId))
       .get()?.value ?? 0,
 
-  set: (
+  /**
+   * Merges the chats that were delivered to, keyed by `(event_id, tg_chat_id)`.
+   *
+   * Deliberately additive: a partial failure must not erase the chats that did
+   * land, or the retry stops recognising them as already-supplied and sends a
+   * duplicate message. Chats are only ever removed via {@link forget}.
+   */
+  record: (
     db: TelegramDatabase,
     eventId: string,
     messages: EventMessage[],
   ): void => {
-    db.transaction((tx) => {
-      tx.delete(eventMessages).where(eq(eventMessages.eventId, eventId)).run()
+    if (messages.length === 0) return
 
-      if (messages.length > 0) {
-        tx.insert(eventMessages)
-          .values(
-            messages.map((m) => ({
-              eventId,
-              tgChatId: m.chatId,
-              messageId: m.id,
-            })),
-          )
-          .run()
-      }
-    })
+    db.insert(eventMessages)
+      .values(
+        messages.map((m) => ({
+          eventId,
+          tgChatId: m.chatId,
+          messageId: m.id,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [eventMessages.eventId, eventMessages.tgChatId],
+        set: { messageId: sql`excluded.message_id` },
+      })
+      .run()
+  },
+
+  /** Drops the messages of chats that are no longer subscribed. */
+  forget: (db: TelegramDatabase, eventId: string, chatIds: string[]): void => {
+    if (chatIds.length === 0) return
+
+    db.delete(eventMessages)
+      .where(
+        and(
+          eq(eventMessages.eventId, eventId),
+          inArray(eventMessages.tgChatId, chatIds),
+        ),
+      )
+      .run()
   },
 }
 

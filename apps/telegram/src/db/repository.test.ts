@@ -80,8 +80,8 @@ describe('telegram db repository', () => {
     expect(tgBindingsRepo.list(db)).toHaveLength(0)
   })
 
-  test('eventMessages: set replaces, find / count', () => {
-    eventMessagesRepo.set(db, 'event-1', [
+  test('eventMessages: record merges, find / count', () => {
+    eventMessagesRepo.record(db, 'event-1', [
       { id: 10, chatId: 'c1' },
       { id: 20, chatId: 'c2' },
     ])
@@ -92,14 +92,34 @@ describe('telegram db repository', () => {
       chatId: 'c1',
     })
 
-    // replace with a smaller set
-    eventMessagesRepo.set(db, 'event-1', [{ id: 30, chatId: 'c1' }])
-    expect(eventMessagesRepo.find(db, 'event-1')).toEqual([
-      { id: 30, chatId: 'c1' },
+    // Re-recording one chat updates that row and leaves the others alone.
+    eventMessagesRepo.record(db, 'event-1', [{ id: 30, chatId: 'c1' }])
+    expect(eventMessagesRepo.find(db, 'event-1')).toContainEqual({
+      id: 30,
+      chatId: 'c1',
+    })
+    expect(eventMessagesRepo.count(db, 'event-1')).toBe(2)
+
+    // The duplicate-message bug: a delivery where every chat failed records
+    // nothing, and must NOT wipe the chats that already got the message.
+    eventMessagesRepo.record(db, 'event-1', [])
+    expect(eventMessagesRepo.count(db, 'event-1')).toBe(2)
+  })
+
+  test('eventMessages: forget drops only the named chats', () => {
+    eventMessagesRepo.record(db, 'event-2', [
+      { id: 10, chatId: 'c1' },
+      { id: 20, chatId: 'c2' },
     ])
 
-    // clearing with an empty set removes all rows
-    eventMessagesRepo.set(db, 'event-1', [])
-    expect(eventMessagesRepo.count(db, 'event-1')).toBe(0)
+    eventMessagesRepo.forget(db, 'event-2', ['c1'])
+
+    expect(eventMessagesRepo.find(db, 'event-2')).toEqual([
+      { id: 20, chatId: 'c2' },
+    ])
+
+    // An empty list is a no-op, not a wipe.
+    eventMessagesRepo.forget(db, 'event-2', [])
+    expect(eventMessagesRepo.count(db, 'event-2')).toBe(1)
   })
 })
