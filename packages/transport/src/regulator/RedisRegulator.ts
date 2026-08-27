@@ -11,6 +11,11 @@ import {
 
 export type { StreamMessage } from './parseStreamReply'
 
+// A durable Redis replaying its AOF can take a minute; 60 x 2s covers that
+// without hanging a genuinely broken startup forever.
+const GROUP_LOADING_RETRIES = 60
+const GROUP_LOADING_DELAY_MS = 2000
+
 export type StreamMessagePayload = {
   topic: string
   message: StreamMessage
@@ -33,6 +38,8 @@ export type RegulatorOptions = {
    * `<stream>.dead` and acked instead of being retried forever.
    */
   maxDeliveries?: number
+  /** Delay between XGROUP retries while Redis replays its AOF. Tests shorten it. */
+  loadingRetryDelayMs?: number
 }
 
 export type RegulatorHandle = {
@@ -91,6 +98,34 @@ export class StreamProducer {
   }
 }
 
+/**
+ * Redis replaying an AOF/RDB answers every command with `-LOADING` until it is
+ * done, which on a restart of a durable instance can take a while. Treating
+ * that as fatal killed the service on exactly the restart it was meant to
+ * survive, so the group creation waits it out instead.
+ */
+const createGroup = async (
+  producer: StreamProducer,
+  stream: string,
+  group: string,
+  delayMs: number,
+): Promise<void> => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await producer.send('XGROUP', ['CREATE', stream, group, '$', 'MKSTREAM'])
+      return
+    } catch (error) {
+      const message = String((error as Error)?.message ?? error)
+      // The group already exists — the normal case on every restart.
+      if (message.includes('BUSYGROUP')) return
+      if (!message.includes('LOADING') || attempt >= GROUP_LOADING_RETRIES) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+}
+
 export class RedisRegulator<Context extends BaseContext> {
   subscribers: Record<string, StreamMessageController<Context>> = {}
 
@@ -128,22 +163,10 @@ export class RedisRegulator<Context extends BaseContext> {
 
     await producer.connect()
 
+    const loadingDelayMs = options.loadingRetryDelayMs ?? GROUP_LOADING_DELAY_MS
+
     for (const stream of streams) {
-      try {
-        await producer.send('XGROUP', [
-          'CREATE',
-          stream,
-          group,
-          '$',
-          'MKSTREAM',
-        ])
-      } catch (error) {
-        // BUSYGROUP just means the group already exists — anything else is fatal.
-        const message = String((error as Error)?.message ?? error)
-        if (!message.includes('BUSYGROUP')) {
-          throw error
-        }
-      }
+      await createGroup(producer, stream, group, loadingDelayMs)
     }
 
     const dispatch = async (record: StreamRecord): Promise<void> => {

@@ -271,6 +271,49 @@ describe('RedisRegulator reclaim', () => {
     expect(handler.mock.calls[0][0].message.value).toBe('{"id":"last-chance"}')
   })
 
+  test('waits out a loading Redis instead of dying on it', async () => {
+    // A durable Redis replaying its AOF rejects everything with -LOADING. That
+    // is exactly the restart the forwarder exists to survive, so it must retry.
+    const subscriber = stagedSubscriber([])
+    let attempts = 0
+    const producerClient = new FakeRedis().on('XGROUP', () => {
+      attempts += 1
+      if (attempts < 3) {
+        throw new Error('LOADING Redis is loading the dataset in memory')
+      }
+      return 'OK'
+    })
+
+    const handle = await new RedisRegulator()
+      .message('spotter.event', handlerMock())
+      .run(buildContext(subscriber, producerClient), {
+        group: 'g',
+        consumer: 'c',
+        reaperIntervalMs: 999999,
+        loadingRetryDelayMs: 1,
+      })
+    handles.push(handle)
+
+    expect(attempts).toBe(3)
+  })
+
+  test('still fails fast on an error that is not LOADING', async () => {
+    const subscriber = stagedSubscriber([])
+    const producerClient = new FakeRedis().on('XGROUP', () => {
+      throw new Error('WRONGTYPE Operation against a key')
+    })
+
+    expect(
+      new RedisRegulator()
+        .message('spotter.event', handlerMock())
+        .run(buildContext(subscriber, producerClient), {
+          group: 'g',
+          consumer: 'c',
+          reaperIntervalMs: 999999,
+        }),
+    ).rejects.toThrow(/WRONGTYPE/)
+  })
+
   test('ignores BUSYGROUP when the consumer group already exists', async () => {
     const subscriber = stagedSubscriber([])
     const producerClient = new FakeRedis().on('XGROUP', () => {

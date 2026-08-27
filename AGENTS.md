@@ -111,6 +111,10 @@ const handle = await new RedisRegulator<Context>()
 с позиции `$` — на рестарте старые события заново не пересылаются. Heartbeat'ов нет (в отличие
 от Kafka): держи `REDIS_RECLAIM_MIN_IDLE_MS` выше самой долгой операции (транскодинг).
 
+**Рестарт Redis:** durable-инстанс на старте отвечает `-LOADING`, пока проигрывает AOF.
+`XGROUP CREATE` ждёт этого (до 2 минут), а не падает — иначе сервис умирал ровно на том
+рестарте, который призван пережить.
+
 **Защита от poison-message:** `XPENDING` отдаёт счётчик доставок; запись, не обработанную успешно
 за `REDIS_MAX_DELIVERIES` (по умолч. 5) раз, регулятор переносит в dead-letter-стрим `<stream>.dead`
 (с полями `reason`/`deliveries`/`originalId` + оригинальный `value`) и `XACK`-ает оригинал — чтобы

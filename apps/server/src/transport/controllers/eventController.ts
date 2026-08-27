@@ -58,17 +58,9 @@ export const eventController: StreamMessageController<ServerContext> = async (
 
   if (event.type !== 'end') return
 
-  // Only the snapshot is transcoded eagerly; the clip is requested on demand
-  // when a recipient taps the "Видео" button (see the event.clip command).
-  const want: MediaWant[] = []
-  if (event.hasSnapshot) want.push('snapshot')
-
-  if (want.length === 0) {
-    logger.debug(
-      'Event advertises no snapshot. Skipping eager media request...',
-    )
-    return
-  }
+  // Clip is requested on demand (event.clip). `hasSnapshot` is not checked:
+  // Frigate writes the snapshot as tracking ends, so it is still false here.
+  const want: MediaWant[] = ['snapshot']
 
   const source = resolveSource(event)
 

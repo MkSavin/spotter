@@ -37,7 +37,7 @@ env при необходимости). NVR-кредов **нет** — серв
 ```
 spotter.event ──▶ eventController ──┬─▶ persist (eventsRepo.upsert)
                                     ├─▶ publish spotter.delivery.event (create|update)
-                                    └─▶ (на end + hasSnapshot) publish
+                                    └─▶ (на end) publish
                                           spotter.media.request.<source> (want: [snapshot])
 event.clip (RPC по кнопке) ──────▶ eventClipHandler
                                     └─▶ publish spotter.media.request.<source> (want: [clip])
@@ -45,6 +45,10 @@ spotter.event.media_processed ──▶ eventMediaController
                                     └─▶ publish spotter.delivery.event (action: media, +clip/snapshotKey)
 ```
 
+- **`hasSnapshot` не проверяется.** Frigate пишет снапшот
+  [в момент завершения трекинга](https://docs.frigate.video/configuration/snapshots/), поэтому
+  на `end` флаг ещё `false` — фильтр по нему оставлял события без фото. Если снапшота правда
+  нет, адаптер ответит пустым `mediaProcessed`.
 - **Snapshot — eager, clip — по запросу.** На `end` запрашивается только `snapshot`;
   клип транскодится лениво, когда получатель жмёт кнопку «Видео» (команда `event.clip`,
   см. ниже). Так не транскодим клипы, которые никто не смотрит.
