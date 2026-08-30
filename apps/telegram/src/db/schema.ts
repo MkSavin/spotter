@@ -77,9 +77,28 @@ export const serviceVersions = sqliteTable(
   (table) => [primaryKey({ columns: [table.node, table.service] })],
 )
 
+/**
+ * In-progress command dialogs, keyed by the session's (chat, user) pair, so a
+ * bot restart does not throw away a half-answered wizard.
+ */
+export const dialogStates = sqliteTable(
+  'dialog_states',
+  {
+    tgUserId: text('tg_user_id').notNull(),
+    tgChatId: text('tg_chat_id').notNull(),
+    /** Serialized `DialogState`; shape is owned by the dialog engine. */
+    state: text('state').notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [primaryKey({ columns: [table.tgUserId, table.tgChatId] })],
+)
+
 export type TgChat = InferSelectModel<typeof tgChats>
 export type TgBinding = InferSelectModel<typeof tgBindings>
 export type ServiceVersion = InferSelectModel<typeof serviceVersions>
+export type DialogStateRow = InferSelectModel<typeof dialogStates>
 
 export type EventMessage = {
   id: number

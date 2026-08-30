@@ -1,31 +1,23 @@
 import type { BotContext } from '../../context'
 import { tgBindingsRepo } from '../../db/repository'
-import { parseRole, roleTitle } from '../../helpers/role'
-import { argument } from '../../middlewares/command/argument'
+import { escapeHtml } from '../../helpers/html'
+import { type Role, roleTitle } from '../../helpers/role'
 import { SpotterCommand } from '../framework/SpotterCommand'
+import { roleArg, userRefArg } from './userArgs'
 
 class UserPromoteCommand extends SpotterCommand {
   readonly name = 'user_promote'
   readonly description = 'Изменить роль пользователя'
   readonly access = 'ADMIN' as const
 
-  protected readonly matcher = argument.string
-  protected readonly signature =
-    'user_promote [@username | id] [viewer|user|admin]'
+  readonly args = [userRefArg('👤 <b>Выберите пользователя</b>'), roleArg]
 
-  async handle(context: BotContext): Promise<void> {
-    if (typeof context.match !== 'string') return
-
-    const [ref, roleArg] = context.match.trim().split(/\s+/)
-    const role = roleArg ? parseRole(roleArg) : undefined
-
-    if (!ref || !role) {
-      await context.replyWithHTML(
-        `<b>Неверный список аргументов команды!</b>
-Сигнатура команды: <code>${this.signature}</code>`,
-      )
-      return
-    }
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
+    const ref = args.ref
+    const role = args.role as Role
 
     let reply: Awaited<ReturnType<typeof context.commandBus.send>>
     try {
@@ -42,7 +34,7 @@ class UserPromoteCommand extends SpotterCommand {
     if (!reply.ok) {
       if (reply.error === 'not-found') {
         await context.replyWithHTML(
-          `🔍 <b>Пользователь <code>${ref}</code> не найден</b>`,
+          `🔍 <b>Пользователь <code>${escapeHtml(ref)}</code> не найден</b>`,
         )
       } else {
         await context.reply(`Ошибка: ${reply.error}`)

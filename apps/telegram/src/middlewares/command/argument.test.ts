@@ -1,51 +1,53 @@
-import { describe, expect, mock, test } from 'bun:test'
-import type { BotContext } from '../../context'
-import { argument } from './argument'
+import { describe, expect, test } from 'bun:test'
+import { type ArgSpec, parsePositional, signatureOf } from './argument'
 
-const context = (match: string | RegExpMatchArray | undefined) => {
-  const replyWithHTML = mock(async () => undefined)
-  return {
-    match,
-    replyWithHTML,
-  } as unknown as BotContext & { replyWithHTML: ReturnType<typeof mock> }
-}
+const camera: ArgSpec = { name: 'camera', hint: 'камера', prompt: '' }
+const role: ArgSpec = { name: 'role', hint: 'роль', prompt: '' }
+const optional: ArgSpec = { name: 'id', optional: true, prompt: '' }
 
-const run = (
-  matcher: Parameters<typeof argument>[0],
-  match: string | RegExpMatchArray | undefined,
-) => {
-  const ctx = context(match)
-  const next = mock(async () => undefined)
-  const middleware = argument(matcher, 'команда <код>') as (
-    ctx: BotContext,
-    next: () => Promise<void>,
-  ) => Promise<unknown>
-  return middleware(ctx, next).then(() => ({ ctx, next }))
-}
-
-describe('argument middleware', () => {
-  test('string matcher passes only for a non-empty string argument', async () => {
-    const ok = await run(argument.string, 'front')
-    expect(ok.next).toHaveBeenCalledTimes(1)
-    expect(ok.ctx.replyWithHTML).not.toHaveBeenCalled()
-
-    const missing = await run(argument.string, undefined)
-    expect(missing.next).not.toHaveBeenCalled()
-    expect(missing.ctx.replyWithHTML).toHaveBeenCalledTimes(1)
+describe('signatureOf', () => {
+  test('contains no HTML-significant characters', () => {
+    const signature = signatureOf('user_promote', [
+      { name: 'ref', hint: '@username | id', prompt: '' },
+      { name: 'role', hint: 'viewer|user|admin', prompt: '' },
+    ])
+    expect(signature).not.toMatch(/[<>&]/)
   })
 
-  test('optional string matcher passes for both a string and no argument', async () => {
-    const withArg = await run(argument.stringOptional, 'front')
-    expect(withArg.next).toHaveBeenCalledTimes(1)
-
-    const withoutArg = await run(argument.stringOptional, undefined)
-    expect(withoutArg.next).toHaveBeenCalledTimes(1)
-    expect(withoutArg.ctx.replyWithHTML).not.toHaveBeenCalled()
+  test('marks required and optional arguments differently', () => {
+    expect(signatureOf('user_promote', [camera, optional])).toBe(
+      'user_promote {камера} [id]',
+    )
   })
 
-  test('reply renders the signature label on a bad argument list', async () => {
-    const { ctx } = await run(argument.string, undefined)
-    const message = ctx.replyWithHTML.mock.calls[0][0] as string
-    expect(message).toContain('команда <код>')
+  test('a command without arguments is just its name', () => {
+    expect(signatureOf('camera_list', [])).toBe('camera_list')
+  })
+})
+
+describe('parsePositional', () => {
+  test('maps positional words onto argument names', () => {
+    expect(parsePositional('@vasya admin', [camera, role])).toEqual({
+      camera: '@vasya',
+      role: 'admin',
+    })
+  })
+
+  test('a partial argument list fills only what was given', () => {
+    expect(parsePositional('@vasya', [camera, role])).toEqual({
+      camera: '@vasya',
+    })
+  })
+
+  test('the last argument absorbs the remainder', () => {
+    expect(parsePositional('front двор у дома', [camera, role])).toEqual({
+      camera: 'front',
+      role: 'двор у дома',
+    })
+  })
+
+  test('empty input yields no values', () => {
+    expect(parsePositional(undefined, [camera])).toEqual({})
+    expect(parsePositional('   ', [camera])).toEqual({})
   })
 })

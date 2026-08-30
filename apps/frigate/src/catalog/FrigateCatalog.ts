@@ -9,6 +9,9 @@ import {
   settleUrl,
 } from '../frigate/frigateClient'
 
+/** How long one `/api/config` read stays good before it is fetched again. */
+export const CONFIG_TTL_MS = 60_000
+
 /**
  * Builds the catalog from Frigate's `/api/config`: camera names and the global
  * tracked-object list. Labels come from the adapter's configured map (falling
@@ -20,25 +23,36 @@ export class FrigateCatalog implements Catalog {
     cameras: string[]
     objects: string[]
   } | null> | null = null
+  private fetchedAt = 0
 
   constructor(
     private readonly config: CoreConfig,
     private readonly logger: Stenograph,
+    private readonly ttlMs: number = CONFIG_TTL_MS,
   ) {}
 
   /**
    * Memoized so `listCameras`/`listObjectTypes` share one `/api/config` hit.
-   * A failure is not cached — otherwise a Frigate that was briefly down would
-   * leave the catalog empty until the adapter restarts.
+   * The memo expires so cameras added in Frigate are picked up without an
+   * adapter restart. A failure is not cached — otherwise a Frigate that was
+   * briefly down would leave the catalog empty until the adapter restarts.
    */
   private fetchConfig(): Promise<{
     cameras: string[]
     objects: string[]
   } | null> {
-    this.pending ??= this.loadConfig().then((result) => {
-      if (!result) this.pending = null
-      return result
-    })
+    if (this.pending && Date.now() - this.fetchedAt >= this.ttlMs) {
+      this.pending = null
+    }
+
+    if (!this.pending) {
+      this.fetchedAt = Date.now()
+      this.pending = this.loadConfig().then((result) => {
+        if (!result) this.pending = null
+        return result
+      })
+    }
+
     return this.pending
   }
 

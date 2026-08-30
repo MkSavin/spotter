@@ -3,7 +3,6 @@ import { renderQr } from '../../auth/qr'
 import { deepLink } from '../../auth/token'
 import type { BotContext } from '../../context'
 import { normalizeUsername } from '../../helpers/username'
-import { argument } from '../../middlewares/command/argument'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 class UserSignCommand extends SpotterCommand {
@@ -11,18 +10,28 @@ class UserSignCommand extends SpotterCommand {
   readonly description = 'Создать код доступа и QR-код'
   readonly access = 'ADMIN' as const
 
-  protected readonly matcher = argument.stringOptional
-  protected readonly signature = 'user_sign [@username?]'
+  readonly args = [
+    {
+      name: 'username',
+      hint: '@username',
+      optional: true,
+      ask: true,
+      prompt:
+        '🔑 <b>Кому выдать код?</b>\n\nВведите <code>@username</code> или пропустите — код подойдёт любому.',
+    },
+  ]
 
-  async handle(context: BotContext): Promise<void> {
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
     const logger = context.logger.sub('auth')
     const from = context.from
     if (!from) return
 
-    const username =
-      typeof context.match === 'string' && context.match.trim()
-        ? normalizeUsername(context.match)
-        : undefined
+    const username = args.username
+      ? normalizeUsername(args.username)
+      : undefined
 
     let reply: Awaited<ReturnType<typeof context.commandBus.send>>
     try {

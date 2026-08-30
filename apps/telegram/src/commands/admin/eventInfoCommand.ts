@@ -1,7 +1,7 @@
 import type { SpotterEvent } from '@spotter/transport'
 import type { BotContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
-import { argument } from '../../middlewares/command/argument'
+import { escapeHtml } from '../../helpers/html'
 import { renderEvent } from '../../transport/view/renderEvent'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
@@ -10,13 +10,19 @@ class EventInfoCommand extends SpotterCommand {
   readonly description = 'Информация о событии'
   readonly access = 'ADMIN' as const
 
-  protected readonly matcher = argument.string
-  protected readonly signature = 'event_info [код]'
+  readonly args = [
+    {
+      name: 'code',
+      hint: 'код',
+      prompt: '🔍 <b>Введите код события</b>',
+    },
+  ]
 
-  async handle(context: BotContext): Promise<void> {
-    if (typeof context.match !== 'string') return
-
-    const code = context.match.trim()
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
+    const code = args.code
 
     let reply: Awaited<ReturnType<typeof context.commandBus.send>>
     try {
@@ -32,7 +38,7 @@ class EventInfoCommand extends SpotterCommand {
 
     if (!reply.ok) {
       await context.replyWithHTML(
-        `🔍 <b>Событие с кодом <code>${code}</code> не найдено</b>`,
+        `🔍 <b>Событие с кодом <code>${escapeHtml(code)}</code> не найдено</b>`,
       )
       return
     }

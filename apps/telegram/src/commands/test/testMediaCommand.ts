@@ -1,6 +1,5 @@
 import { eventStreams } from '@spotter/transport'
 import type { BotContext } from '../../context'
-import { argument } from '../../middlewares/command/argument'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 /** Seconds of footage Frigate records for the manual event. */
@@ -11,17 +10,26 @@ class TestMediaCommand extends SpotterCommand {
   readonly description = 'Сквозной тест: настоящее событие в NVR'
   readonly access = 'ADMIN' as const
 
-  protected readonly matcher = argument.stringOptional
-  protected readonly signature = 'test_media [камера?]'
+  readonly args = [
+    {
+      name: 'camera',
+      hint: 'камера',
+      optional: true,
+      prompt: '📷 <b>Выберите камеру</b>',
+      choices: (context: BotContext) =>
+        context.catalog.cameras(context.config.source),
+      allowManual: true,
+    },
+  ]
 
-  async handle(context: BotContext): Promise<void> {
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
     const { producer, config } = context
 
     const cameras = context.catalog.cameras(config.source)
-    const requested =
-      typeof context.match === 'string' && context.match.trim()
-        ? context.match.trim()
-        : undefined
+    const requested = args.camera?.trim() || undefined
 
     if (cameras.length === 0) {
       await context.replyWithHTML(

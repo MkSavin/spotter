@@ -94,6 +94,47 @@ describe('keepCatalogPublished', () => {
     expect(sent).toEqual([])
   })
 
+  test('republishes when the camera list changes', async () => {
+    let cameras = [{ code: 'front', label: 'Front' }]
+    const { producer, sent } = makeProducer()
+    const stop = keepCatalogPublished(
+      {
+        listCameras: async () => cameras,
+        listObjectTypes: async () => [],
+      },
+      'frigate',
+      producer,
+      silent,
+      10,
+      10,
+    )
+    await settle(25)
+    cameras = [
+      { code: 'front', label: 'Front' },
+      { code: 'yard', label: 'Yard' },
+    ]
+    await settle(30)
+    stop()
+
+    expect(sent.filter((c) => c === 'SET')).toHaveLength(2)
+  })
+
+  test('an unchanged catalog is not republished on refresh', async () => {
+    const { producer, sent } = makeProducer()
+    const stop = keepCatalogPublished(
+      flakyCatalog(0),
+      'frigate',
+      producer,
+      silent,
+      10,
+      10,
+    )
+    await settle(60)
+    stop()
+
+    expect(sent).toEqual(['SET'])
+  })
+
   test('a throwing catalog is retried, not fatal', async () => {
     let calls = 0
     const { producer, sent } = makeProducer()

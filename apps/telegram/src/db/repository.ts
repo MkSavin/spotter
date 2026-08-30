@@ -1,7 +1,9 @@
-import { and, count, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, lt, sql } from 'drizzle-orm'
 import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { TelegramDatabase } from './client'
 import {
+  type DialogStateRow,
+  dialogStates,
   type EventMessage,
   eventMessages,
   type Role,
@@ -220,4 +222,56 @@ export const serviceVersionsRepo = {
 
       return previous
     }),
+}
+
+export const dialogStatesRepo = {
+  find: (
+    db: TelegramDatabase,
+    tgUserId: string,
+    tgChatId: string,
+  ): DialogStateRow | undefined =>
+    db
+      .select()
+      .from(dialogStates)
+      .where(
+        and(
+          eq(dialogStates.tgUserId, tgUserId),
+          eq(dialogStates.tgChatId, tgChatId),
+        ),
+      )
+      .get(),
+
+  save: (
+    db: TelegramDatabase,
+    tgUserId: string,
+    tgChatId: string,
+    state: string,
+  ): void => {
+    db.insert(dialogStates)
+      .values({ tgUserId, tgChatId, state, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [dialogStates.tgUserId, dialogStates.tgChatId],
+        set: { state, updatedAt: new Date() },
+      })
+      .run()
+  },
+
+  remove: (db: TelegramDatabase, tgUserId: string, tgChatId: string): void => {
+    db.delete(dialogStates)
+      .where(
+        and(
+          eq(dialogStates.tgUserId, tgUserId),
+          eq(dialogStates.tgChatId, tgChatId),
+        ),
+      )
+      .run()
+  },
+
+  /** Drops dialogs older than the TTL so abandoned ones do not accumulate. */
+  prune: (db: TelegramDatabase, olderThan: Date): number =>
+    db
+      .delete(dialogStates)
+      .where(lt(dialogStates.updatedAt, olderThan))
+      .returning()
+      .all().length,
 }

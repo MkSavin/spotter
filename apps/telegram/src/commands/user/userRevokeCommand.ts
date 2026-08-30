@@ -1,25 +1,26 @@
 import type { BotContext } from '../../context'
 import { tgBindingsRepo } from '../../db/repository'
-import { argument } from '../../middlewares/command/argument'
+import { escapeHtml } from '../../helpers/html'
 import { SpotterCommand } from '../framework/SpotterCommand'
+import { userRefArg } from './userArgs'
 
 class UserRevokeCommand extends SpotterCommand {
   readonly name = 'user_revoke'
   readonly description = 'Отозвать доступ пользователя'
   readonly access = 'ADMIN' as const
 
-  protected readonly matcher = argument.string
-  protected readonly signature = 'user_revoke [@username | id]'
+  readonly args = [userRefArg('👤 <b>Выберите пользователя</b>')]
 
-  async handle(context: BotContext): Promise<void> {
-    if (typeof context.match !== 'string') return
-
-    const ref = context.match.trim()
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
+    const ref = args.ref
 
     const binding = tgBindingsRepo.findByRef(context.db, ref)
     if (!binding) {
       await context.replyWithHTML(
-        `🔍 <b>Пользователь <code>${ref}</code> не найден</b>`,
+        `🔍 <b>Пользователь <code>${escapeHtml(ref)}</code> не найден</b>`,
       )
       return
     }
@@ -39,7 +40,7 @@ class UserRevokeCommand extends SpotterCommand {
     if (!reply.ok) {
       if (reply.error === 'not-found') {
         await context.replyWithHTML(
-          `🔍 <b>Пользователь <code>${ref}</code> не найден</b>`,
+          `🔍 <b>Пользователь <code>${escapeHtml(ref)}</code> не найден</b>`,
         )
       } else {
         await context.reply(`Ошибка: ${reply.error}`)

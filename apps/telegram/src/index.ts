@@ -26,7 +26,9 @@ import { registerUnknownCommand } from './commands/framework/unknownCommand'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
 import { createDatabase, type TelegramDatabase } from './db/client'
-import { tgBindingsRepo } from './db/repository'
+import { dialogStatesRepo, tgBindingsRepo } from './db/repository'
+import { DIALOG_TTL_MS } from './dialog/Dialog'
+import { DialogRegistry } from './dialog/DialogRegistry'
 import { attachInnoxious } from './extension/innoxious/attachInnoxious'
 import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
@@ -78,6 +80,7 @@ const initialize = async (
           authorizedRole: undefined,
           recipientUuid: undefined,
           needUpdateCommands: true,
+          dialog: undefined,
         }),
         getSessionKey: (context) =>
           context.from === undefined || context.chat === undefined
@@ -216,8 +219,23 @@ const polling = async (): Promise<void> => {
 
   bot = await initialize(coreContext)
 
+  // Abandoned wizards would otherwise sit in the table forever.
+  const pruned = dialogStatesRepo.prune(
+    database,
+    new Date(Date.now() - DIALOG_TTL_MS),
+  )
+  if (pruned > 0) applicationLogger.debug(`Pruned ${pruned} stale dialog(s)`)
+
+  const dialogs = new DialogRegistry()
+  for (const command of commandRegistry) {
+    if (command.args.length > 0) dialogs.register(command.dialog())
+  }
+
   registerCommands(bot, commandRegistry)
   registerClipCallback(bot)
+  dialogs.callbacks(bot)
+  // Before unknownCommand, which would otherwise swallow the reply.
+  dialogs.input(bot)
   bot.use(syncCommandMenu(commandRegistry))
   // Last: whatever reaches here matched no command above.
   registerUnknownCommand(bot, commandRegistry)

@@ -1,7 +1,6 @@
 import { eventStreams } from '@spotter/transport'
 import type { BotContext } from '../../context'
 import { timeout } from '../../helpers/timeout'
-import { argument } from '../../middlewares/command/argument'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 class TestDeliveryCommand extends SpotterCommand {
@@ -9,16 +8,23 @@ class TestDeliveryCommand extends SpotterCommand {
   readonly description = 'Проверить доставку сообщений (без медиа)'
   readonly access = 'ADMIN' as const
 
-  protected readonly matcher = argument.stringOptional
-  protected readonly signature = 'test_delivery [id?]'
+  readonly args = [
+    {
+      name: 'id',
+      hint: 'id',
+      optional: true,
+      prompt: '🏓 <b>Введите id события</b>',
+    },
+  ]
 
-  async handle(context: BotContext): Promise<void> {
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
     const { producer } = context
 
     const id =
-      typeof context.match === 'string' && context.match.trim()
-        ? context.match.trim()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      args.id?.trim() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
     const eventMessage = (type: 'start' | 'update' | 'end') => ({
       eventId: id,

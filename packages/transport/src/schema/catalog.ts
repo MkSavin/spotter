@@ -6,7 +6,8 @@ import { z } from 'zod'
  * The list of cameras and the object types an NVR can detect are properties of
  * the NVR, not of any downstream consumer. The adapter owns this taxonomy and
  * publishes a `Catalog` snapshot to the Redis key `spotter.catalog.<source>`
- * (on start and on change), notifying via `spotter.catalog.updated`.
+ * (on start, then on change as it re-reads the NVR), notifying via
+ * `spotter.catalog.updated`.
  *
  * bot/server reads and caches it for `camera_list`, snapshot-command
  * validation and `code → label` rendering — instead of carrying hard-coded

@@ -1,6 +1,6 @@
 import { type CameraRequest, mediaStreams } from '@spotter/transport'
 import type { BotContext } from '../../context'
-import { argument } from '../../middlewares/command/argument'
+import { escapeHtml } from '../../helpers/html'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 class CameraSnapshotCommand extends SpotterCommand {
@@ -8,31 +8,34 @@ class CameraSnapshotCommand extends SpotterCommand {
   readonly description = 'Получить последний кадр с камеры'
   readonly access = 'USER' as const
 
-  protected readonly matcher = argument.string
-  protected readonly signature = 'camera_snapshot [камера]'
+  readonly args = [
+    {
+      name: 'camera',
+      hint: 'камера',
+      prompt: '📷 <b>Выберите камеру</b>',
+      // Read at prompt time so a refreshed catalog is reflected immediately.
+      choices: (context: BotContext) =>
+        context.catalog.cameras(context.config.source),
+      emptyPrompt:
+        '📷 <b>Список камер пока недоступен</b> — NVR ещё не отдал каталог.\n\nВведите имя камеры вручную.',
+      allowManual: true,
+    },
+  ]
 
-  async handle(context: BotContext): Promise<void> {
-    if (typeof context.match !== 'string') return
+  async handle(
+    context: BotContext,
+    args: Record<string, string>,
+  ): Promise<void> {
+    const cameraName = args.camera?.trim().toLowerCase()
+    if (!cameraName) return
 
-    const cameraName = context.match.trim().toLowerCase()
     const source = context.config.source
-
     const cameras = context.catalog.cameras(source)
     const known = cameras.map((e) => `<code>${e.code}</code>`).join(', ')
 
-    // Without a name there is nothing to look up; list what is available.
-    if (!cameraName) {
-      await context.replyWithHTML(
-        `\u{26a0}\u{fe0f} <b>Укажи камеру:</b> <code>/camera_snapshot front</code>${
-          known ? `\n\nДоступны: ${known}` : ''
-        }`,
-      )
-      return
-    }
-
     if (cameras.length > 0 && !cameras.some((e) => e.code === cameraName)) {
       await context.replyWithHTML(
-        `\u{26a0}\u{fe0f} <b>Камера <code>${cameraName}</code> не найдена</b>${
+        `\u{26a0}\u{fe0f} <b>Камера <code>${escapeHtml(cameraName)}</code> не найдена</b>${
           known ? `\n\nДоступны: ${known}` : ''
         }`,
       )
