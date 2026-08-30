@@ -22,8 +22,7 @@ export const videoButtonKeyboard = (eventId: string): InlineKeyboard =>
 export const STAGE_LABELS = {
   requested: '⏳ Запрошено…',
   fetching: '⏳ Скачивается с камеры…',
-  // Staged but no percent yet: depot has not picked the job up, so the honest
-  // word is "queued" — ffmpeg reports a percent the moment it starts.
+  // No percent yet means depot has not started: ffmpeg reports one once it has.
   staged: '⏳ В очереди…',
 } as const
 

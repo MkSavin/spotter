@@ -49,9 +49,7 @@ export const actualizeEventMedia = async (
         markup,
       )
     } catch (naiveError) {
-      // Expected on this deployment: Telegram often cannot fetch the presigned
-      // URL itself, so the accurate path uploads the bytes. Only the reason is
-      // logged — the error object expands into a grammY source dump.
+      // Reason only: the error object expands into a grammY source dump.
       logger.debug(
         `editMessageMedia (naive) failed, retrying accurate: ${(naiveError as Error)?.message}`,
       )
@@ -82,9 +80,7 @@ export const actualizeEventMedia = async (
     .map((entry) => entry.data)
     .filter((entry): entry is EventMessage => Boolean(entry))
 
-  // Persist the chats that succeeded before propagating: on retry they count as
-  // already-supplied, so only the failed chats are re-attempted. Merged, never
-  // replaced — a wipe here would re-send to chats that already got the media.
+  // Merged, never replaced: a wipe makes the retry re-send to served chats.
   eventMessagesRepo.record(db, eventId, affected)
 
   if (failed) {

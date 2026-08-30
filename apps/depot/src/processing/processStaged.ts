@@ -4,7 +4,6 @@ import type { CoreContext } from '../context'
 import { TransientError, transient } from './TransientError'
 import {
   type ProgressReporter,
-  TranscodeError,
   transcodeImage,
   transcodeVideo,
 } from './transcode'
@@ -78,16 +77,7 @@ export const processStaged = async (
   logger.debug(`Processing staged ${kind} from ${rawKey}`)
 
   if (kind === 'video') {
-    try {
-      await transcodeVideo(raw, processed, config.video, logger, onProgress)
-    } catch (error) {
-      // A killed encode says the box was too slow or too busy, not that the
-      // clip is bad — worth one more delivery.
-      if (error instanceof TranscodeError && error.timedOut) {
-        throw new TransientError(error.message, error)
-      }
-      throw error
-    }
+    await transcodeVideo(raw, processed, config.video, logger, onProgress)
   } else {
     await transcodeImage(raw, processed, config.image, logger, onProgress)
   }

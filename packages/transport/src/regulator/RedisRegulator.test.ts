@@ -272,8 +272,6 @@ describe('RedisRegulator reclaim', () => {
   })
 
   test('waits out a loading Redis instead of dying on it', async () => {
-    // A durable Redis replaying its AOF rejects everything with -LOADING. That
-    // is exactly the restart the forwarder exists to survive, so it must retry.
     const subscriber = stagedSubscriber([])
     let attempts = 0
     const producerClient = new FakeRedis().on('XGROUP', () => {

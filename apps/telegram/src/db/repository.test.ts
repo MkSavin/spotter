@@ -92,7 +92,6 @@ describe('telegram db repository', () => {
       chatId: 'c1',
     })
 
-    // Re-recording one chat updates that row and leaves the others alone.
     eventMessagesRepo.record(db, 'event-1', [{ id: 30, chatId: 'c1' }])
     expect(eventMessagesRepo.find(db, 'event-1')).toContainEqual({
       id: 30,
@@ -100,8 +99,7 @@ describe('telegram db repository', () => {
     })
     expect(eventMessagesRepo.count(db, 'event-1')).toBe(2)
 
-    // The duplicate-message bug: a delivery where every chat failed records
-    // nothing, and must NOT wipe the chats that already got the message.
+    // A delivery where every chat failed must not wipe the served ones.
     eventMessagesRepo.record(db, 'event-1', [])
     expect(eventMessagesRepo.count(db, 'event-1')).toBe(2)
   })
@@ -118,7 +116,6 @@ describe('telegram db repository', () => {
       { id: 20, chatId: 'c2' },
     ])
 
-    // An empty list is a no-op, not a wipe.
     eventMessagesRepo.forget(db, 'event-2', [])
     expect(eventMessagesRepo.count(db, 'event-2')).toBe(1)
   })

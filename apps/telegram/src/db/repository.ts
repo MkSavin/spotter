@@ -147,13 +147,7 @@ export const eventMessagesRepo = {
       .where(eq(eventMessages.eventId, eventId))
       .get()?.value ?? 0,
 
-  /**
-   * Merges the chats that were delivered to, keyed by `(event_id, tg_chat_id)`.
-   *
-   * Deliberately additive: a partial failure must not erase the chats that did
-   * land, or the retry stops recognising them as already-supplied and sends a
-   * duplicate message. Chats are only ever removed via {@link forget}.
-   */
+  /** Additive upsert: a wipe would make the retry re-send to served chats. */
   record: (
     db: TelegramDatabase,
     eventId: string,

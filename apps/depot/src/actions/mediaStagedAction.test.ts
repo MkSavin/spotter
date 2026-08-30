@@ -73,6 +73,18 @@ describe('mediaStagedAction', () => {
     expect(await mediaStagedAction(payload, context)).toBeUndefined()
   })
 
+  test('treats an ffmpeg timeout as final, not retryable', async () => {
+    const { TranscodeError } = await import('../processing/transcode')
+    processStaged.mockImplementation(async (kind: string) => {
+      if (kind === 'video') {
+        throw new TranscodeError('ffmpeg timed out after 120000ms', 614, true)
+      }
+      return undefined
+    })
+
+    expect(await mediaStagedAction(payload, context)).toBeUndefined()
+  })
+
   test('prefers the retry when one kind is transient and the other is not', async () => {
     processStaged.mockImplementation(async (kind: string) => {
       if (kind === 'video') throw new Error('Invalid data found')

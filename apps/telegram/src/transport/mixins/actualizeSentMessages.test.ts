@@ -56,7 +56,6 @@ describe('actualizeSentMessages', () => {
   })
 
   test('does not re-send to a chat that already has the message', async () => {
-    // First delivery lands and is recorded.
     const first = makeContext(db, false)
     await actualizeSentMessages(eventId, [], 'text', first.context)
 
@@ -64,8 +63,6 @@ describe('actualizeSentMessages', () => {
     const stored = eventMessagesRepo.find(db, eventId)
     expect(stored).toHaveLength(1)
 
-    // Second delivery (the retry / next update) must EDIT, never send again —
-    // this is the duplicate-message regression from event oemp2q.
     const second = makeContext(db, false)
     await actualizeSentMessages(eventId, stored, 'updated', second.context)
 
@@ -80,9 +77,7 @@ describe('actualizeSentMessages', () => {
     const stored = eventMessagesRepo.find(db, eventId)
     expect(stored).toHaveLength(1)
 
-    // Telegram goes down: the edit for the known chat fails too, so nothing is
-    // supplied. The stored message id must still survive — wiping it here is
-    // what made the retry send a duplicate (event oemp2q).
+    // Nothing supplied: the stored id must survive or the retry duplicates.
     const second = makeContext(db, true, true)
 
     await expect(
@@ -91,7 +86,6 @@ describe('actualizeSentMessages', () => {
 
     expect(eventMessagesRepo.find(db, eventId)).toEqual(stored)
 
-    // And the recovery delivery edits rather than sending a second message.
     const third = makeContext(db, false)
     await actualizeSentMessages(
       eventId,

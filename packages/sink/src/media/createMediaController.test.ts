@@ -70,8 +70,6 @@ describe('createMediaController', () => {
       'staging/frigate-home/event-e1-clip.mp4',
       'staging/frigate-home/event-e1-snapshot.jpg',
     ])
-    // Each kind goes to its own stream: a depot replica subscribed to snapshots
-    // only must never be handed a clip to transcode.
     const staged = published.find(
       (entry) => entry.stream === mediaStreams.mediaStaged,
     )
@@ -106,8 +104,6 @@ describe('createMediaController', () => {
     const { context, published } = makeContext()
     const controller = createMediaController(provider)
 
-    // The eager path: server asks for a snapshot on every ended event. It must
-    // stay off the clip lane, which is where the slow transcodes queue up.
     await controller(
       message({ eventId: 'e2', source: 'frigate-home', want: ['snapshot'] }),
       context,
@@ -148,7 +144,7 @@ describe('createMediaController', () => {
     expect(published).toHaveLength(0)
   })
 
-  test('answers with an empty result when the NVR has no media', async () => {
+  test('reports the miss and rethrows so the entry is retried', async () => {
     globalThis.fetch = mock(
       async () => new Response('', { status: 404 }),
     ) as never
@@ -156,18 +152,13 @@ describe('createMediaController', () => {
     const { context, published } = makeContext()
     const controller = createMediaController(provider)
 
-    await controller(
-      message({ eventId: 'e1', source: 'frigate-home', want: ['clip'] }),
-      context,
-    )
+    await expect(
+      controller(
+        message({ eventId: 'e1', source: 'frigate-home', want: ['clip'] }),
+        context,
+      ),
+    ).rejects.toThrow(/Nothing staged/)
 
-    // Silence would leave the bot's "processing" button stuck forever.
-    const processed = published.find(
-      (entry) => entry.stream === mediaStreams.mediaProcessed,
-    )
-    expect(processed?.payload).toEqual({ eventId: 'e1' })
-
-    // And the button says why, instead of just going back to idle.
     const failure = published.find(
       (entry) =>
         entry.stream === mediaStreams.mediaProgress &&

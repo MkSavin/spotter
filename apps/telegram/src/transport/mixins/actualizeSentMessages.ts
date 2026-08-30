@@ -33,10 +33,7 @@ export const actualizeSentMessages = async (
     .map((entry) => entry.data)
     .filter((entry): entry is EventMessage => Boolean(entry))
 
-  // Persist what did land before propagating: on retry these chats are seen as
-  // already-supplied and skipped, so only the failed ones are re-attempted.
-  // Merged, never replaced — a wipe here would make the retry re-send to chats
-  // that already got the message.
+  // Merged, never replaced: a wipe makes the retry re-send to served chats.
   eventMessagesRepo.record(db, eventId, affected)
 
   if (failed) {

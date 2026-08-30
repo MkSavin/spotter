@@ -71,21 +71,14 @@ export const createMediaController = <TConfig extends SinkConfig>(
       }
     }
 
-    // Silence would leave the bot's "processing" button stuck forever.
+    // Usually temporary: the NVR writes media just after the event ends and
+    // rate-limits under a burst. Throw so the reaper retries instead of acking.
     if (!rawClipKey && !rawSnapshotKey) {
-      logger.warn('Nothing staged for media request')
-      // Usually not final: the NVR finishes writing a clip seconds after the
-      // event ends, so a retry a little later often succeeds.
       await report('failed', 'Видео ещё не готово — попробуй через полминуты')
-      await producer.publish(mediaStreams.mediaProcessed, {
-        eventId: request.eventId,
-      })
-      return
+      throw new Error(`Nothing staged for media request ${request.eventId}`)
     }
 
-    // Clips go to their own stream so a slow transcode cannot starve snapshots.
-    // A request carries one kind in practice (snapshot eagerly, clip on demand),
-    // but a mixed one is split so neither kind waits on the other.
+    // Own stream per kind, so a slow transcode cannot starve snapshots.
     const staged: Array<[string, Record<string, unknown>]> = []
 
     if (rawSnapshotKey) {

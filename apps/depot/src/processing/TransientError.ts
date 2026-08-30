@@ -1,9 +1,4 @@
-/**
- * A failure that is worth another delivery: S3 hiccups, an object the stager
- * has not made visible yet, a killed encode. Actions let these escape so the
- * regulator leaves the entry pending and the reaper retries it; every other
- * error is final and gets acked with a `failed` progress report.
- */
+/** A failure worth another delivery (S3 hiccup, key not visible yet). */
 export class TransientError extends Error {
   constructor(
     message: string,
@@ -28,10 +23,7 @@ export const transient = async <T>(
 
 export type Outcome<T> = { value?: T; error?: unknown }
 
-/**
- * Captures an outcome instead of rejecting, so sibling media can be processed
- * in parallel and the caller can still tell transient from permanent failure.
- */
+/** Captures the outcome so a sibling's failure does not cancel the other. */
 export const settle = async <T>(
   operation: () => Promise<T>,
 ): Promise<Outcome<T>> => {

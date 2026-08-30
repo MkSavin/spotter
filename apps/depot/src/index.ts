@@ -68,8 +68,7 @@ const run = async (): Promise<void> => {
     details: () => probeDetails(config),
   })
 
-  // Camera frames ride the snapshot lane: both are quick and user-facing, so
-  // neither should queue behind a clip transcode.
+  // Camera frames ride the snapshot lane: both are quick and user-facing.
   const regulator = new RedisRegulator<CoreContext>()
 
   if (config.lane !== 'clips') {
