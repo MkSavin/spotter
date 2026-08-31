@@ -1,13 +1,14 @@
 import process from 'node:process'
 import {
   CatalogCache,
-  connectRedis,
   probeRedisVersion,
+  RedisConnection,
   type RegulatorHandle,
   StreamProducer,
   startHeartbeat,
+  startLiveness,
 } from '@spotter/transport'
-import { RedisClient, S3Client } from 'bun'
+import { S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { ServerContext } from './context'
@@ -34,19 +35,28 @@ const run = async (): Promise<void> => {
 
   const catalog = new CatalogCache(applicationLogger.sub('catalog'))
 
-  const subscriber = new RedisClient(config.redis.url)
+  const subscriber = new RedisConnection(config.redis.url)
   const producer = new StreamProducer(
-    new RedisClient(config.redis.url),
+    new RedisConnection(config.redis.url),
     config.redis.maxLen,
   )
 
   await producer.connect()
-  await connectRedis(subscriber, { url: config.redis.url })
+  await subscriber.connect()
 
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'server',
     version: information.version,
     details: () => probeRedisVersion(producer),
+  })
+
+  // Healthcheck signal: refreshed only while Redis actually answers, so a
+  // wedged-but-running container fails its healthcheck and gets restarted.
+  const stopLiveness = startLiveness({
+    check: async () => {
+      await subscriber.send('PING', [])
+      return true
+    },
   })
 
   await catalog.bootstrap(config.source, producer)
@@ -66,6 +76,7 @@ const run = async (): Promise<void> => {
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat()
+    stopLiveness()
     await transport?.stop()
     subscriber.close()
     producer.disconnect()

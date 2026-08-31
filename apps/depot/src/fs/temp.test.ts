@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import { existsSync, mkdirSync, mkdtempSync, utimesSync } from 'node:fs'
 import fs from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { temp } from './temp'
+import { sweepStale, temp } from './temp'
 
 describe('temp helper', () => {
   test('creates temporary directory with prefix and removes it', async () => {
@@ -40,5 +42,37 @@ describe('temp helper', () => {
         // ignore
       }
     }
+  })
+})
+
+describe('sweepStale', () => {
+  test('removes an old directory left by a killed run', async () => {
+    const prefix = `spotter-sweep-${crypto.randomUUID()}-`
+    const stale = path.join(tmpdir(), `${prefix}old`)
+    mkdirSync(stale)
+    const past = new Date(Date.now() - 7_200_000)
+    utimesSync(stale, past, past)
+
+    expect(await sweepStale(prefix)).toBe(1)
+    expect(existsSync(stale)).toBe(false)
+  })
+
+  test('leaves a fresh directory alone: a sibling replica may own it', async () => {
+    const prefix = `spotter-sweep-${crypto.randomUUID()}-`
+    const fresh = mkdtempSync(path.join(tmpdir(), prefix))
+
+    expect(await sweepStale(prefix)).toBe(0)
+    expect(existsSync(fresh)).toBe(true)
+  })
+
+  test('ignores directories belonging to another prefix', async () => {
+    const mine = `spotter-sweep-${crypto.randomUUID()}-`
+    const other = path.join(tmpdir(), `spotter-other-${crypto.randomUUID()}`)
+    mkdirSync(other)
+    const past = new Date(Date.now() - 7_200_000)
+    utimesSync(other, past, past)
+
+    expect(await sweepStale(mine)).toBe(0)
+    expect(existsSync(other)).toBe(true)
   })
 })

@@ -1,5 +1,9 @@
-import type { CatalogCache, StreamProducer } from '@spotter/transport'
-import type { RedisClient, S3Client } from 'bun'
+import type {
+  CatalogCache,
+  RedisConnection,
+  StreamProducer,
+} from '@spotter/transport'
+import type { S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { Config } from './config'
 import type { EmailDatabase } from './db/client'
@@ -14,7 +18,7 @@ export type CoreContext = {
   s3: S3Client
   mailer: SmtpGateway
   producer: StreamProducer
-  subscriber: RedisClient
+  subscriber: RedisConnection
 }
 
 /**

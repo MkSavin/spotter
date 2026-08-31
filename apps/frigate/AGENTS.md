@@ -63,6 +63,17 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 (HS256, `FRIGATE_AUTH_*`). **Только здесь** живут креды NVR; рантайм фетчит этот `Request` и
 стейджит байты в S3 — по сети уходит лишь ключ S3.
 
+## TimelapseProvider — экспорт записей
+
+[FrigateTimelapseProvider](src/timelapse/FrigateTimelapseProvider.ts) реализует порт `TimelapseProvider` поверх `POST /api/export/{camera}/start/{start}/end/{end}`. Экспорт **асинхронный**: ручка возвращает `export_id`, дальше состояние читается из `GET /api/exports` до `in_progress: false`.
+
+Две тонкости, обе проверены по исходникам Frigate v0.17.0:
+
+- Наш контракт знает скорости `realtime` / `timelapse`, Frigate — `realtime` / `timelapse_25x`; маппинг живёт здесь, чтобы имя из NVR не протекало в шину.
+- Готовый файл отдаёт **nginx** (`/exports/<файл>`, та же JWT-авторизация), а не Python-API: `video_path` из записи экспорта указывает внутрь контейнера и снаружи недостижим.
+
+Опрос и стейджинг ведёт `TimelapseTracker` в `@spotter/sink`, а не контроллер: экспорт суток идёт дольше `REDIS_RECLAIM_MIN_IDLE_MS` (5 мин), и удержание записи в PEL привело бы к повторной выдаче и второму экспорту того же интервала. Запущенные экспорты пишутся в `TIMELAPSE_STATE_PATH` (том `frigate-state`) и подхватываются при старте — иначе рестарт оставил бы NVR кодировать файл, которого никто не ждёт.
+
 ## Catalog — таксономия
 
 [src/catalog/FrigateCatalog.ts](src/catalog/FrigateCatalog.ts) реализует порт `Catalog`: тянет

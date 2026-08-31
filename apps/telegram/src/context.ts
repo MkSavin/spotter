@@ -1,9 +1,13 @@
 import type { HydrateApiFlavor, HydrateFlavor } from '@grammyjs/hydrate'
 import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
-import type { CatalogCache, StreamProducer } from '@spotter/transport'
+import type {
+  CatalogCache,
+  RedisConnection,
+  StreamProducer,
+} from '@spotter/transport'
 import type { AbortSignal } from 'abort-controller'
-import type { RedisClient, S3Client } from 'bun'
+import type { S3Client } from 'bun'
 import type {
   Api,
   Bot,
@@ -49,7 +53,7 @@ export type CoreContext = {
   rollouts: RolloutWatcher
   clips: ClipTracker
   s3: S3Client
-  subscriber: RedisClient
+  subscriber: RedisConnection
   producer: StreamProducer
   commandBus: CommandBus
   runner: RunnerHandle | undefined

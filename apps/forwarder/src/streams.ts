@@ -11,10 +11,12 @@
  */
 
 import {
+  catalogRequestStream,
   catalogUpdatedStream,
   eventStreams,
   heartbeatStream,
   mediaStreams,
+  timelapseStreams,
 } from '@spotter/transport'
 
 /** Produced on the ingest node, consumed on the remote — mirrored local → remote. */
@@ -33,6 +35,10 @@ export const UP_STREAMS = [
   // Stage updates for a pending clip, so the bot shows real progress instead
   // of a spinner frozen until the video lands.
   mediaStreams.mediaProgress,
+  // Outcome of a timelapse export: the adapter stages it on the ingest node,
+  // the cloud bot presigns and delivers it.
+  timelapseStreams.ready,
+  timelapseStreams.failed,
 ] as const
 
 /**
@@ -45,6 +51,9 @@ export const downStreams = (sources: string[]): string[] => [
   ...sources.flatMap((source) => [
     mediaStreams.mediaRequest(source),
     mediaStreams.cameraRequest(source),
+    timelapseStreams.request(source),
   ]),
   eventStreams.testSeed,
+  // A restarted cloud consumer asking the adapter to republish its catalog.
+  catalogRequestStream,
 ]

@@ -11,6 +11,46 @@ export type TempDirectoryController = {
   remove: () => Promise<void>
 }
 
+/**
+ * Removes directories this prefix left behind. A killed process (SIGKILL after
+ * the stop grace period, OOM) never runs its cleanup, and each start makes a
+ * fresh `mkdtemp`, so the old ones would accumulate untouched.
+ *
+ * Only entries older than `minAgeMs` are touched: a sibling replica may be
+ * using a directory created moments ago.
+ */
+export const sweepStale = async (
+  prefix: string,
+  minAgeMs = 3_600_000,
+): Promise<number> => {
+  let removed = 0
+
+  try {
+    const root = tmpdir()
+    const entries = await fs.readdir(root, { withFileTypes: true })
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith(prefix)) continue
+
+      const full = path.join(root, entry.name)
+      try {
+        const stat = await fs.stat(full)
+        if (Date.now() - stat.mtimeMs < minAgeMs) continue
+        await fs.rm(full, { recursive: true, force: true })
+        removed += 1
+      } catch {
+        // Another replica may have removed it first; nothing to report.
+      }
+    }
+  } catch (error) {
+    logger.warn('Could not sweep stale temp directories', error)
+  }
+
+  if (removed > 0) logger.info(`Removed ${removed} stale temp directory(ies)`)
+
+  return removed
+}
+
 export const temp = async (
   prefix: string,
 ): Promise<TempDirectoryController> => {

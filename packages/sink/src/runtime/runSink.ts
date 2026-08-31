@@ -1,22 +1,33 @@
 import process from 'node:process'
 import {
-  connectRedis,
+  catalogRequestStream,
   mediaStreams,
+  RedisConnection,
   RedisRegulator,
   type StreamMessageController,
   StreamProducer,
   startHeartbeat,
+  startLiveness,
+  timelapseStreams,
 } from '@spotter/transport'
-import { RedisClient, S3Client } from 'bun'
+import { S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { Catalog } from '../catalog/Catalog'
-import { keepCatalogPublished } from '../catalog/keepCatalogPublished'
+import { createCatalogRequestController } from '../catalog/createCatalogRequestController'
+import {
+  type CatalogHandle,
+  keepCatalogPublished,
+} from '../catalog/keepCatalogPublished'
 import type { SinkConfig } from '../config/sinkConfig'
 import { publishEvent } from '../helpers/publishEvent'
 import { createCameraController } from '../media/createCameraController'
 import { createMediaController } from '../media/createMediaController'
 import type { MediaProvider } from '../media/MediaProvider'
 import type { Source, SourceHandle } from '../source/Source'
+import { createTimelapseController } from '../timelapse/createTimelapseController'
+import { FileTimelapseStore } from '../timelapse/FileTimelapseStore'
+import type { TimelapseProvider } from '../timelapse/TimelapseProvider'
+import { TimelapseTracker } from '../timelapse/TimelapseTracker'
 import type { SinkContext } from './context'
 
 /** A stream subscription an adapter wants the runtime to register. */
@@ -40,6 +51,10 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
   mediaProvider?: MediaProvider
   /** Owns the NVR taxonomy; published to `spotter.catalog.<source>` on startup. */
   catalog?: Catalog
+  /** Exports spans of recordings; enables the timelapse consumer. */
+  timelapseProvider?: TimelapseProvider
+  /** Where in-flight exports are remembered across restarts. */
+  timelapseStatePath?: string
   /** Extra stream subscriptions (e.g. a test-seed controller). */
   controllers?: SinkController<TConfig>[]
   /** Extras for `/status`, e.g. the NVR build behind this adapter. */
@@ -66,6 +81,7 @@ export const runSink = async <TConfig extends SinkConfig>(
     source,
     mediaProvider,
     catalog,
+    timelapseProvider,
     controllers = [],
   } = options
 
@@ -77,9 +93,9 @@ export const runSink = async <TConfig extends SinkConfig>(
 
   // Dedicated blocking connection for XREADGROUP; the producer connection stays
   // free for XADD (ingested events + staged media) and the regulator's acks.
-  const subscriber = new RedisClient(config.redis.url)
+  const subscriber = new RedisConnection(config.redis.url)
   const producer = new StreamProducer(
-    new RedisClient(config.redis.url),
+    new RedisConnection(config.redis.url),
     config.redis.maxLen,
   )
 
@@ -93,11 +109,13 @@ export const runSink = async <TConfig extends SinkConfig>(
     : null
 
   await producer.connect()
-  await connectRedis(subscriber, { url: config.redis.url })
+  await subscriber.connect()
 
   let sourceHandle: SourceHandle | null = null
   let stopHeartbeat: (() => void) | null = null
-  let stopCatalog: (() => void) | null = null
+  let stopLiveness: (() => void) | null = null
+  let catalogHandle: CatalogHandle | null = null
+  let timelapse: TimelapseTracker | null = null
   let transport: Awaited<
     ReturnType<RedisRegulator<SinkContext<TConfig>>['run']>
   > | null = null
@@ -105,7 +123,9 @@ export const runSink = async <TConfig extends SinkConfig>(
   const shutdown = async (signal: NodeJS.Signals) => {
     logger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat?.()
-    stopCatalog?.()
+    stopLiveness?.()
+    catalogHandle?.stop()
+    timelapse?.stop()
     await transport?.stop()
     await sourceHandle?.stop()
     subscriber.close()
@@ -132,7 +152,7 @@ export const runSink = async <TConfig extends SinkConfig>(
   })
 
   if (catalog) {
-    stopCatalog = keepCatalogPublished(catalog, sourceId, producer, logger)
+    catalogHandle = keepCatalogPublished(catalog, sourceId, producer, logger)
   }
 
   stopHeartbeat = startHeartbeat(producer, {
@@ -140,6 +160,38 @@ export const runSink = async <TConfig extends SinkConfig>(
     version: information.version,
     details: options.heartbeatDetails,
   })
+
+  // Healthcheck signal: refreshed only while Redis actually answers, so a
+  // wedged-but-running container fails its healthcheck and gets restarted.
+  stopLiveness = startLiveness({
+    check: async () => {
+      await subscriber.send('PING', [])
+      return true
+    },
+  })
+
+  if (timelapseProvider && s3 && config.s3) {
+    timelapse = new TimelapseTracker({
+      provider: timelapseProvider,
+      producer,
+      s3,
+      stagingPrefix: config.s3.stagingPrefix,
+      sourceId,
+      logger: logger.sub('timelapse'),
+      store: options.timelapseStatePath
+        ? new FileTimelapseStore(
+            options.timelapseStatePath,
+            logger.sub('timelapse'),
+          )
+        : undefined,
+    })
+
+    // Exports started by a previous process are still running on the NVR; pick
+    // them back up rather than leaving the requester waiting forever.
+    await timelapse
+      .recover(logger.sub('timelapse'))
+      .catch((error) => logger.warn('Could not recover exports', error))
+  }
 
   const regulator = new RedisRegulator<SinkContext<TConfig>>()
 
@@ -151,6 +203,20 @@ export const runSink = async <TConfig extends SinkConfig>(
     regulator.message(
       mediaStreams.cameraRequest(sourceId),
       createCameraController<TConfig>(mediaProvider),
+    )
+  }
+
+  if (timelapse) {
+    regulator.message(
+      timelapseStreams.request(sourceId),
+      createTimelapseController<TConfig>(timelapse),
+    )
+  }
+
+  if (catalogHandle) {
+    regulator.message(
+      catalogRequestStream,
+      createCatalogRequestController<TConfig>(catalogHandle.republish),
     )
   }
 

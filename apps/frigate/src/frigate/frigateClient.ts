@@ -19,6 +19,13 @@ export const frigateUrls = {
   // caller publishes the canonical event itself.
   createEvent: '{host}/api/events/{camera}/{label}/create',
   endEvent: '{host}/api/events/{id}/end',
+  // Recording exports. `exportFile` is served by Frigate's nginx, not the API,
+  // so it takes a bare file name rather than the container-internal path the
+  // export record reports.
+  exportStart: '{host}/api/export/{camera}/start/{start}/end/{end}',
+  exportList: '{host}/api/exports',
+  exportDelete: '{host}/api/export/{id}',
+  exportFile: '{host}/exports/{file}',
 } as const
 
 /** Strips trailing slash / query noise from the configured host URL. */

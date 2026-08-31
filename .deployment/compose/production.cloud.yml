@@ -26,6 +26,13 @@ services:
     image: ghcr.io/mksavin/spotter-server:latest
     container_name: spotter-server
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     environment:
@@ -45,6 +52,13 @@ services:
     image: ghcr.io/mksavin/spotter-telegram:latest
     container_name: spotter-telegram
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     environment:
@@ -67,6 +81,13 @@ services:
     image: ghcr.io/mksavin/spotter-pwa:latest
     container_name: spotter-pwa
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     ports:
@@ -90,6 +111,13 @@ services:
     image: ghcr.io/mksavin/spotter-email:latest
     container_name: spotter-email
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     environment:

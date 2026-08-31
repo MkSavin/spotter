@@ -12,6 +12,11 @@ type Options = {
   timeoutMs?: number
   /** Repaints the event's messages; `undefined` reason means still working. */
   render: (eventId: string, outcome: ClipOutcome) => unknown
+  /** Mirrors the wait so a restart does not freeze the button. */
+  store?: {
+    save: (eventId: string, stage: ClipStage) => void
+    remove: (eventId: string) => void
+  }
 }
 
 /** Tracks awaited clips; a timeout ends the wait with a retry button. */
@@ -66,6 +71,7 @@ export class ClipTracker {
     }, this.options.timeoutMs ?? CLIP_TIMEOUT_MS)
     timer.unref?.()
     this.waiting.set(eventId, { stage, percent, timer })
+    this.options.store?.save(eventId, stage)
   }
 
   /** Drops the wait; returns false when there was nothing to drop. */
@@ -74,6 +80,7 @@ export class ClipTracker {
     if (!entry) return false
     clearTimeout(entry.timer)
     this.waiting.delete(eventId)
+    this.options.store?.remove(eventId)
     return true
   }
 

@@ -35,6 +35,26 @@ export const catalogKey = (source: string): string =>
 /** Stream notified whenever any source's catalog changes. */
 export const catalogUpdatedStream = 'spotter.catalog.updated'
 
+/**
+ * Consumers ask adapters to republish their catalog. A consumer that starts
+ * after the last publish has no other way to reach it: the snapshot key is
+ * node-local, and a stream group only ever sees messages newer than itself.
+ */
+export const catalogRequestStream = 'spotter.catalog.request'
+
+export const catalogRequestSchema = z.object({
+  /** Which source to republish; omitted means every source the node owns. */
+  source: z.string().min(1).optional(),
+})
+export type CatalogRequest = z.infer<typeof catalogRequestSchema>
+
+export const safeParseCatalogRequest = (
+  value: unknown,
+): CatalogRequest | null => {
+  const result = catalogRequestSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
 /** Throws `ZodError` on invalid input. Use when producing the catalog. */
 export const parseCatalog = (value: unknown): Catalog =>
   catalogSchema.parse(value)

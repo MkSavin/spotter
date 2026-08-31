@@ -1,6 +1,7 @@
 import type { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
 import { connectRedis } from '../helpers/connectRedis'
+import { RedisConnection } from '../helpers/RedisConnection'
 import {
   parseEntries,
   parsePendingReply,
@@ -47,7 +48,7 @@ export type RegulatorHandle = {
 }
 
 type BaseContext = {
-  subscriber: RedisClient
+  subscriber: RedisClient | RedisConnection
   producer: StreamProducer
   logger: Stenograph
 }
@@ -62,7 +63,7 @@ export class StreamProducer {
   private connected = false
 
   constructor(
-    private readonly client: RedisClient,
+    private readonly client: RedisClient | RedisConnection,
     private readonly maxLen = 10000,
   ) {}
 
@@ -71,7 +72,11 @@ export class StreamProducer {
       this.connected = true
       return
     }
-    await connectRedis(this.client)
+    if (this.client instanceof RedisConnection) {
+      await this.client.connect()
+    } else {
+      await connectRedis(this.client)
+    }
     this.connected = true
   }
 
@@ -81,7 +86,7 @@ export class StreamProducer {
   }
 
   async publish(stream: string, payload: unknown): Promise<string> {
-    return this.client.send('XADD', [
+    return this.send('XADD', [
       stream,
       'MAXLEN',
       '~',
@@ -298,6 +303,19 @@ export class RedisRegulator<Context extends BaseContext> {
           if (!running) {
             break
           }
+
+          // A Redis that came back empty (lost volume, FLUSHALL) has no groups,
+          // and every read fails the same way until they are made again.
+          if (String((error as Error)?.message ?? error).includes('NOGROUP')) {
+            log.warn('Consumer group missing — recreating')
+            for (const stream of streams) {
+              await createGroup(producer, stream, group, loadingDelayMs).catch(
+                (retryError) => log.error(retryError),
+              )
+            }
+            continue
+          }
+
           log.error(error)
           await new Promise((resolve) => setTimeout(resolve, 1000))
         }

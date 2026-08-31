@@ -3,10 +3,10 @@ import {
   type CommandReply,
   type CommandRequest,
   deliveryStreams,
+  type RedisConnection,
   type StreamProducer,
   safeParseCommandReply,
 } from '@spotter/transport'
-import type { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
 
 const COMMAND_TIMEOUT_MS = 30_000
@@ -38,7 +38,7 @@ export class CommandBus {
 
   constructor(
     private readonly producer: StreamProducer,
-    private readonly subscriber: RedisClient,
+    private readonly subscriber: RedisConnection,
     private readonly logger: Stenograph,
     options: CommandBusOptions = {},
   ) {

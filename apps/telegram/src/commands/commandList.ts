@@ -8,6 +8,7 @@ import type { SpotterCommand } from './framework/SpotterCommand'
 import { startCommand } from './general/startCommand'
 import { cameraListCommand } from './nvr/cameraListCommand'
 import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
+import { timelapseCommand } from './nvr/timelapseCommand'
 import { testDeliveryCommand } from './test/testDeliveryCommand'
 import { testMediaCommand } from './test/testMediaCommand'
 import { userDemoteCommand } from './user/userDemoteCommand'
@@ -22,6 +23,7 @@ export const commandRegistry: SpotterCommand[] = [
   meCommand,
   cameraListCommand,
   cameraSnapshotCommand,
+  timelapseCommand,
   userSignCommand,
   userRevokeCommand,
   userPromoteCommand,

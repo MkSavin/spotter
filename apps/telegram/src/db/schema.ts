@@ -95,10 +95,38 @@ export const dialogStates = sqliteTable(
   (table) => [primaryKey({ columns: [table.tgUserId, table.tgChatId] })],
 )
 
+/**
+ * Last catalog snapshot per source. The `spotter.catalog.<source>` key lives on
+ * the ingest node and does not cross the forwarder, so without this a cloud
+ * restart shows "неизв. камера" until the taxonomy happens to change.
+ */
+export const catalogSnapshots = sqliteTable('catalog_snapshots', {
+  source: text('source').primaryKey(),
+  /** Serialized `Catalog`; the shape belongs to @spotter/transport. */
+  snapshot: text('snapshot').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+})
+
+/**
+ * Events whose clip the user is waiting for. Held in memory the wait would be
+ * lost on restart, leaving the "⏳" button frozen with no way to retry.
+ */
+export const clipWaits = sqliteTable('clip_waits', {
+  eventId: text('event_id').primaryKey(),
+  stage: text('stage').notNull(),
+  startedAt: integer('started_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+})
+
 export type TgChat = InferSelectModel<typeof tgChats>
 export type TgBinding = InferSelectModel<typeof tgBindings>
 export type ServiceVersion = InferSelectModel<typeof serviceVersions>
 export type DialogStateRow = InferSelectModel<typeof dialogStates>
+export type CatalogSnapshotRow = InferSelectModel<typeof catalogSnapshots>
+export type ClipWaitRow = InferSelectModel<typeof clipWaits>
 
 export type EventMessage = {
   id: number

@@ -1,5 +1,9 @@
-import type { CatalogCache, StreamProducer } from '@spotter/transport'
-import type { RedisClient, S3Client } from 'bun'
+import type {
+  CatalogCache,
+  RedisConnection,
+  StreamProducer,
+} from '@spotter/transport'
+import type { S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { Config } from './config'
 import type { ServerDatabase } from './db/client'
@@ -10,6 +14,6 @@ export type ServerContext = {
   db: ServerDatabase
   catalog: CatalogCache
   s3: S3Client
-  subscriber: RedisClient
+  subscriber: RedisConnection
   producer: StreamProducer
 }

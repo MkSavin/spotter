@@ -6,6 +6,7 @@ import {
   mediaStreams,
   RedisRegulator,
   type RegulatorHandle,
+  timelapseStreams,
 } from '@spotter/transport'
 import type { Bot } from 'grammy'
 import type {
@@ -19,6 +20,10 @@ import { deliveryEventController } from './controllers/deliveryEventController'
 import { deliveryRecipientController } from './controllers/deliveryRecipientController'
 import { heartbeatController } from './controllers/heartbeatController'
 import { mediaProgressController } from './controllers/mediaProgressController'
+import {
+  timelapseFailedController,
+  timelapseReadyController,
+} from './controllers/timelapseController'
 
 export const telegramTransport = async (
   bot: Bot<BotContext, BotApi>,
@@ -33,6 +38,8 @@ export const telegramTransport = async (
     .message(catalogUpdatedStream, catalogController)
     .message(heartbeatStream, heartbeatController)
     .message(mediaStreams.mediaProgress, mediaProgressController)
+    .message(timelapseStreams.ready, timelapseReadyController)
+    .message(timelapseStreams.failed, timelapseFailedController)
     .run(
       { ...context, logger, bot },
       {

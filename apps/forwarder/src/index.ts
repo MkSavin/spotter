@@ -1,11 +1,11 @@
 import process from 'node:process'
 import {
-  connectRedis,
+  RedisConnection,
   RedisRegulator,
   StreamProducer,
   startHeartbeat,
+  startLiveness,
 } from '@spotter/transport'
-import { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
 import information from '../package.json'
 import { resolveConfig } from './config'
@@ -14,7 +14,7 @@ import { applicationLogger } from './log'
 import { downStreams, UP_STREAMS } from './streams'
 
 type BridgeContext = {
-  subscriber: RedisClient
+  subscriber: RedisConnection
   producer: StreamProducer
   logger: Stenograph
 }
@@ -28,20 +28,20 @@ const run = async (): Promise<void> => {
 
   // One blocking subscriber + one producer (XADD/admin) per Redis side. The
   // forwarder is the only component touching both instances.
-  const localSubscriber = new RedisClient(config.localUrl)
+  const localSubscriber = new RedisConnection(config.localUrl)
   const localProducer = new StreamProducer(
-    new RedisClient(config.localUrl),
+    new RedisConnection(config.localUrl),
     config.maxLen,
   )
-  const remoteSubscriber = new RedisClient(config.remoteUrl)
+  const remoteSubscriber = new RedisConnection(config.remoteUrl)
   const remoteProducer = new StreamProducer(
-    new RedisClient(config.remoteUrl),
+    new RedisConnection(config.remoteUrl),
     config.maxLen,
   )
 
   await Promise.all([
-    connectRedis(localSubscriber, { url: config.localUrl }),
-    connectRedis(remoteSubscriber, { url: config.remoteUrl }),
+    localSubscriber.connect(),
+    remoteSubscriber.connect(),
     localProducer.connect(),
     remoteProducer.connect(),
   ])
@@ -91,9 +91,19 @@ const run = async (): Promise<void> => {
     version: information.version,
   })
 
+  // Healthcheck signal: refreshed only while Redis actually answers, so a
+  // wedged-but-running container fails its healthcheck and gets restarted.
+  const stopLiveness = startLiveness({
+    check: async () => {
+      await localSubscriber.send('PING', [])
+      return true
+    },
+  })
+
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat()
+    stopLiveness()
     await upHandle.stop()
     await downHandle.stop()
     localSubscriber.close()

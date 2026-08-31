@@ -10,6 +10,18 @@ export const CATALOG_RETRY_MS = 60_000
 export const CATALOG_REFRESH_MS = 600_000
 
 /**
+ * Republish even when nothing changed after this many quiet refreshes, so a
+ * consumer that restarted and missed the last publish still gets one.
+ */
+export const CATALOG_FORCE_EVERY = 6
+
+export type CatalogHandle = {
+  stop: () => void
+  /** Publishes the current catalog regardless of whether it changed. */
+  republish: () => Promise<void>
+}
+
+/**
  * Keeps the published catalog in sync with the NVR: retries a fast interval
  * until the first snapshot lands, then re-checks on a slow one.
  */
@@ -20,24 +32,39 @@ export const keepCatalogPublished = (
   logger: Stenograph,
   retryMs = CATALOG_RETRY_MS,
   refreshMs = CATALOG_REFRESH_MS,
-): (() => void) => {
+  forceEvery = CATALOG_FORCE_EVERY,
+): CatalogHandle => {
   let timer: ReturnType<typeof setTimeout> | undefined
   let stopped = false
+  let quiet = 0
   const previous: { value: string | undefined } = { value: undefined }
 
-  const attempt = async (): Promise<void> => {
-    if (stopped) return
-
-    const published = await publishCatalog(
+  const publish = (force: boolean): Promise<boolean> =>
+    publishCatalog(
       catalog,
       sourceId,
       producer,
       logger,
-      previous,
+      force ? undefined : previous,
     ).catch((error) => {
       logger.warn(`Catalog publish failed: ${error}`)
       return false
     })
+
+  const attempt = async (): Promise<void> => {
+    if (stopped) return
+
+    // A forced round also refreshes the memo, so the next quiet round compares
+    // against what was actually sent.
+    const force = forceEvery > 0 && quiet >= forceEvery
+    if (force) {
+      previous.value = undefined
+      quiet = 0
+    } else {
+      quiet += 1
+    }
+
+    const published = await publish(force)
 
     if (stopped) return
 
@@ -47,8 +74,15 @@ export const keepCatalogPublished = (
 
   void attempt()
 
-  return () => {
-    stopped = true
-    clearTimeout(timer)
+  return {
+    stop: () => {
+      stopped = true
+      clearTimeout(timer)
+    },
+    republish: async () => {
+      previous.value = undefined
+      quiet = 0
+      await publish(true)
+    },
   }
 }

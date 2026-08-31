@@ -1,12 +1,13 @@
 import process from 'node:process'
 import {
   CatalogCache,
-  connectRedis,
+  RedisConnection,
   type RegulatorHandle,
   StreamProducer,
   startHeartbeat,
+  startLiveness,
 } from '@spotter/transport'
-import { RedisClient, S3Client } from 'bun'
+import { S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
@@ -35,18 +36,27 @@ const main = async (): Promise<void> => {
   const catalog = new CatalogCache(applicationLogger.sub('catalog'))
   const mailer = new SmtpGateway(config.smtp, applicationLogger.sub('smtp'))
 
-  const subscriber = new RedisClient(config.redis.url)
+  const subscriber = new RedisConnection(config.redis.url)
   const producer = new StreamProducer(
-    new RedisClient(config.redis.url),
+    new RedisConnection(config.redis.url),
     config.redis.maxLen,
   )
 
   await producer.connect()
-  await connectRedis(subscriber, { url: config.redis.url })
+  await subscriber.connect()
 
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'email',
     version: information.version,
+  })
+
+  // Healthcheck signal: refreshed only while Redis actually answers, so a
+  // wedged-but-running container fails its healthcheck and gets restarted.
+  const stopLiveness = startLiveness({
+    check: async () => {
+      await subscriber.send('PING', [])
+      return true
+    },
   })
 
   // Fail fast if SMTP creds are wrong — better at boot than on the first event.
@@ -70,6 +80,7 @@ const main = async (): Promise<void> => {
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat()
+    stopLiveness()
     await transport?.stop()
     subscriber.close()
     producer.disconnect()

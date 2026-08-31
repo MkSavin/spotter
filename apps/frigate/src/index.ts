@@ -8,6 +8,7 @@ import { FrigateMediaProvider } from './media/FrigateMediaProvider'
 import { probeDetails } from './probeDetails'
 import { constructSource } from './source/constructSource'
 import { eventTestController } from './stream/controllers/eventTestController'
+import { FrigateTimelapseProvider } from './timelapse/FrigateTimelapseProvider'
 
 const config = resolveConfig()
 
@@ -19,6 +20,7 @@ const source = constructSource(config.source.type, config, applicationLogger)
 // live only here; only staged S3 keys travel downstream.
 const mediaProvider = new FrigateMediaProvider(config.frigate)
 const catalog = new FrigateCatalog(config, applicationLogger)
+const timelapseProvider = new FrigateTimelapseProvider(config.frigate)
 
 runSink({
   config,
@@ -28,6 +30,8 @@ runSink({
   source,
   mediaProvider,
   catalog,
+  timelapseProvider,
+  timelapseStatePath: config.timelapseStatePath,
   controllers: [
     { stream: eventStreams.testSeed, controller: eventTestController },
   ],

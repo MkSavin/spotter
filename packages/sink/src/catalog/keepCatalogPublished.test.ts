@@ -35,7 +35,7 @@ const settle = (ms: number): Promise<void> =>
 describe('keepCatalogPublished', () => {
   test('publishes a catalog that is ready right away', async () => {
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       flakyCatalog(0),
       'frigate',
       producer,
@@ -43,7 +43,7 @@ describe('keepCatalogPublished', () => {
       10,
     )
     await settle(20)
-    stop()
+    handle.stop()
 
     expect(sent).toEqual(['SET'])
   })
@@ -51,7 +51,7 @@ describe('keepCatalogPublished', () => {
   test('never publishes an empty catalog', async () => {
     // An empty snapshot would overwrite a good one and blank the camera list.
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       { listCameras: async () => [], listObjectTypes: async () => [] },
       'frigate',
       producer,
@@ -59,14 +59,14 @@ describe('keepCatalogPublished', () => {
       10,
     )
     await settle(25)
-    stop()
+    handle.stop()
 
     expect(sent).toEqual([])
   })
 
   test('keeps trying until the NVR answers', async () => {
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       flakyCatalog(2),
       'frigate',
       producer,
@@ -74,21 +74,21 @@ describe('keepCatalogPublished', () => {
       10,
     )
     await settle(60)
-    stop()
+    handle.stop()
 
     expect(sent).toEqual(['SET'])
   })
 
   test('stops retrying once stopped', async () => {
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       flakyCatalog(5),
       'frigate',
       producer,
       silent,
       10,
     )
-    stop()
+    handle.stop()
     await settle(60)
 
     expect(sent).toEqual([])
@@ -97,7 +97,7 @@ describe('keepCatalogPublished', () => {
   test('republishes when the camera list changes', async () => {
     let cameras = [{ code: 'front', label: 'Front' }]
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       {
         listCameras: async () => cameras,
         listObjectTypes: async () => [],
@@ -114,14 +114,14 @@ describe('keepCatalogPublished', () => {
       { code: 'yard', label: 'Yard' },
     ]
     await settle(30)
-    stop()
+    handle.stop()
 
     expect(sent.filter((c) => c === 'SET')).toHaveLength(2)
   })
 
   test('an unchanged catalog is not republished on refresh', async () => {
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       flakyCatalog(0),
       'frigate',
       producer,
@@ -130,7 +130,7 @@ describe('keepCatalogPublished', () => {
       10,
     )
     await settle(60)
-    stop()
+    handle.stop()
 
     expect(sent).toEqual(['SET'])
   })
@@ -138,7 +138,7 @@ describe('keepCatalogPublished', () => {
   test('a throwing catalog is retried, not fatal', async () => {
     let calls = 0
     const { producer, sent } = makeProducer()
-    const stop = keepCatalogPublished(
+    const handle = keepCatalogPublished(
       {
         listCameras: async () => {
           calls++
@@ -153,8 +153,66 @@ describe('keepCatalogPublished', () => {
       10,
     )
     await settle(40)
-    stop()
+    handle.stop()
 
     expect(sent).toEqual(['SET'])
+  })
+})
+
+describe('forced republish', () => {
+  test('republishes an unchanged catalog after enough quiet rounds', async () => {
+    // A consumer that restarted and missed the last publish has no other way
+    // back: it cannot read the node-local key.
+    const { producer, sent } = makeProducer()
+    const handle = keepCatalogPublished(
+      flakyCatalog(0),
+      'frigate',
+      producer,
+      silent,
+      5,
+      5,
+      2,
+    )
+    await settle(60)
+    handle.stop()
+
+    expect(sent.filter((c) => c === 'SET').length).toBeGreaterThan(1)
+  })
+
+  test('republish() sends even when nothing changed', async () => {
+    const { producer, sent } = makeProducer()
+    const handle = keepCatalogPublished(
+      flakyCatalog(0),
+      'frigate',
+      producer,
+      silent,
+      10_000,
+      10_000,
+      0,
+    )
+    await settle(20)
+    const before = sent.filter((c) => c === 'SET').length
+
+    await handle.republish()
+    handle.stop()
+
+    expect(sent.filter((c) => c === 'SET').length).toBe(before + 1)
+  })
+
+  test('forceEvery = 0 keeps quiet rounds quiet', async () => {
+    const { producer, sent } = makeProducer()
+    const handle = keepCatalogPublished(
+      flakyCatalog(0),
+      'frigate',
+      producer,
+      silent,
+      5,
+      5,
+      0,
+    )
+    await settle(60)
+    handle.stop()
+
+    expect(sent.filter((c) => c === 'SET')).toHaveLength(1)
   })
 })

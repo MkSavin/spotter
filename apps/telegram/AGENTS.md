@@ -42,6 +42,8 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ deliveryEvent
 
 Snapshot-команда камеры идёт по медиа-контракту: `spotter.camera.request.<source>` → `camera.staged` → depot → `spotter.camera.frame_processed` → `cameraFrameController`.
 
+`/timelapse` ([timelapseCommand.ts](src/commands/nvr/timelapseCommand.ts)) собирает таймлапс за период: камера и скорость кнопками, период текстом (`сегодня`, `15.08`, `15.08 09:00-18:00`). Скоростей ровно две — API Frigate принимает только `realtime` и `timelapse_25x`, а множитель второй задаётся в конфиге NVR (`record.export.timelapse_args`), поэтому лейбл говорит «ускоренно», не обещая кратность. Период парсится в **таймзоне бота** ([dateSpan.ts](src/timelapse/dateSpan.ts)) — иначе экспорт уехал бы на величину смещения — и уходит в шину уже как unix-секунды. Ответ приходит на `spotter.timelapse.ready` / `.failed`; экспорт долгий, поэтому команда только ставит его в очередь и показывает плейсхолдер.
+
 ## БД (`src/db/`, drizzle/sqlite)
 
 Telegram-локальный стейт — **никакого домена/ролей как источника истины**:

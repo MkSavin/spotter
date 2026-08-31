@@ -2,6 +2,10 @@ import { and, count, eq, inArray, lt, sql } from 'drizzle-orm'
 import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { TelegramDatabase } from './client'
 import {
+  type CatalogSnapshotRow,
+  type ClipWaitRow,
+  catalogSnapshots,
+  clipWaits,
   type DialogStateRow,
   dialogStates,
   type EventMessage,
@@ -274,4 +278,49 @@ export const dialogStatesRepo = {
       .where(lt(dialogStates.updatedAt, olderThan))
       .returning()
       .all().length,
+}
+
+export const catalogSnapshotsRepo = {
+  find: (
+    db: TelegramDatabase,
+    source: string,
+  ): CatalogSnapshotRow | undefined =>
+    db
+      .select()
+      .from(catalogSnapshots)
+      .where(eq(catalogSnapshots.source, source))
+      .get(),
+
+  save: (db: TelegramDatabase, source: string, snapshot: string): void => {
+    db.insert(catalogSnapshots)
+      .values({ source, snapshot, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [catalogSnapshots.source],
+        set: { snapshot, updatedAt: new Date() },
+      })
+      .run()
+  },
+}
+
+export const clipWaitsRepo = {
+  list: (db: TelegramDatabase): ClipWaitRow[] =>
+    db.select().from(clipWaits).all(),
+
+  save: (db: TelegramDatabase, eventId: string, stage: string): void => {
+    db.insert(clipWaits)
+      .values({ eventId, stage, startedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [clipWaits.eventId],
+        set: { stage },
+      })
+      .run()
+  },
+
+  remove: (db: TelegramDatabase, eventId: string): void => {
+    db.delete(clipWaits).where(eq(clipWaits.eventId, eventId)).run()
+  },
+
+  clear: (db: TelegramDatabase): void => {
+    db.delete(clipWaits).run()
+  },
 }

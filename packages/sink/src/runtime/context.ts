@@ -1,5 +1,5 @@
-import type { StreamProducer } from '@spotter/transport'
-import type { RedisClient, S3Client } from 'bun'
+import type { RedisConnection, StreamProducer } from '@spotter/transport'
+import type { S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
 import type { SinkConfig } from '../config/sinkConfig'
 
@@ -11,7 +11,7 @@ export type SinkContext<TConfig extends SinkConfig = SinkConfig> = {
   config: TConfig
   logger: Stenograph
   producer: StreamProducer
-  subscriber: RedisClient
+  subscriber: RedisConnection
   /** Routing id of this adapter instance — the `<source>` in stream/key names. */
   sourceId: string
   /** S3 client for staging raw media; `null` for ingest-only adapters. */

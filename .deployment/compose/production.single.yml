@@ -40,6 +40,13 @@ services:
   spotter-frigate:
     image: ghcr.io/mksavin/spotter-frigate:latest
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
       # Reaches an own broker by name; harmless when the broker is external.
@@ -51,6 +58,9 @@ services:
     # own broker or someone else's. Raw media is staged to S3, keys travel on.
     env_file:
       - ./.env
+    volumes:
+      # In-flight timelapse exports; without this a restart orphans them.
+      - frigate-state:/data
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
@@ -59,6 +69,15 @@ services:
   spotter-depot:
     image: ghcr.io/mksavin/spotter-depot:latest
     restart: unless-stopped
+    # ffmpeg needs longer than Docker's 10s default to finish or abort cleanly.
+    stop_grace_period: 45s
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     environment:
@@ -78,6 +97,13 @@ services:
     image: ghcr.io/mksavin/spotter-server:latest
     container_name: spotter-server
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     environment:
@@ -97,6 +123,13 @@ services:
     image: ghcr.io/mksavin/spotter-telegram:latest
     container_name: spotter-telegram
     restart: unless-stopped
+    healthcheck:
+      # Refreshed only while Redis answers; a wedged process goes stale.
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
     networks:
       - spotter
     environment:
@@ -120,6 +153,9 @@ services:
     command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  frigate-state:
 
 networks:
   spotter:

@@ -4,17 +4,19 @@ import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import {
   CatalogCache,
-  connectRedis,
   probeRedisVersion,
+  RedisConnection,
   type RegulatorHandle,
   StreamProducer,
   startHeartbeat,
+  startLiveness,
 } from '@spotter/transport'
-import { RedisClient, S3Client } from 'bun'
+import { S3Client } from 'bun'
 import { Bot, session } from 'grammy'
 import information from '../package.json'
 import { registerClipCallback } from './callback/clipCallback'
 import { ClipTracker } from './clip/ClipTracker'
+import { recoverClipWaits } from './clip/recoverClipWaits'
 import { renderClipState } from './clip/renderClipState'
 import { CommandBus } from './command/CommandBus'
 import { commandRegistry } from './commands/commandList'
@@ -25,8 +27,13 @@ import {
 import { registerUnknownCommand } from './commands/framework/unknownCommand'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
+import { catalogStore } from './db/catalogStore'
 import { createDatabase, type TelegramDatabase } from './db/client'
-import { dialogStatesRepo, tgBindingsRepo } from './db/repository'
+import {
+  clipWaitsRepo,
+  dialogStatesRepo,
+  tgBindingsRepo,
+} from './db/repository'
 import { DIALOG_TTL_MS } from './dialog/Dialog'
 import { DialogRegistry } from './dialog/DialogRegistry'
 import { attachInnoxious } from './extension/innoxious/attachInnoxious'
@@ -132,7 +139,10 @@ const polling = async (): Promise<void> => {
     bucket: config.s3.bucket,
   })
 
-  const catalog = new CatalogCache(applicationLogger.sub('catalog'))
+  const catalog = new CatalogCache(
+    applicationLogger.sub('catalog'),
+    catalogStore(database),
+  )
   const heartbeats = new HeartbeatRegistry(applicationLogger.sub('heartbeat'))
 
   // `bot` is built further down, but the first notice is a debounce away.
@@ -150,25 +160,38 @@ const polling = async (): Promise<void> => {
       renderClipState(bot.api, database, clipLogger, eventId, outcome).catch(
         (error) => clipLogger.warn(`Clip repaint failed: ${error}`),
       ),
+    store: {
+      save: (eventId, stage) => clipWaitsRepo.save(database, eventId, stage),
+      remove: (eventId) => clipWaitsRepo.remove(database, eventId),
+    },
   })
 
-  const subscriber = new RedisClient(config.redis.url)
+  const subscriber = new RedisConnection(config.redis.url)
   // Dedicated connection for the CommandBus reply poller.
-  const commandSubscriber = new RedisClient(config.redis.url)
+  const commandSubscriber = new RedisConnection(config.redis.url)
 
   const producer = new StreamProducer(
-    new RedisClient(config.redis.url),
+    new RedisConnection(config.redis.url),
     config.redis.maxLen,
   )
 
   await producer.connect()
-  await connectRedis(subscriber, { url: config.redis.url })
-  await connectRedis(commandSubscriber, { url: config.redis.url })
+  await subscriber.connect()
+  await commandSubscriber.connect()
 
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'telegram',
     version: information.version,
     details: () => probeRedisVersion(producer),
+  })
+
+  // Healthcheck signal: refreshed only while Redis actually answers, so a
+  // wedged-but-running container fails its healthcheck and gets restarted.
+  const stopLiveness = startLiveness({
+    check: async () => {
+      await subscriber.send('PING', [])
+      return true
+    },
   })
 
   await catalog.bootstrap(config.source, producer)
@@ -203,6 +226,7 @@ const polling = async (): Promise<void> => {
       await coreContext.runner?.stop()
     }
     stopHeartbeat()
+    stopLiveness()
     rollouts.stop()
     clips.stop()
     commandBus.stop()
@@ -230,6 +254,12 @@ const polling = async (): Promise<void> => {
   for (const command of commandRegistry) {
     if (command.args.length > 0) dialogs.register(command.dialog())
   }
+
+  // Before commands: a frozen button from the previous life must not outlive
+  // the restart that caused it.
+  await recoverClipWaits(database, clipLogger, (eventId, outcome) =>
+    renderClipState(bot.api, database, clipLogger, eventId, outcome),
+  ).catch((error) => clipLogger.warn(`Clip wait recovery failed: ${error}`))
 
   registerCommands(bot, commandRegistry)
   registerClipCallback(bot)
