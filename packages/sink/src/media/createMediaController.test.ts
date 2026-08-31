@@ -144,9 +144,9 @@ describe('createMediaController', () => {
     expect(published).toHaveLength(0)
   })
 
-  test('reports the miss and rethrows so the entry is retried', async () => {
+  test('rethrows a transient miss so the entry is retried', async () => {
     globalThis.fetch = mock(
-      async () => new Response('', { status: 404 }),
+      async () => new Response('', { status: 503 }),
     ) as never
 
     const { context, published } = makeContext()
@@ -168,5 +168,129 @@ describe('createMediaController', () => {
       eventId: 'e1',
       stage: 'failed',
     })
+  })
+
+  test('a 404 on every kind is final: no throw, no retry', async () => {
+    // A sub-second event never gets a snapshot written, so retrying spends
+    // five deliveries on the same answer.
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 404 }),
+    ) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(provider)
+
+    await controller(
+      message({ eventId: 'e1', source: 'frigate-home', want: ['snapshot'] }),
+      context,
+    )
+
+    expect(
+      published.some((entry) => entry.stream === mediaStreams.mediaProcessed),
+    ).toBe(true)
+  })
+
+  test('a 404 on one kind still retries while another may appear', async () => {
+    globalThis.fetch = mock(async (request: Request) =>
+      String((request as Request).url).includes('clip')
+        ? new Response('', { status: 404 })
+        : new Response('', { status: 503 }),
+    ) as never
+
+    const { context } = makeContext()
+    const controller = createMediaController(provider)
+
+    await expect(
+      controller(
+        message({
+          eventId: 'e1',
+          source: 'frigate-home',
+          want: ['clip', 'snapshot'],
+        }),
+        context,
+      ),
+    ).rejects.toThrow(/Nothing staged/)
+  })
+})
+
+describe('recording-frame fallback', () => {
+  const withFrame: MediaProvider = {
+    ...provider,
+    resolveEventFrame: (id) => new Request(`https://nvr/recfrfame/${id}`),
+  }
+
+  test('recovers a snapshot from the recording when the event has none', async () => {
+    globalThis.fetch = mock(async (request: Request) =>
+      String(request.url).includes('recfrfame')
+        ? new Response(new Uint8Array([9, 9, 9]))
+        : new Response('', { status: 404 }),
+    ) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(withFrame)
+
+    await controller(
+      message({ eventId: 'e9', source: 'frigate-home', want: ['snapshot'] }),
+      context,
+    )
+
+    const staged = published.find(
+      (entry) => entry.stream === mediaStreams.mediaStaged,
+    )
+    expect(staged?.payload).toMatchObject({ eventId: 'e9' })
+  })
+
+  test('a missing recording still reports the event as pictureless', async () => {
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 404 }),
+    ) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(withFrame)
+
+    await controller(
+      message({ eventId: 'e9', source: 'frigate-home', want: ['snapshot'] }),
+      context,
+    )
+
+    expect(
+      published.some((entry) => entry.stream === mediaStreams.mediaProcessed),
+    ).toBe(true)
+  })
+
+  test('the fallback is skipped when the snapshot itself succeeded', async () => {
+    const seen: string[] = []
+    globalThis.fetch = mock(async (request: Request) => {
+      seen.push(String(request.url))
+      return new Response(new Uint8Array([1]))
+    }) as never
+
+    const { context } = makeContext()
+    const controller = createMediaController(withFrame)
+
+    await controller(
+      message({ eventId: 'e9', source: 'frigate-home', want: ['snapshot'] }),
+      context,
+    )
+
+    expect(seen.some((url) => url.includes('recfrfame'))).toBe(false)
+  })
+
+  test('an adapter without recordings is unaffected', async () => {
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 404 }),
+    ) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(provider)
+
+    await controller(
+      message({ eventId: 'e9', source: 'frigate-home', want: ['snapshot'] }),
+      context,
+    )
+
+    expect(
+      published.some((entry) => entry.stream === mediaStreams.mediaProcessed),
+    ).toBe(true)
   })
 })

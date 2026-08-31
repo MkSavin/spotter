@@ -1,3 +1,20 @@
+/**
+ * Reads a variable, dropping a trailing `# hint` an `.env` example carried in.
+ * Both Bun's `--env-file` and compose's `env_file` already strip these, but a
+ * value injected another way (compose `environment:`, a shell export, CI) is
+ * passed through verbatim — and a stray hint silently becomes the value.
+ *
+ * Only for constrained values (enum/number/boolean/list), never for free-form
+ * ones: a secret or URL may legitimately contain a hash.
+ */
+const readHinted = (variable: string): string | undefined => {
+  const value = process.env[variable]
+  if (value === undefined) return undefined
+
+  const trimmed = value.replace(/\s+#.*$/s, '').trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
 export const env = {
   string: (variable: string, defaultValue: string): string =>
     process.env[variable] ?? defaultValue,
@@ -7,7 +24,7 @@ export const env = {
     defaultValue: string[] = [],
     splitter = ',',
   ): string[] => {
-    const value = process.env[variable] ?? undefined
+    const value = readHinted(variable)
 
     if (!value) {
       return defaultValue
@@ -21,19 +38,19 @@ export const env = {
     values: Values,
     defaultValue: Values[number],
   ): Values[number] => {
-    const value = process.env[variable] ?? undefined
+    const value = readHinted(variable)
 
     if (!value) {
       return defaultValue
     }
 
-    const normalized = value.trim().toLowerCase() as Values[number]
+    const normalized = value.toLowerCase() as Values[number]
 
     return values.includes(normalized) ? normalized : defaultValue
   },
 
   number: (variable: string, defaultValue: number): number => {
-    const value = process.env[variable] ?? undefined
+    const value = readHinted(variable)
 
     if (!value) {
       return defaultValue
@@ -45,7 +62,7 @@ export const env = {
   },
 
   boolean: (variable: string, defaultValue: boolean): boolean => {
-    const value = process.env[variable] ?? undefined
+    const value = readHinted(variable)
 
     if (!value) {
       return defaultValue

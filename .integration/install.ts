@@ -100,15 +100,22 @@ const probeGpu = async (): Promise<GpuProbe> => {
   }
 }
 
-/** Replace `KEY=...` in place, keeping any trailing `# hint` on that line. */
+/** Replace `KEY=...` in place. */
 const setEnv = (content: string, key: string, value: string): string => {
   const pattern = new RegExp(`^${key}=.*$`, 'm')
   if (!pattern.test(content)) return `${content}\n${key}=${value}\n`
-  return content.replace(pattern, (current) => {
-    const hint = current.match(/\s+#.*$/)?.[0] ?? ''
-    return `${key}=${value}${hint}`
-  })
+  return content.replace(pattern, `${key}=${value}`)
 }
+
+/**
+ * Drops the `# a | b | c` hints the examples carry on value lines. They are a
+ * reading aid for the template, and a copy-paste hazard in a real `.env`.
+ * Whole-line comments stay: they are the file's documentation.
+ */
+export const stripValueHints = (content: string): string =>
+  // `[^\n#]` and `[ \t]` keep the match on one line: `\s` would swallow the
+  // newline and eat everything up to the next comment.
+  content.replaceAll(/^([A-Z_][A-Z0-9_]*=[^\n#]*?)[ \t]+#[^\n]*$/gm, '$1')
 
 const fail = (msg: string): never => {
   say(`\n✗ ${msg}`)
@@ -181,7 +188,7 @@ if (existsSync('.env')) {
 }
 if (!existsSync(example))
   fail(`Не найден шаблон ${example} в корне репозитория.`)
-let env = await Bun.file(example).text()
+let env = stripValueHints(await Bun.file(example).text())
 say(`  ✓ Скопировал ${example} → .env (пока в памяти)`)
 
 // The CLI reads this back instead of asking for a mode on every command.

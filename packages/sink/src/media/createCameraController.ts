@@ -50,7 +50,9 @@ export const createCameraController = <TConfig extends SinkConfig>(
       request.camera,
     )
 
-    if (!(await stageMedia(s3, key, fetchRequest, 'image/jpeg', logger))) {
+    if (
+      !(await stageMedia(s3, key, fetchRequest, 'image/jpeg', logger)).staged
+    ) {
       return
     }
 

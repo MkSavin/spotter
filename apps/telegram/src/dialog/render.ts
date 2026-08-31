@@ -34,3 +34,17 @@ export const renderPrompt = async (
   const sent = await context.replyWithHTML(text, { reply_markup: keyboard })
   return sent?.message_id
 }
+
+/** Clears the prompt once it is answered: the result speaks for itself. */
+export const removePrompt = async (
+  context: BotContext,
+  messageId: number | undefined,
+): Promise<void> => {
+  if (!messageId || !context.chatId) return
+
+  try {
+    await context.api.deleteMessage(context.chatId, messageId)
+  } catch (error) {
+    context.logger.debug('Dialog prompt delete failed', error)
+  }
+}

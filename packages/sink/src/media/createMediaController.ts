@@ -1,6 +1,7 @@
 import {
   bufferToJson,
   type MediaStage,
+  type MediaWant,
   mediaStreams,
   type StreamMessageController,
   safeParseMediaRequest,
@@ -51,13 +52,22 @@ export const createMediaController = <TConfig extends SinkConfig>(
     let rawClipKey: string | undefined
     let rawSnapshotKey: string | undefined
 
+    // Every requested kind the NVR answered "does not exist" for.
+    const absent: MediaWant[] = []
+
     if (request.want.includes('clip')) {
       const fetchRequest = await provider.resolveClip(request.eventId)
       if (fetchRequest) {
         const key = stagedClipKey(prefix, sourceId, request.eventId)
-        if (await stageMedia(s3, key, fetchRequest, 'video/mp4', logger)) {
-          rawClipKey = key
-        }
+        const result = await stageMedia(
+          s3,
+          key,
+          fetchRequest,
+          'video/mp4',
+          logger,
+        )
+        if (result.staged) rawClipKey = key
+        else if (result.reason === 'absent') absent.push('clip')
       }
     }
 
@@ -65,15 +75,58 @@ export const createMediaController = <TConfig extends SinkConfig>(
       const fetchRequest = await provider.resolveSnapshot(request.eventId)
       if (fetchRequest) {
         const key = stagedSnapshotKey(prefix, sourceId, request.eventId)
-        if (await stageMedia(s3, key, fetchRequest, 'image/jpeg', logger)) {
-          rawSnapshotKey = key
+        const result = await stageMedia(
+          s3,
+          key,
+          fetchRequest,
+          'image/jpeg',
+          logger,
+        )
+        if (result.staged) rawSnapshotKey = key
+        else if (result.reason === 'absent') absent.push('snapshot')
+      }
+
+      // No snapshot of its own: cut a frame out of the recording instead, so a
+      // sub-second event still gets a picture.
+      if (!rawSnapshotKey && provider.resolveEventFrame) {
+        const frameRequest = await provider.resolveEventFrame(request.eventId)
+        if (frameRequest) {
+          const key = stagedSnapshotKey(prefix, sourceId, request.eventId)
+          const result = await stageMedia(
+            s3,
+            key,
+            frameRequest,
+            'image/jpeg',
+            logger,
+          )
+          if (result.staged) {
+            rawSnapshotKey = key
+            // The recording covered it after all.
+            const index = absent.indexOf('snapshot')
+            if (index !== -1) absent.splice(index, 1)
+            logger.debug(
+              `Recovered snapshot from recording for ${request.eventId}`,
+            )
+          }
         }
       }
     }
 
-    // Usually temporary: the NVR writes media just after the event ends and
-    // rate-limits under a burst. Throw so the reaper retries instead of acking.
     if (!rawClipKey && !rawSnapshotKey) {
+      // The NVR has ruled out everything asked for: a sub-second event never
+      // got a snapshot written. Report it as final so the entry is acked
+      // instead of burning five deliveries on the same 404.
+      if (absent.length === request.want.length) {
+        await report('failed', 'У события нет снимка')
+        await producer.publish(mediaStreams.mediaProcessed, {
+          eventId: request.eventId,
+        })
+        logger.debug(`No media exists for ${request.eventId}; not retrying`)
+        return
+      }
+
+      // Usually temporary: the NVR writes media just after the event ends and
+      // rate-limits under a burst. Throw so the reaper retries instead of acking.
       await report('failed', 'Видео ещё не готово — попробуй через полминуты')
       throw new Error(`Nothing staged for media request ${request.eventId}`)
     }

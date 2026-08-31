@@ -1,6 +1,6 @@
 import type { BotContext } from '../context'
 import { newDialogId } from './callbackData'
-import { renderPrompt } from './render'
+import { removePrompt, renderPrompt } from './render'
 import { dropDialog, loadDialog, saveDialog } from './store'
 import type { DialogDefinition, DialogState, StepResult } from './types'
 
@@ -79,6 +79,7 @@ export const advance = async (
 
   if (state.step >= definition.steps.length) {
     clearDialog(context)
+    await removePrompt(context, state.promptMessageId)
     await definition.complete(context, state.values)
     return
   }
@@ -122,10 +123,7 @@ export const applyResult = async (
 ): Promise<void> => {
   if (result.status === 'cancel') {
     clearDialog(context)
-    await renderPrompt(context, {
-      text: '✖ Отменено',
-      messageId: state.promptMessageId,
-    })
+    await removePrompt(context, state.promptMessageId)
     return
   }
 

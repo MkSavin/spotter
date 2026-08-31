@@ -19,6 +19,14 @@ export interface MediaProvider {
   resolveSnapshot(
     eventId: string,
   ): MediaFetch | null | Promise<MediaFetch | null>
+  /**
+   * Resolve a still from the continuous recording covering the event, for
+   * events the NVR never wrote a snapshot for. Optional: adapters without
+   * recordings simply omit it.
+   */
+  resolveEventFrame?(
+    eventId: string,
+  ): MediaFetch | null | Promise<MediaFetch | null>
   /** Resolve the latest frame for a camera. */
   resolveFrame(camera: string): MediaFetch | null | Promise<MediaFetch | null>
 }

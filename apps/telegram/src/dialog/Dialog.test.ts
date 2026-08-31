@@ -15,6 +15,7 @@ const completeMock = () => mock<DialogComplete>(async () => undefined)
 /** `sent` is what the user sees: the dialog edits one message in place. */
 const makeContext = () => {
   const sent: string[] = []
+  const deleted = mock(async () => undefined)
   let messages = 0
   const context = {
     chatId: 1,
@@ -26,6 +27,7 @@ const makeContext = () => {
           sent.push(text)
         },
       ),
+      deleteMessage: deleted,
     },
     replyWithHTML: mock(async (text: string) => {
       sent.push(text)
@@ -33,7 +35,7 @@ const makeContext = () => {
       return { message_id: messages }
     }),
   } as unknown as BotContext
-  return { context, sent }
+  return { context, sent, deleted }
 }
 
 const definition = (complete = completeMock()): DialogDefinition => ({
@@ -110,6 +112,29 @@ describe('applyResult', () => {
 
     expect(complete.mock.calls[0][1]).toEqual({ first: 'a', second: 'b' })
     expect(context.session.user.dialog).toBeUndefined()
+  })
+
+  test('the prompt is removed once the dialog completes', async () => {
+    const { context, deleted } = makeContext()
+    const spec = definition()
+    await startDialog(context, spec, { first: 'a' })
+
+    const state = context.session.user.dialog as DialogState
+    const promptId = state.promptMessageId
+    await applyResult(context, spec, state, { status: 'done', value: 'b' })
+
+    expect(deleted).toHaveBeenCalledWith(1, promptId)
+  })
+
+  test('a cancel removes the prompt too', async () => {
+    const { context, deleted } = makeContext()
+    const spec = definition()
+    await startDialog(context, spec)
+
+    const state = context.session.user.dialog as DialogState
+    await applyResult(context, spec, state, { status: 'cancel' })
+
+    expect(deleted).toHaveBeenCalledTimes(1)
   })
 
   test('a retry re-asks without losing the dialog', async () => {

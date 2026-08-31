@@ -14,7 +14,7 @@ type ProcessorPreset = {
   inputParameters: string[]
 }
 
-const resolveVideoPreset = (
+export const resolveVideoPreset = (
   acceleration: PresetAcceleration | string,
   codec: PresetCodec | string,
   quality: PresetQuality | string,
@@ -63,10 +63,12 @@ const resolveVideoPreset = (
 
   switch (acceleration) {
     case 'cuda':
+      // Decode on the GPU but hand nvenc ordinary frames: keeping them in VRAM
+      // (`-hwaccel_output_format cuda`) needs a cuda filter chain, and without
+      // one ffmpeg fails to negotiate a format and falls back to the CPU.
       inputParameters = [
         '-hide_banner',
         '-hwaccel cuda',
-        '-hwaccel_output_format cuda',
         `-hwaccel_device ${device}`,
       ]
       break
@@ -108,6 +110,36 @@ const resolveVideoPreset = (
         normal: ['-q:v 80'],
         bad: ['-q:v 65'],
         awful: ['-q:v 45'],
+      }
+      const qualityParameters =
+        quality in map ? map[quality as keyof typeof map] : map.normal
+      outputParameters.push(...qualityParameters)
+      break
+    }
+    case 'cuda': {
+      // Without these nvenc silently uses p4/medium, which on a small Pascal
+      // card is slower than the CPU it was meant to beat. `-cq` caps the size
+      // the way CRF does; `ll` tuning matches Frigate's own presets.
+      const map: Record<PresetQuality, string[]> = {
+        best: ['-preset:v p4', '-cq:v 24'],
+        good: ['-preset:v p3', '-cq:v 26'],
+        normal: ['-preset:v p2', '-cq:v 28'],
+        bad: ['-preset:v p1', '-cq:v 32'],
+        awful: ['-preset:v p1', '-cq:v 36'],
+      }
+      const qualityParameters =
+        quality in map ? map[quality as keyof typeof map] : map.normal
+      outputParameters.push(...qualityParameters, '-tune:v ll', '-rc:v vbr')
+      break
+    }
+    case 'vaapi': {
+      // vaapi has no -preset; quality is driven by the global quality knob.
+      const map: Record<PresetQuality, string[]> = {
+        best: ['-global_quality 24'],
+        good: ['-global_quality 26'],
+        normal: ['-global_quality 28'],
+        bad: ['-global_quality 32'],
+        awful: ['-global_quality 36'],
       }
       const qualityParameters =
         quality in map ? map[quality as keyof typeof map] : map.normal
@@ -211,7 +243,8 @@ export const transcodeVideo = async (
     if (preset.name === fallback.name || !shouldRetryOnCpu(error)) {
       throw error
     }
-    // Losing the clip is worse than losing the speed-up.
+    // Losing the clip is worse than losing the speed-up. Warn loudly: a
+    // silent fallback looks like working acceleration that is merely slow.
     logger.warn(
       `Preset ${preset.name} failed (${(error as Error).message}) — retrying on CPU`,
     )

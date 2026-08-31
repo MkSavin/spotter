@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { shouldRetryOnCpu, TranscodeError, toProgressStep } from './transcode'
+import {
+  resolveVideoPreset,
+  shouldRetryOnCpu,
+  TranscodeError,
+  toProgressStep,
+} from './transcode'
 
 describe('toProgressStep', () => {
   test('rounds down to tens', () => {
@@ -59,5 +64,47 @@ describe('shouldRetryOnCpu', () => {
       false,
     )
     expect(shouldRetryOnCpu(undefined)).toBe(false)
+  })
+})
+
+describe('resolveVideoPreset', () => {
+  test('cuda carries an explicit speed preset and rate control', () => {
+    // Without these nvenc defaults to p4/medium, losing to the CPU on a
+    // small Pascal card.
+    const preset = resolveVideoPreset('cuda', 'h264', 'normal')
+
+    expect(preset.outputParameters).toContain('-preset:v p2')
+    expect(preset.outputParameters).toContain('-cq:v 28')
+    expect(preset.outputParameters).toContain('-c:v h264_nvenc')
+  })
+
+  test('cuda quality steps map to different presets', () => {
+    const best = resolveVideoPreset('cuda', 'hevc', 'best')
+    const awful = resolveVideoPreset('cuda', 'hevc', 'awful')
+
+    expect(best.outputParameters).toContain('-preset:v p4')
+    expect(awful.outputParameters).toContain('-preset:v p1')
+  })
+
+  test('cuda decodes on the GPU without pinning frames to VRAM', () => {
+    // A cuda output format needs a cuda filter chain; without one ffmpeg
+    // cannot negotiate a format and silently drops to the CPU.
+    const preset = resolveVideoPreset('cuda', 'h264', 'normal')
+
+    expect(preset.inputParameters).toContain('-hwaccel cuda')
+    expect(preset.inputParameters).not.toContain('-hwaccel_output_format cuda')
+  })
+
+  test('vaapi gets a quality knob too', () => {
+    const preset = resolveVideoPreset('vaapi', 'h264', 'good')
+
+    expect(preset.outputParameters).toContain('-global_quality 26')
+  })
+
+  test('cpu keeps its own preset mapping', () => {
+    const preset = resolveVideoPreset('cpu', 'h264', 'awful')
+
+    expect(preset.outputParameters).toContain('-preset:v ultrafast')
+    expect(preset.outputParameters).toContain('-c:v libx264')
   })
 })

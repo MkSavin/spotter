@@ -59,3 +59,16 @@ describe('frigateClient', () => {
     expect(request.headers.get('Authorization')).toMatch(/^Bearer /)
   })
 })
+
+describe('recording frame url', () => {
+  test('addresses the camera and the frame time', () => {
+    expect(
+      settleUrl(frigateUrls.recordingFrame, 'https://frigate.example.com', {
+        camera: 'front',
+        time: '1788114532.100829',
+      }),
+    ).toBe(
+      'https://frigate.example.com/api/front/recordings/1788114532.100829/snapshot.jpg',
+    )
+  })
+})

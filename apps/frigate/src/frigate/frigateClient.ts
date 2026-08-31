@@ -8,6 +8,10 @@ import jwt from '../helpers/jwt'
 export const frigateUrls = {
   clip: '{host}/api/events/{id}/clip.mp4',
   snapshot: '{host}/api/events/{id}/snapshot.jpg',
+  event: '{host}/api/events/{id}',
+  // A frame pulled from the continuous recording, for events too short for
+  // Frigate to have written a snapshot of their own.
+  recordingFrame: '{host}/api/{camera}/recordings/{time}/snapshot.jpg',
   latestFrame: '{host}/api/{camera}/latest.jpg',
   config: '{host}/api/config',
   version: '{host}/api/version',

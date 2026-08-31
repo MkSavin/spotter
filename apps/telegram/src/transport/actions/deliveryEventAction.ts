@@ -14,14 +14,18 @@ export const deliveryEventAction = async (
   const { logger, db, s3, config } = context
   const { eventId, event, action, clipKey, snapshotKey } = delivery
 
-  const caption = renderEvent(event, context)
-
   if (action === 'create' || action === 'update') {
     const messages = eventMessagesRepo.find(db, eventId)
     // Offer the clip once the event has ended and advertises a clip.
     const keyboard = shouldOfferClip(event)
       ? videoButtonKeyboard(eventId)
       : undefined
+
+    // A snapshot is requested the moment an event ends, so say it is coming
+    // rather than leaving a bare text message that looks final.
+    const caption = renderEvent(event, context, {
+      media: event.type === 'end' ? 'pending' : undefined,
+    })
 
     await actualizeSentMessages(eventId, messages, caption, context, keyboard)
 
@@ -32,13 +36,29 @@ export const deliveryEventAction = async (
   // action === 'media' — attach transcoded media to the existing messages.
   const messages = eventMessagesRepo.find(db, eventId)
 
-  // Nothing came back — the NVR has no clip for this event. Only the button
-  // changes; editing the text would fail on a message that already has a photo.
+  // The photo is on the message now, so the indicator has done its job.
+  const caption = renderEvent(event, context, { media: 'ready' })
+
+  // Nothing came back — the NVR has no media for this event. Mark the text so
+  // an empty notification is not mistaken for one still waiting on its photo.
   if (!clipKey && !snapshotKey) {
     context.clips.fail(
       eventId,
       'Видео ещё не готово — попробуй через полминуты',
     )
+
+    const keyboard = shouldOfferClip(event)
+      ? videoButtonKeyboard(eventId)
+      : undefined
+
+    await actualizeSentMessages(
+      eventId,
+      messages,
+      renderEvent(event, context, { media: 'absent' }),
+      context,
+      keyboard,
+    )
+
     logger.debug(`deliveryEvent (media) had nothing to attach for ${eventId}`)
     return
   }
