@@ -1,6 +1,6 @@
 {
   "name": "@spotter/frigate",
-  "version": "1.3.5",
+  "version": "1.3.6",
   "description": "Frigate NVR adapter (Source + MediaProvider + Catalog) on @spotter/sink",
   "main": "index.js",
   "scripts": {
