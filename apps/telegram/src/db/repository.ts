@@ -1,5 +1,5 @@
 import { isNumericId, normalizeUsername } from '@spotter/transport'
-import { and, count, eq, inArray, lt, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import type { TelegramDatabase } from './client'
 import {
   type CatalogSnapshotRow,
@@ -22,6 +22,36 @@ import {
 export const tgChatsRepo = {
   listIds: (db: TelegramDatabase): Pick<TgChat, 'id'>[] =>
     db.select({ id: tgChats.id }).from(tgChats).all(),
+
+  /**
+   * Chats that should receive events right now — muted ones are left out.
+   * A lapsed mute needs no cleanup: the comparison is against the clock.
+   */
+  listDeliverableIds: (
+    db: TelegramDatabase,
+    now = new Date(),
+  ): Pick<TgChat, 'id'>[] =>
+    db
+      .select({ id: tgChats.id })
+      .from(tgChats)
+      .where(or(isNull(tgChats.mutedUntil), lt(tgChats.mutedUntil, now)))
+      .all(),
+
+  /** Silences a chat until `until`; `null` lifts the silence. */
+  setMuted: (
+    db: TelegramDatabase,
+    id: string,
+    until: Date | null,
+  ): TgChat | undefined =>
+    db
+      .update(tgChats)
+      .set({ mutedUntil: until })
+      .where(eq(tgChats.id, id))
+      .returning()
+      .get(),
+
+  find: (db: TelegramDatabase, id: string): TgChat | undefined =>
+    db.select().from(tgChats).where(eq(tgChats.id, id)).get(),
 
   upsert: (db: TelegramDatabase, id: string): TgChat => {
     const existing = db

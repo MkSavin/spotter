@@ -1,0 +1,1 @@
+ALTER TABLE `tg_chats` ADD `muted_until` integer;

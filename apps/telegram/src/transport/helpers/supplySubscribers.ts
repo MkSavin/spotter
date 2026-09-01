@@ -112,7 +112,9 @@ export const supplySubscribers = async <
   context: CoreContext,
   supplyContext: SupplyContext<Create, Update, Remove>,
 ): Promise<SupplyResult<Devoidify<Create | Update | Remove>>> => {
-  const chatIds = tgChatsRepo.listIds(context.db).map((c) => c.id)
+  // Muted chats are skipped here rather than at render time: nothing should be
+  // sent, edited or tracked for a chat that asked for silence.
+  const chatIds = tgChatsRepo.listDeliverableIds(context.db).map((c) => c.id)
 
   return supplySubscribedChats<Create, Update, Remove>(
     chatIds,

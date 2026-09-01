@@ -8,6 +8,8 @@ export * from './media/createCameraController'
 export * from './media/createMediaController'
 export * from './media/MediaProvider'
 export * from './media/stageMedia'
+export * from './notifications/createSuspendController'
+export * from './notifications/NotificationSuspender'
 
 export * from './runtime/context'
 export * from './runtime/runSink'

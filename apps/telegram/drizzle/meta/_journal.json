@@ -43,6 +43,13 @@
       "when": 1788279383800,
       "tag": "0005_chemical_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788288066189,
+      "tag": "0006_outgoing_red_ghost",
+      "breakpoints": true
     }
   ]
 }

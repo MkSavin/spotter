@@ -21,6 +21,9 @@ export const tgChats = sqliteTable('tg_chats', {
   authorizedAt: integer('authorized_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
+  // Silence for this chat alone; null means it receives events. Stored rather
+  // than held in memory so a restart does not un-mute someone mid-holiday.
+  mutedUntil: integer('muted_until', { mode: 'timestamp_ms' }),
 })
 
 /**
