@@ -73,13 +73,23 @@ export class FrigateCatalog implements Catalog {
       }
 
       const body = (await response.json()) as {
-        cameras?: Record<string, { objects?: { track?: string[] } }>
+        cameras?: Record<
+          string,
+          { enabled?: boolean; objects?: { track?: string[] } }
+        >
         objects?: { track?: string[] }
       }
 
-      const cameras = Object.keys(body.cameras ?? {})
+      const entries = Object.entries(body.cameras ?? {})
+
+      const enabled = entries.filter(([, camera]) => camera.enabled !== false)
+
+      const cameras = enabled.map(([name]) => name)
+
+      // Object types still come from every camera: the taxonomy is used to
+      // render existing events, including ones a since-disabled camera left.
       const objects = new Set<string>(body.objects?.track ?? [])
-      for (const camera of Object.values(body.cameras ?? {})) {
+      for (const [, camera] of entries) {
         for (const object of camera.objects?.track ?? []) {
           objects.add(object)
         }
