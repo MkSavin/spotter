@@ -1,5 +1,11 @@
 # @spotter/telegram
 
+## 1.7.1
+
+### Patch Changes
+
+- ce37f5e: fix: make the `sent_at` migration work on a populated table — SQLite rejects a non-constant DEFAULT in `ALTER TABLE ADD COLUMN` once the table has rows
+
 ## 1.7.0
 
 ### Minor Changes
