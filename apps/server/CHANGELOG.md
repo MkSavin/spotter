@@ -1,5 +1,26 @@
 # @spotter/server
 
+## 1.4.0
+
+### Minor Changes
+
+- 3ed7822: Ограничен рост таблиц: события, дедуп-леджеры и ссылки на сообщения подрезаются по возрасту. Коды доступа получили срок годности (`ACCESS_CODE_TTL_HOURS`, по умолчанию сутки)
+- 93d636e: Фильтрация по вердикту NVR: адаптер читает `frigate/reviews` и проставляет событию `severity`, а `DELIVERY_POLICY=alerts` оставляет пуши только для алертов
+- 049f333: `/user_sign` принимает роль (по умолчанию VIEWER), а PWA объясняет, почему код не подошёл, вместо общего «неверный или уже использованный»
+
+### Patch Changes
+
+- 211f3c3: Убрана нерабочая `PRAGMA foreign_keys`: внешних ключей ни в одной схеме нет, а связи между сервисами SQLite проверить не может
+- 0ecd990: Глубина очередей едет в heartbeat и видна в `/status`: сколько записей ждёт, сколько в работе и возраст старейшей незакрытой
+- b389438: Словарь ролей и нормализация username сведены к одному определению в `@spotter/transport`: проверки доступа в server и telegram больше не опираются на локальные копии `ROLE_RANK`
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 1.3.0
 
 ### Minor Changes
