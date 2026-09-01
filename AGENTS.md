@@ -28,7 +28,8 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 4. **depot** ловит `*.staged`, берёт сырьё из S3 по ключу, транскодит (ffmpeg/sharp), кладёт результат в S3, отвечает `*_processed` (ключи S3). NVR не знает. Снапшоты и клипы едут **разными стримами** (`spotter.media.staged` / `spotter.media.staged.clip`), чтобы долгий транскод видео не задерживал фото — какие читать, задаёт `DEPOT_LANE` (см. [apps/depot/AGENTS.md](apps/depot/AGENTS.md)).
 5. **server** ловит `*_processed` и публикует `spotter.delivery.event` (action `media`, +S3-ключи). **telegram** консьюмит delivery-стрим, пресайнит ключи в короткоживущие URL и крепит медиа **на исходное сообщение** через `editMessageMedia` (текст → фото → видео). Креды NVR по сети не ходят — только ключи S3.
 6. **Видео по кнопке:** под фото-сообщением — кнопка «Видео». Нажатие → telegram шлёт RPC `event.clip` → **server** запрашивает транскод клипа (`want:[clip]`) → готовый клип тем же путём проставляется видео всем подписчикам события (fan-out по `eventId`). Пока клип готовится, sink и depot шлют `spotter.media.progress` (`fetching`/`staged`/`failed`), и бот двигает по ним кнопку; провал или таймаут возвращают кнопку в состояние «повторить».
-7. **telegram** домен не мутирует напрямую — шлёт `spotter.command.request` в server и ждёт коррелированный `spotter.command.reply` (login/роли/event-команды).
+7. **Фронтенды домен не мутируют напрямую** — шлют `spotter.command.request` в server и ждут коррелированный `spotter.command.reply` (login/роли/event-команды). `CommandBus` живёт в `@spotter/transport` и используется и telegram, и pwa.
+8. **Таймлапсы:** запрос идёт в `spotter.timelapse.request.<source>`, адаптер стартует экспорт в NVR и **сразу подтверждает** — сборка идёт минутами, дольше окна reclaim, и удержание записи привело бы к повторному экспорту. Результат приходит на `spotter.timelapse.ready` / `.failed`.
 8. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между локальным и удалённым Redis (store-and-forward, `XACK`-после-успеха). Сам бизнес-логику не трогает.
 
 Абстракция NVR: вся специфика конкретного NVR изолирована в адаптере (`apps/frigate` на
@@ -41,8 +42,44 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 доставки (рендер, отправка/редактирование сообщений, Telegram-локальный стейт, presign).
 Контракт между ними — `spotter.delivery.*` (downstream) и `spotter.command.*` (upstream).
 
-Стримы (= имена топиков) целиком — в [README.md](README.md#redis-streams). Деплой-профили
-(dev / single / ingest / cloud) — в [README.md](README.md#развёртывание-docker).
+Деплой-профили (dev / single / ingest / cloud) — в [docs/deployment.md](docs/deployment.md).
+
+## Стримы
+
+Каждый стрим читается своей consumer-группой — по одной на сервис (`spotter-server`,
+`spotter-telegram`, `spotter-depot`, `spotter-frigate`, `spotter-pwa`, `spotter-email`,
+`spotter-forwarder`, `spotter-test`). Доставка — at-least-once: `XACK` после успешной
+обработки, зависшие записи перезабираются reaper'ом (`XPENDING IDLE` → `XCLAIM`). Группы
+создаются с позиции `$` — на рестарте старое не пересылается. Запись, не осилившая
+`REDIS_MAX_DELIVERIES` попыток, уходит в `<stream>.dead`.
+
+| Стрим | Кто пишет | Кто читает | Назначение |
+| --- | --- | --- | --- |
+| `spotter.event` | frigate | server | Событие камеры (start/update/end) |
+| `spotter.event.test_seed` | telegram | frigate | Посев тестовых событий |
+| `spotter.catalog.updated` | frigate | server, telegram, pwa | Снимок каталога камер/объектов |
+| `spotter.catalog.request` | консьюмеры | frigate | Просьба переопубликовать каталог |
+| `spotter.media.request.<source>` | server | frigate | Стейджинг медиа события |
+| `spotter.media.staged` | frigate | depot | Снапшот застейджен (быстрая полоса) |
+| `spotter.media.staged.clip` | frigate | depot | Клип застейджен (медленная полоса) |
+| `spotter.event.media_processed` | depot | server | Ключи обработанного медиа |
+| `spotter.media.progress` | frigate, depot | telegram | Стадия готовности клипа |
+| `spotter.camera.request.<source>` | telegram, pwa | frigate | Запрос кадра камеры |
+| `spotter.camera.staged` | frigate | depot | Кадр застейджен |
+| `spotter.camera.frame_processed` | depot | telegram, pwa | Ключ обработанного кадра |
+| `spotter.timelapse.request.<source>` | telegram, pwa | frigate | Запрос экспорта таймлапса |
+| `spotter.timelapse.ready` | frigate | telegram, pwa | Экспорт готов, ключ в S3 |
+| `spotter.timelapse.failed` | frigate | telegram, pwa | Экспорт не состоится, с причиной |
+| `spotter.delivery.event` | server | telegram, pwa, email | Доставка события (create/update/media) |
+| `spotter.delivery.recipient` | server | telegram, pwa | Изменение роли / отзыв доступа |
+| `spotter.command.request` | telegram, pwa | server | Домен-мутирующая команда (RPC) |
+| `spotter.command.reply` | server | telegram, pwa | Ответ, корреляция по `requestId` |
+| `spotter.heartbeat` | все сервисы | telegram, pwa | Живость и версия (`/status`) |
+| `frigate/events` *(MQTT)* | Frigate | frigate | Сырые события NVR |
+
+В распределённом деплое стримы зеркалирует `forwarder` — направление задаётся картой в
+[apps/forwarder/src/streams.ts](apps/forwarder/src/streams.ts). Забыть стрим там значит,
+что он молча не доедет: это ловит smoke на split-топологии.
 
 ## Команды
 
@@ -53,6 +90,8 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | **Зелёный чек**   | `/green` или `bun run green` — typecheck + тесты + biome по всему репо (~3 с) |
 | Тесты             | `bun test` (или `cd apps/<svc> && bun test`) |
 | Покрытие          | `bun test:coverage`                        |
+| Сквозные тесты    | `bun run test:e2e` — настоящий Redis в Docker, обе топологии |
+| Smoke             | `bun run smoke:build`, затем `bun run test:smoke` — реальные образы в compose |
 | Линт + формат     | `bunx biome check --write`                 |
 | Проверка типов    | `bun run typecheck` (`tsc --noEmit` по всему репо)      |
 | Миграции БД       | `cd apps/<server\|telegram> && bunx drizzle-kit generate` |
@@ -166,7 +205,7 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
   `tg_chats`, `tg_bindings` (составной PK `(tg_user_id, tg_chat_id)`, `recipient_uuid` + кэш роли),
   `event_messages` (составной PK `(event_id, tg_chat_id)`, `message_id`),
   `service_versions` (версии сервисов из heartbeat — для `/status` и уведомления о раскатке).
-- **pwa** ([apps/pwa/src/db/](apps/pwa/src/db/)) — `push_subscriptions`, `notified_events` (дедуп), `recent_events` (лента).
+- **pwa** ([apps/pwa/src/db/](apps/pwa/src/db/)) — `push_subscriptions`, `notified_events` (дедуп), `recent_events` (лента), `devices` (авторизованные установки: токен + роль от домена), `timelapses` (запущенные экспорты, переживают рестарт).
 - **email** ([apps/email/src/db/](apps/email/src/db/)) — `notified_events` (дедуп-леджер).
 
 - Доступ к БД — **только через repository**, не дёргай drizzle из бизнес-логики/команд.
@@ -206,4 +245,5 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - [apps/depot/AGENTS.md](apps/depot/AGENTS.md) — транскод медиа из S3 по ключу, ffmpeg/sharp.
 - [apps/frigate/AGENTS.md](apps/frigate/AGENTS.md) — NVR-адаптер: `Source`/`MediaProvider`/`Catalog` на `@spotter/sink`.
 - [apps/test/AGENTS.md](apps/test/AGENTS.md) — синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка).
-- [packages/sink](packages/sink) — фреймворк адаптера (`runSink`, порты, стейджинг в S3).
+- [packages/transport](packages/transport) — общий слой: контракты стримов, `RedisRegulator`, `RedisConnection`, `CommandBus`, `CatalogCache`, `HeartbeatRegistry`, словарь ролей.
+- [packages/sink](packages/sink) — фреймворк адаптера (`runSink`, порты `Source`/`MediaProvider`/`Catalog`/`TimelapseProvider`, стейджинг в S3).

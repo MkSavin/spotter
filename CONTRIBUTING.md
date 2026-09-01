@@ -77,4 +77,4 @@ if (seen.has(event.id)) return
   Проверить сообщение локально: `echo 'fix: ...' | bunx commitlint`.
 - К изменению, влияющему на пользователей, добавляй changeset: `bunx changeset`.
 - Версионирование и сборка образов — автоматические, по мержу в `master`.
-  Детали — в [README](README.md#cicd-и-релизы).
+  Детали — в [docs/operations.md](docs/operations.md).

@@ -38,7 +38,7 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ deliveryEvent
 
 ## Команды и RPC
 
-Команды (`src/commands/`) на фреймворке `SpotterCommand` + `registry`. Домен-мутирующие (login-redeem, promote/demote/revoke/sign, event clear/info, deployment version) **не пишут в БД напрямую** — шлют `context.commandBus.send(kind, args, principalUuid)`. `CommandBus` ([src/command/CommandBus.ts](src/command/CommandBus.ts)) публикует `spotter.command.request` и ждёт коррелированный ответ на `spotter.command.reply` (один фоновый poll-loop, 30 s timeout, `instanceId` разделяет инстансы на общем reply-стриме).
+Команды (`src/commands/`) на фреймворке `SpotterCommand` + `registry`. Домен-мутирующие (login-redeem, promote/demote/revoke/sign, event clear/info, deployment version) **не пишут в БД напрямую** — шлют `context.commandBus.send(kind, args, principalUuid)`. `CommandBus` (в `@spotter/transport`, общий с pwa) публикует `spotter.command.request` и ждёт коррелированный ответ на `spotter.command.reply` (один фоновый poll-loop, 30 s timeout, `instanceId` разделяет инстансы на общем reply-стриме).
 
 Snapshot-команда камеры идёт по медиа-контракту: `spotter.camera.request.<source>` → `camera.staged` → depot → `spotter.camera.frame_processed` → `cameraFrameController`.
 
@@ -63,7 +63,7 @@ Telegram-локальный стейт — **никакого домена/ро�
 
 Сервисы шлют heartbeat в `spotter.heartbeat` раз в 30 секунд; `heartbeatController` раздаёт их двум потребителям:
 
-- `HeartbeatRegistry` — последний удар на `node/service` в памяти, читается `/status`. Сервис не исчезает при молчании, а помечается протухшим (`HEARTBEAT_STALE_MS`).
+- `HeartbeatRegistry` (в `@spotter/transport`) — последний удар на `node/service` в памяти, читается `/status`. Сервис не исчезает при молчании, а помечается протухшим (`HEARTBEAT_STALE_MS`).
 - `RolloutWatcher` — сравнивает версию с сохранённой в `service_versions` и через `ROLLOUT_DEBOUNCE_MS` (90 с тишины) шлёт админам одно беззвучное сообщение на всю волну. Первый в жизни удар сервиса молчит — иначе установка отчиталась бы как выкат.
 
 ## Особенности
