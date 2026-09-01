@@ -76,7 +76,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | `spotter.delivery.recipient` | server | telegram, pwa | Изменение роли / отзыв доступа |
 | `spotter.command.request` | telegram, pwa | server | Домен-мутирующая команда (RPC) |
 | `spotter.command.reply` | server | telegram, pwa | Ответ, корреляция по `requestId` |
-| `spotter.heartbeat` | все сервисы | telegram, pwa | Живость и версия (`/status`) |
+| `spotter.heartbeat` | все сервисы | telegram, pwa | Живость, версия и глубина очередей (`/status`) |
 | `frigate/events` *(MQTT)* | Frigate | frigate | Сырые события NVR |
 | `frigate/reviews` *(MQTT)* | Frigate | frigate | Вердикт NVR: alert или detection |
 

@@ -1,6 +1,25 @@
 import { z } from 'zod'
 
 /**
+ * How much work a service's consumer group is sitting on, per stream.
+ *
+ * `lag` is the number of entries never handed to anyone — the honest measure of
+ * "is this service keeping up", and the one an autoscaler wants. `pending` is
+ * work already claimed but not yet acked; a small number is normal traffic, a
+ * growing one means handlers are failing or stuck. `oldestPendingMs` separates
+ * those two cases: a backlog that is merely large clears, one that is old does
+ * not.
+ */
+export const queueDepthSchema = z.object({
+  stream: z.string().min(1),
+  lag: z.number().nonnegative(),
+  pending: z.number().nonnegative(),
+  /** Age of the oldest unacked entry; absent when nothing is pending. */
+  oldestPendingMs: z.number().nonnegative().optional(),
+})
+export type QueueDepth = z.infer<typeof queueDepthSchema>
+
+/**
  * Liveness and version report from a single service.
  *
  * Every service announces itself on start and then on a timer. Consumers keep
@@ -22,6 +41,12 @@ export const heartbeatSchema = z.object({
   at: z.number().positive(),
   /** Free-form extras: NVR build, ffmpeg, redis server version. */
   details: z.record(z.string(), z.string()).optional(),
+  /**
+   * Depth of every stream this service consumes. Absent for services that
+   * consume nothing, and omitted entirely when all queues are empty — the
+   * common case, and not worth the bytes on every beat.
+   */
+  queues: z.array(queueDepthSchema).optional(),
 })
 export type Heartbeat = z.infer<typeof heartbeatSchema>
 

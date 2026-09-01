@@ -9,6 +9,7 @@ import {
   probeRedisVersion,
   RedisConnection,
   type RegulatorHandle,
+  readQueueDepths,
   StreamProducer,
   startHeartbeat,
   startLiveness,
@@ -186,10 +187,19 @@ const polling = async (): Promise<void> => {
   await subscriber.connect()
   await commandSubscriber.connect()
 
+  // Declared before the heartbeat that reads it: the first beat fires
+  // immediately, and a `let` further down would still be in its dead zone.
+  let transport: RegulatorHandle | null = null
+
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'telegram',
     version: information.version,
     details: () => probeRedisVersion(producer),
+    // Read at beat time: the regulator is created further down.
+    queues: async () =>
+      transport
+        ? readQueueDepths(producer, transport.streams, config.redis.group)
+        : [],
   })
 
   // Healthcheck signal: refreshed only while Redis actually answers, so a
@@ -242,8 +252,6 @@ const polling = async (): Promise<void> => {
     applicationLogger.sub('command-bus'),
   )
   commandBus.start()
-
-  let transport: RegulatorHandle | null = null
 
   const coreContext: CoreContext = {
     config,

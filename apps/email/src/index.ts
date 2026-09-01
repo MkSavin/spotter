@@ -4,6 +4,7 @@ import {
   DEDUP_RETENTION_MS,
   RedisConnection,
   type RegulatorHandle,
+  readQueueDepths,
   StreamProducer,
   startHeartbeat,
   startLiveness,
@@ -48,8 +49,17 @@ const main = async (): Promise<void> => {
   await producer.connect()
   await subscriber.connect()
 
+  // Declared before the heartbeat that reads it: the first beat fires
+  // immediately, and a `let` further down would still be in its dead zone.
+  let transport: RegulatorHandle | null = null
+
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'email',
+    // Read at beat time: the regulator is created after this call.
+    queues: async () =>
+      transport
+        ? readQueueDepths(producer, transport.streams, config.redis.group)
+        : [],
     version: information.version,
   })
 
@@ -73,8 +83,6 @@ const main = async (): Promise<void> => {
   await mailer.verify()
 
   await catalog.bootstrap(config.source, producer)
-
-  let transport: RegulatorHandle | null = null
 
   const context: CoreContext = {
     config,

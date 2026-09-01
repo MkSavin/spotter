@@ -4,6 +4,7 @@ import {
   probeRedisVersion,
   RedisConnection,
   type RegulatorHandle,
+  readQueueDepths,
   StreamProducer,
   startHeartbeat,
   startLiveness,
@@ -46,8 +47,17 @@ const run = async (): Promise<void> => {
   await producer.connect()
   await subscriber.connect()
 
+  // Declared before the heartbeat that reads it: the first beat fires
+  // immediately, and a `let` further down would still be in its dead zone.
+  let transport: RegulatorHandle | null = null
+
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'server',
+    // Read at beat time: the regulator is created after this call.
+    queues: async () =>
+      transport
+        ? readQueueDepths(producer, transport.streams, config.redis.group)
+        : [],
     version: information.version,
     details: () => probeRedisVersion(producer),
   })
@@ -86,8 +96,6 @@ const run = async (): Promise<void> => {
     producer,
     subscriber,
   }
-
-  let transport: RegulatorHandle | null = null
 
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)

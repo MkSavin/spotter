@@ -45,6 +45,8 @@ export type RegulatorOptions = {
 
 export type RegulatorHandle = {
   stop: () => Promise<void>
+  /** Streams this regulator consumes — the set to report depth for. */
+  streams: string[]
 }
 
 type BaseContext = {
@@ -379,6 +381,7 @@ export class RedisRegulator<Context extends BaseContext> {
     const looping = loop()
 
     return {
+      streams,
       stop: async () => {
         running = false
         clearInterval(reaper)
