@@ -12,6 +12,7 @@ import { unmuteCommand } from './notify/unmuteCommand'
 import { cameraListCommand } from './nvr/cameraListCommand'
 import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
 import { timelapseCommand } from './nvr/timelapseCommand'
+import { timelapseStatusCommand } from './nvr/timelapseStatusCommand'
 import { testDeliveryCommand } from './test/testDeliveryCommand'
 import { testMediaCommand } from './test/testMediaCommand'
 import { userDemoteCommand } from './user/userDemoteCommand'
@@ -27,6 +28,7 @@ export const commandRegistry: SpotterCommand[] = [
   cameraListCommand,
   cameraSnapshotCommand,
   timelapseCommand,
+  timelapseStatusCommand,
   muteCommand,
   unmuteCommand,
   nvrSuspendCommand,

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { createDatabase, type TelegramDatabase } from './client'
-import { eventMessagesRepo, tgBindingsRepo, tgChatsRepo } from './repository'
+import {
+  eventMessagesRepo,
+  tgBindingsRepo,
+  tgChatsRepo,
+  timelapseWaitsRepo,
+} from './repository'
 
 describe('telegram db repository', () => {
   let db: TelegramDatabase
@@ -177,5 +182,62 @@ describe('chat mute', () => {
     tgChatsRepo.setMuted(db, 'c1', new Date(Date.now() + 60_000))
     tgChatsRepo.setMuted(db, 'c1', null)
     expect(ids(tgChatsRepo.listDeliverableIds(db))).toEqual(['c1', 'c2'])
+  })
+})
+
+describe('timelapse waits', () => {
+  let db: TelegramDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  const wait = { camera: 'yard', tgChatId: 'c1', start: 100, end: 200 }
+
+  test('a queued export is listed for its chat', () => {
+    timelapseWaitsRepo.begin(db, wait)
+
+    const listed = timelapseWaitsRepo.list(db, 'c1')
+    expect(listed).toHaveLength(1)
+    // No progress tick yet, so it is queued rather than running.
+    expect(listed[0].startedAt).toBeNull()
+  })
+
+  test('another chat does not see it', () => {
+    timelapseWaitsRepo.begin(db, wait)
+    expect(timelapseWaitsRepo.list(db, 'c2')).toHaveLength(0)
+  })
+
+  test('progress stamps when the NVR took the job', () => {
+    timelapseWaitsRepo.begin(db, wait)
+    timelapseWaitsRepo.markStarted(db, 'yard', 100, new Date(1_700_000_000_000))
+
+    expect(timelapseWaitsRepo.list(db, 'c1')[0].startedAt).toEqual(
+      new Date(1_700_000_000_000),
+    )
+  })
+
+  test('settling drops the wait', () => {
+    timelapseWaitsRepo.begin(db, wait)
+    timelapseWaitsRepo.settle(db, 'yard', 100)
+
+    expect(timelapseWaitsRepo.list(db, 'c1')).toHaveLength(0)
+  })
+
+  test('a failure without a span settles every wait on that camera', () => {
+    timelapseWaitsRepo.begin(db, wait)
+    timelapseWaitsRepo.begin(db, { ...wait, start: 300, end: 400 })
+
+    timelapseWaitsRepo.settle(db, 'yard')
+    expect(timelapseWaitsRepo.list(db, 'c1')).toHaveLength(0)
+  })
+
+  test('re-requesting the same span updates rather than duplicates', () => {
+    timelapseWaitsRepo.begin(db, { ...wait, messageId: 1 })
+    timelapseWaitsRepo.begin(db, { ...wait, messageId: 2 })
+
+    const listed = timelapseWaitsRepo.list(db, 'c1')
+    expect(listed).toHaveLength(1)
+    expect(listed[0].messageId).toBe(2)
   })
 })

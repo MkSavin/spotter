@@ -22,6 +22,7 @@ import { heartbeatController } from './controllers/heartbeatController'
 import { mediaProgressController } from './controllers/mediaProgressController'
 import {
   timelapseFailedController,
+  timelapseProgressController,
   timelapseReadyController,
 } from './controllers/timelapseController'
 
@@ -38,6 +39,7 @@ export const telegramTransport = async (
     .message(catalogUpdatedStream, catalogController)
     .message(heartbeatStream, heartbeatController)
     .message(mediaStreams.mediaProgress, mediaProgressController)
+    .message(timelapseStreams.progress, timelapseProgressController)
     .message(timelapseStreams.ready, timelapseReadyController)
     .message(timelapseStreams.failed, timelapseFailedController)
     .run(

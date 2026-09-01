@@ -65,6 +65,31 @@ export const eventMessages = sqliteTable(
 )
 
 /**
+ * Exports the bot is waiting on, so `/timelapse_status` can answer after a
+ * restart. Rows are dropped when the export resolves either way — this is a
+ * work list, not a history.
+ */
+export const timelapseWaits = sqliteTable(
+  'timelapse_waits',
+  {
+    camera: text('camera').notNull(),
+    tgChatId: text('tg_chat_id').notNull(),
+    /** Unix seconds, the requested span. */
+    start: integer('start').notNull(),
+    end: integer('end').notNull(),
+    messageId: integer('message_id'),
+    /** Unix ms when the NVR accepted it; `null` until the first progress tick. */
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }),
+    requestedAt: integer('requested_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.camera, table.start, table.tgChatId] }),
+  ],
+)
+
+/**
  * Last version seen per service, so a rollout is still detected after the bot
  * itself restarts — an in-memory registry would report every service as new.
  */
@@ -131,6 +156,7 @@ export type ServiceVersion = InferSelectModel<typeof serviceVersions>
 export type DialogStateRow = InferSelectModel<typeof dialogStates>
 export type CatalogSnapshotRow = InferSelectModel<typeof catalogSnapshots>
 export type ClipWaitRow = InferSelectModel<typeof clipWaits>
+export type TimelapseWait = InferSelectModel<typeof timelapseWaits>
 
 export type EventMessage = {
   id: number

@@ -15,8 +15,10 @@ import {
   serviceVersions,
   type TgBinding,
   type TgChat,
+  type TimelapseWait,
   tgBindings,
   tgChats,
+  timelapseWaits,
 } from './schema'
 
 export const tgChatsRepo = {
@@ -229,6 +231,76 @@ export const eventMessagesRepo = {
       .delete(eventMessages)
       .where(lt(eventMessages.sentAt, cutoff))
       .returning({ eventId: eventMessages.eventId })
+      .all().length,
+}
+
+export const timelapseWaitsRepo = {
+  /** Records a queued export so `/timelapse_status` survives a restart. */
+  begin: (
+    db: TelegramDatabase,
+    wait: {
+      camera: string
+      tgChatId: string
+      start: number
+      end: number
+      messageId?: number
+    },
+  ): void => {
+    db.insert(timelapseWaits)
+      .values(wait)
+      .onConflictDoUpdate({
+        target: [
+          timelapseWaits.camera,
+          timelapseWaits.start,
+          timelapseWaits.tgChatId,
+        ],
+        set: { messageId: wait.messageId, requestedAt: new Date() },
+      })
+      .run()
+  },
+
+  /** Stamps when the NVR actually took it, as reported by the first progress. */
+  markStarted: (
+    db: TelegramDatabase,
+    camera: string,
+    start: number,
+    startedAt: Date,
+  ): void => {
+    db.update(timelapseWaits)
+      .set({ startedAt })
+      .where(
+        and(eq(timelapseWaits.camera, camera), eq(timelapseWaits.start, start)),
+      )
+      .run()
+  },
+
+  list: (db: TelegramDatabase, tgChatId: string): TimelapseWait[] =>
+    db
+      .select()
+      .from(timelapseWaits)
+      .where(eq(timelapseWaits.tgChatId, tgChatId))
+      .all(),
+
+  /** Drops the wait once the export resolves, whichever way it went. */
+  settle: (db: TelegramDatabase, camera: string, start?: number): void => {
+    db.delete(timelapseWaits)
+      .where(
+        start === undefined
+          ? eq(timelapseWaits.camera, camera)
+          : and(
+              eq(timelapseWaits.camera, camera),
+              eq(timelapseWaits.start, start),
+            ),
+      )
+      .run()
+  },
+
+  /** Clears waits nobody will ever see resolve. */
+  prune: (db: TelegramDatabase, cutoff: Date): number =>
+    db
+      .delete(timelapseWaits)
+      .where(lt(timelapseWaits.requestedAt, cutoff))
+      .returning({ camera: timelapseWaits.camera })
       .all().length,
 }
 

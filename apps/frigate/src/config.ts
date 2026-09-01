@@ -42,6 +42,8 @@ export type CoreConfig = SinkConfig & {
    * request that started it, so this has to sit on a volume to be of any use.
    */
   timelapseStatePath: string
+  /** How long an export may run before the tracker gives up on it. */
+  timelapseDeadlineMs: number
 
   labels: FrigateLabels
 }
@@ -96,6 +98,8 @@ export const resolveConfig = (): CoreConfig => {
       'TIMELAPSE_STATE_PATH',
       '/data/timelapse-exports.json',
     ),
+    timelapseDeadlineMs:
+      env.number('TIMELAPSE_DEADLINE_HOURS', 12) * 60 * 60 * 1000,
     labels: defaultLabels,
   }
 

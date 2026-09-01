@@ -50,6 +50,13 @@
       "when": 1788288066189,
       "tag": "0006_outgoing_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788290280812,
+      "tag": "0007_uneven_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

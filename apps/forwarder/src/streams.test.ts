@@ -22,6 +22,7 @@ describe('forwarder stream map', () => {
       heartbeatStream,
       mediaStreams.mediaProgress,
       timelapseStreams.ready,
+      timelapseStreams.progress,
       timelapseStreams.failed,
     ])
   })
