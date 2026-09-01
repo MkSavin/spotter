@@ -4,6 +4,7 @@ import {
   timelapseStreams,
 } from '@spotter/transport'
 import type { BotContext } from '../../context'
+import { timelapseWaitsRepo } from '../../db/repository'
 import { escapeHtml } from '../../helpers/html'
 import { formatSpan, parseDateSpan, quickSpans } from '../../timelapse/dateSpan'
 import { SpotterCommand } from '../framework/SpotterCommand'
@@ -113,7 +114,7 @@ class TimelapseCommand extends SpotterCommand {
     const label = context.catalog.cameraLabel(source, camera)
 
     const message = await context.replyWithHTML(
-      `🎞 <b>Собираем таймлапс</b> | ${label} | ${formatSpan(span, context.config.timezone)}\n\n<i>Это займёт несколько минут — пришлём, как будет готово.</i>`,
+      `🎞 <b>Собираем таймлапс</b> | ${label} | ${formatSpan(span, context.config.timezone)}\n\n<i>Ставим в очередь — пришлём, как будет готово.</i>`,
     )
 
     try {
@@ -128,6 +129,14 @@ class TimelapseCommand extends SpotterCommand {
       }
 
       await context.producer.publish(timelapseStreams.request(source), request)
+
+      timelapseWaitsRepo.begin(context.db, {
+        camera,
+        tgChatId: String(context.chatId),
+        start: span.start,
+        end: span.end,
+        messageId: message?.message_id,
+      })
     } catch (error) {
       await message.editText(
         '\u{26a0}\u{fe0f} <b>Не удалось поставить таймлапс в очередь</b>',

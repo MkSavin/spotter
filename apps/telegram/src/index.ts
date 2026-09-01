@@ -40,6 +40,7 @@ import {
   dialogStatesRepo,
   eventMessagesRepo,
   tgBindingsRepo,
+  timelapseWaitsRepo,
 } from './db/repository'
 import { DIALOG_TTL_MS } from './dialog/Dialog'
 import { DialogRegistry } from './dialog/DialogRegistry'
@@ -219,6 +220,13 @@ const polling = async (): Promise<void> => {
     intervalMs: THROTTLE_SWEEP_MS,
   })
 
+  const stopWaitRetention = startRetention({
+    label: 'timelapse wait',
+    retentionMs: config.retention.messageDays * 24 * 60 * 60 * 1000,
+    prune: (cutoff) => timelapseWaitsRepo.prune(database, cutoff),
+    logger: applicationLogger,
+  })
+
   const stopMessageRetention = startRetention({
     label: 'event message',
     retentionMs: config.retention.messageDays * 24 * 60 * 60 * 1000,
@@ -261,6 +269,7 @@ const polling = async (): Promise<void> => {
     stopLiveness()
     stopDialogRetention()
     stopMessageRetention()
+    stopWaitRetention()
     stopThrottleSweep()
     rollouts.stop()
     clips.stop()

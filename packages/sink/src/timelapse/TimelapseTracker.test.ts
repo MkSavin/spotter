@@ -180,14 +180,15 @@ describe('TimelapseTracker', () => {
     ).toBe(true)
   })
 
-  test('recover gives up on an export older than the deadline', async () => {
-    const { tracker, records, published } = makeHarness({})
+  test('recover gives up when the NVR has forgotten the export', async () => {
+    const { tracker, records, published } = makeHarness({
+      pollExport: async () => ({ state: 'lost' }) as TimelapseProgress,
+    })
 
     records.set('front_stale', {
       jobId: 'front_stale',
       request,
-      // Older than the default hour-long deadline.
-      startedAt: Date.now() - 7_200_000,
+      startedAt: Date.now() - 13 * 60 * 60 * 1000,
     })
 
     await tracker.recover(defaultLogger)
@@ -195,5 +196,62 @@ describe('TimelapseTracker', () => {
 
     expect(published[0]?.payload.reason).toBe('timeout')
     expect(records.size).toBe(0)
+  })
+
+  test('recover keeps an overdue export the NVR is still working on', async () => {
+    // The bug this guards: a restart used to fail a long export instantly,
+    // purely on the clock, while the NVR was still writing the file.
+    const { tracker, records, published } = makeHarness({
+      pollExport: async () => ({ state: 'running' }) as TimelapseProgress,
+    })
+
+    records.set('front_slow', {
+      jobId: 'front_slow',
+      request,
+      startedAt: Date.now() - 13 * 60 * 60 * 1000,
+    })
+
+    await tracker.recover(defaultLogger)
+    tracker.stop()
+
+    expect(published.some((p) => p.payload?.reason === 'timeout')).toBe(false)
+    expect(records.size).toBe(1)
+  })
+
+  test('an unreachable NVR is not taken as proof the export died', async () => {
+    const { tracker, records, published } = makeHarness({
+      pollExport: async () => {
+        throw new Error('NVR restarting')
+      },
+    })
+
+    records.set('front_slow', {
+      jobId: 'front_slow',
+      request,
+      startedAt: Date.now() - 13 * 60 * 60 * 1000,
+    })
+
+    await tracker.recover(defaultLogger)
+    tracker.stop()
+
+    expect(published.some((p) => p.payload?.reason === 'timeout')).toBe(false)
+    expect(records.size).toBe(1)
+  })
+
+  test('a running export reports progress so a long wait looks alive', async () => {
+    const { tracker, published } = makeHarness({
+      pollExport: async () => ({ state: 'running' }) as TimelapseProgress,
+    })
+
+    await tracker.start(request, defaultLogger)
+    await Bun.sleep(30)
+    tracker.stop()
+
+    const progress = published.find((p) =>
+      p.stream.endsWith('timelapse.progress'),
+    )
+    expect(progress).toBeDefined()
+    expect(progress?.payload.camera).toBe('front')
+    expect(progress?.payload.startedAt).toBeGreaterThan(0)
   })
 })

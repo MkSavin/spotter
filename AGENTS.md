@@ -29,7 +29,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 5. **server** ловит `*_processed` и публикует `spotter.delivery.event` (action `media`, +S3-ключи). **telegram** консьюмит delivery-стрим, пресайнит ключи в короткоживущие URL и крепит медиа **на исходное сообщение** через `editMessageMedia` (текст → фото → видео). Креды NVR по сети не ходят — только ключи S3.
 6. **Видео по кнопке:** под фото-сообщением — кнопка «Видео». Нажатие → telegram шлёт RPC `event.clip` → **server** запрашивает транскод клипа (`want:[clip]`) → готовый клип тем же путём проставляется видео всем подписчикам события (fan-out по `eventId`). Пока клип готовится, sink и depot шлют `spotter.media.progress` (`fetching`/`staged`/`failed`), и бот двигает по ним кнопку; провал или таймаут возвращают кнопку в состояние «повторить».
 7. **Фронтенды домен не мутируют напрямую** — шлют `spotter.command.request` в server и ждут коррелированный `spotter.command.reply` (login/роли/event-команды). `CommandBus` живёт в `@spotter/transport` и используется и telegram, и pwa.
-8. **Таймлапсы:** запрос идёт в `spotter.timelapse.request.<source>`, адаптер стартует экспорт в NVR и **сразу подтверждает** — сборка идёт минутами, дольше окна reclaim, и удержание записи привело бы к повторному экспорту. Результат приходит на `spotter.timelapse.ready` / `.failed`.
+8. **Таймлапсы:** запрос идёт в `spotter.timelapse.request.<source>`, адаптер стартует экспорт в NVR и **сразу подтверждает** — сборка идёт минутами, дольше окна reclaim, и удержание записи привело бы к повторному экспорту. Пока идёт сборка, трекер шлёт `spotter.timelapse.progress`, и бот обновляет сообщение — экспорт за несколько суток идёт часами, и молчание неотличимо от зависания. Результат приходит на `spotter.timelapse.ready` / `.failed`.
 8. **forwarder** (только распределённый деплой) — двунаправленно зеркалит стримы между локальным и удалённым Redis (store-and-forward, `XACK`-после-успеха). Сам бизнес-логику не трогает.
 
 Абстракция NVR: вся специфика конкретного NVR изолирована в адаптере (`apps/frigate` на
@@ -69,6 +69,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | `spotter.camera.frame_processed` | depot | telegram, pwa | Ключ обработанного кадра |
 | `spotter.notifications.suspend.<source>` | telegram | frigate | Приглушить уведомления самого NVR |
 | `spotter.timelapse.request.<source>` | telegram, pwa | frigate | Запрос экспорта таймлапса |
+| `spotter.timelapse.progress` | frigate | telegram | Экспорт ещё идёт (сколько уже работает) |
 | `spotter.timelapse.ready` | frigate | telegram, pwa | Экспорт готов, ключ в S3 |
 | `spotter.timelapse.failed` | frigate | telegram, pwa | Экспорт не состоится, с причиной |
 | `spotter.delivery.event` | server | telegram, pwa, email | Доставка события (create/update/media) |

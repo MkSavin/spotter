@@ -39,6 +39,9 @@ export const UP_STREAMS = [
   // Outcome of a timelapse export: the adapter stages it on the ingest node,
   // the cloud bot presigns and delivers it.
   timelapseStreams.ready,
+  // Liveness of a running export; without it a multi-hour wait looks hung on
+  // the cloud side.
+  timelapseStreams.progress,
   timelapseStreams.failed,
 ] as const
 

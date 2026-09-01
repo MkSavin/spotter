@@ -25,6 +25,61 @@ const REASONS: Record<TimelapseFailure, string> = {
   timeout: 'экспорт не завершился вовремя',
 }
 
+export type TimelapseProgressPayload = {
+  camera: string
+  start: number
+  end: number
+  startedAt: number
+  chatId: string
+  messageId: number
+}
+
+/** `2 ч 15 мин` — how long the NVR has been at it. */
+export const formatElapsed = (ms: number): string => {
+  const minutes = Math.max(1, Math.floor(ms / 60_000))
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return [hours > 0 ? `${hours} ч` : '', rest > 0 ? `${rest} мин` : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
+/**
+ * Repaints the placeholder so a long export looks alive.
+ *
+ * Elapsed time, not a percentage: Frigate reports only whether the export is
+ * still running, and a made-up percentage would be worse than none.
+ */
+export const timelapseProgressAction = async (
+  payload: TimelapseProgressPayload,
+  context: TransportContext,
+): Promise<void> => {
+  const { bot, logger, config, catalog } = context
+  const { camera, chatId, messageId, startedAt } = payload
+
+  const label = catalog.cameraLabel(config.source, camera)
+  const span = formatSpan(
+    { start: payload.start, end: payload.end },
+    config.timezone,
+  )
+  const elapsed = formatElapsed(Date.now() - startedAt)
+
+  try {
+    await bot.api.editMessageText(
+      chatId,
+      messageId,
+      `🎞 <b>Собираем таймлапс</b> | ${label} | ${span}
+
+⏱ <i>NVR работает уже ${elapsed}. Длинные периоды собираются часами — пришлём, как будет готово.</i>`,
+      { parse_mode: 'HTML' },
+    )
+  } catch (error) {
+    // Editing to identical text throws, and so does a deleted message; neither
+    // is worth more than a debug line on a poll that repeats every 15 seconds.
+    logger.debug(`Could not repaint timelapse progress: ${error}`)
+  }
+}
+
 /** Sends the finished timelapse, replacing the "собираем" placeholder. */
 export const timelapseReadyAction = async (
   payload: TimelapseReadyPayload,

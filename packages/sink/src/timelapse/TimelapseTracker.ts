@@ -12,10 +12,13 @@ import type { TimelapseProvider } from './TimelapseProvider'
 export const POLL_INTERVAL_MS = 15_000
 
 /**
- * How long an export may run before it is given up on. Generous: a full day of
- * recordings re-encodes for a long time on modest hardware.
+ * How long an export may run before it is given up on.
+ *
+ * Twelve hours, because that is the scale these actually take: a multi-day span
+ * on modest hardware has been observed running for eight. The old one-hour
+ * default failed such exports while the NVR was still busy producing them.
  */
-export const POLL_DEADLINE_MS = 3_600_000
+export const POLL_DEADLINE_MS = 12 * 60 * 60 * 1000
 
 /** Build the staging S3 key for an exported timelapse. */
 export const stagedTimelapseKey = (
@@ -112,10 +115,23 @@ export class TimelapseTracker {
 
     for (const record of records) {
       if (Date.now() - record.startedAt > this.deadlineMs) {
-        logger.warn(`Export ${record.jobId} exceeded its deadline; giving up`)
-        await this.forget(record.jobId, logger)
-        await this.fail(record.request, 'timeout')
-        continue
+        // Past the deadline on paper — but the NVR is the authority on whether
+        // it is still working. Declaring a timeout for an export that is alive
+        // (or already finished) is how a restart used to kill a long export
+        // instantly, so ask before giving up.
+        const alive = await this.stillRunning(record, logger)
+        if (!alive) {
+          logger.warn(`Export ${record.jobId} exceeded its deadline; giving up`)
+          await this.forget(record.jobId, logger)
+          await this.fail(record.request, 'timeout')
+          continue
+        }
+
+        logger.info(
+          `Export ${record.jobId} is past its deadline but the NVR is still on it; extending`,
+        )
+        record.startedAt = Date.now()
+        await this.remember(record, logger)
       }
 
       logger.info(`Resuming export ${record.jobId}`)
@@ -160,10 +176,24 @@ export class TimelapseTracker {
     if (this.stopped) return
 
     if (Date.now() - record.startedAt > this.deadlineMs) {
-      logger.warn(`Export ${record.jobId} exceeded its deadline; giving up`)
-      void this.forget(record.jobId, logger).then(() =>
-        this.fail(record.request, 'timeout'),
-      )
+      // The clock alone does not end an export: the next tick asks the NVR, and
+      // only a `lost` answer gives up. Without this a slow-but-healthy export
+      // is failed while its file is still being written.
+      void this.stillRunning(record, logger).then(async (alive) => {
+        if (alive) {
+          logger.info(
+            `Export ${record.jobId} is past its deadline but still running; extending`,
+          )
+          record.startedAt = Date.now()
+          await this.remember(record, logger)
+          this.rearm(record, logger, tick)
+          return
+        }
+
+        logger.warn(`Export ${record.jobId} exceeded its deadline; giving up`)
+        await this.forget(record.jobId, logger)
+        await this.fail(record.request, 'timeout')
+      })
       return
     }
 
@@ -173,6 +203,23 @@ export class TimelapseTracker {
     this.timers.set(record.jobId, timer)
   }
 
+  /**
+   * Whether the NVR still knows about this export. A poll that itself fails
+   * counts as alive: an unreachable NVR is no evidence that the work stopped.
+   */
+  private async stillRunning(
+    record: TimelapseJobRecord,
+    logger: Stenograph,
+  ): Promise<boolean> {
+    try {
+      const progress = await this.options.provider.pollExport(record.jobId)
+      return progress.state !== 'lost'
+    } catch (error) {
+      logger.warn(`Could not check ${record.jobId} against the NVR`, error)
+      return true
+    }
+  }
+
   private async poll(
     record: TimelapseJobRecord,
     logger: Stenograph,
@@ -180,6 +227,20 @@ export class TimelapseTracker {
     const progress = await this.options.provider.pollExport(record.jobId)
 
     if (progress.state === 'running') {
+      // Say so on every tick: an export runs for hours, and silence is
+      // indistinguishable from a hang for whoever is waiting.
+      await this.options.producer
+        .publish(timelapseStreams.progress, {
+          source: this.options.sourceId,
+          camera: record.request.camera,
+          start: record.request.start,
+          end: record.request.end,
+          startedAt: record.startedAt,
+          chatId: record.request.chatId,
+          messageId: record.request.messageId,
+        })
+        .catch((error) => logger.warn('Could not publish progress', error))
+
       this.schedule(record, logger)
       return
     }

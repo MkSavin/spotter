@@ -38,6 +38,26 @@ export const timelapseRequestSchema = z.object({
 export type TimelapseRequest = z.infer<typeof timelapseRequestSchema>
 
 /**
+ * A running export is still alive. Published to `spotter.timelapse.progress`
+ * on every poll, so a wait measured in hours does not look like a hang.
+ *
+ * There is no percentage: Frigate's export record carries only a boolean
+ * `in_progress`, so elapsed time is the honest thing to report. Inventing a
+ * percentage from the span length would be a guess dressed up as a fact.
+ */
+export const timelapseProgressSchema = z.object({
+  source: z.string().min(1),
+  camera: z.string().min(1),
+  start: z.number().int().positive(),
+  end: z.number().int().positive(),
+  /** Unix ms when the NVR accepted the export. */
+  startedAt: z.number().int().positive(),
+  chatId: z.number().optional(),
+  messageId: z.number().optional(),
+})
+export type TimelapseProgressUpdate = z.infer<typeof timelapseProgressSchema>
+
+/**
  * The export finished and its bytes are staged in S3. Published to
  * `spotter.timelapse.ready`.
  */
@@ -77,6 +97,8 @@ export type TimelapseFailed = z.infer<typeof timelapseFailedSchema>
 export const timelapseStreams = {
   /** `spotter.timelapse.request.<source>` — export requests, per source. */
   request: (source: string): string => `spotter.timelapse.request.${source}`,
+  /** `spotter.timelapse.progress` — a running export is still alive. */
+  progress: 'spotter.timelapse.progress',
   /** `spotter.timelapse.ready` — exported video staged in S3. */
   ready: 'spotter.timelapse.ready',
   /** `spotter.timelapse.failed` — the export will never arrive. */
@@ -94,6 +116,13 @@ export const safeParseTimelapseReady = (
   value: unknown,
 ): TimelapseReady | null => {
   const result = timelapseReadySchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
+export const safeParseTimelapseProgress = (
+  value: unknown,
+): TimelapseProgressUpdate | null => {
+  const result = timelapseProgressSchema.safeParse(value)
   return result.success ? result.data : null
 }
 

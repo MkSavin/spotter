@@ -60,6 +60,8 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
   notificationSuspender?: NotificationSuspender
   /** Where in-flight exports are remembered across restarts. */
   timelapseStatePath?: string
+  /** How long an export may run before it is given up on. */
+  timelapseDeadlineMs?: number
   /** Extra stream subscriptions (e.g. a test-seed controller). */
   controllers?: SinkController<TConfig>[]
   /** Extras for `/status`, e.g. the NVR build behind this adapter. */
@@ -183,6 +185,7 @@ export const runSink = async <TConfig extends SinkConfig>(
       s3,
       stagingPrefix: config.s3.stagingPrefix,
       sourceId,
+      deadlineMs: options.timelapseDeadlineMs,
       logger: logger.sub('timelapse'),
       store: options.timelapseStatePath
         ? new FileTimelapseStore(

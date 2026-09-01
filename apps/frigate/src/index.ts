@@ -38,6 +38,7 @@ runSink({
   timelapseProvider,
   notificationSuspender,
   timelapseStatePath: config.timelapseStatePath,
+  timelapseDeadlineMs: config.timelapseDeadlineMs,
   controllers: [
     { stream: eventStreams.testSeed, controller: eventTestController },
   ],
