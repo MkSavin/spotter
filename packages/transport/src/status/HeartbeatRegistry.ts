@@ -1,5 +1,5 @@
-import { HEARTBEAT_STALE_MS, type Heartbeat } from '@spotter/transport'
 import type { Stenograph } from 'stenograph'
+import { HEARTBEAT_STALE_MS, type Heartbeat } from '../schema/heartbeat'
 
 export type ServiceStatus = Heartbeat & { online: boolean }
 

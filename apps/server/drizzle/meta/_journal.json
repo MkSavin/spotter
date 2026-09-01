@@ -8,6 +8,13 @@
       "when": 1781629664588,
       "tag": "0000_tired_stephen_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788263196524,
+      "tag": "0001_fuzzy_tarantula",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,8 @@
 `spotter.delivery.event` и шлёт **Web Push** (VAPID) на подписанные устройства, а также
 раздаёт саму веб-аппу (Vite + React 19 + shadcn/ui + Tailwind v4). Ставится «на экран
 Домой» на iPhone/Android/desktop — один код на все платформы, без App Store. Домен не
-трогает, наружу ничего не мутирует (v1 только принимает — команд/RPC назад нет). План и
+трогает напрямую: доменные мутации идут через `CommandBus` (`spotter.command.request`), как в
+telegram. План и
 обоснование — [.agents/plans/pwa-frontend.md](../../.agents/plans/pwa-frontend.md). Общие
 конвенции — в корневом [AGENTS.md](../../AGENTS.md).
 
@@ -20,7 +21,7 @@ bun test               # тесты серверной части (src/)
 
 Окружение: единый `.env` узла (секция `pwa` в [.env.example](../../.env.example) /
 [.env.cloud.example](../../.env.cloud.example)). Сервис читает `REDIS_URL`, `S3_*`, `TZ`,
-`VAPID_*`, `PORT`, `PUBLIC_URL`, `PWA_COALESCE_MS`, `PWA_ACCESS_CODES`, `S3_PRESIGN_EXPIRY`;
+`VAPID_*`, `PORT`, `PUBLIC_URL`, `PWA_COALESCE_MS`, `S3_PRESIGN_EXPIRY`;
 consumer-группа (`spotter-pwa`), `DATABASE_PATH`, `SOURCE_ID` — с дефолтами в коде.
 `requireConfig` валидирует на старте (fail-fast).
 **VAPID-пару генерирует сам деплойер** (`bunx web-push generate-vapid-keys`); публичный
@@ -108,11 +109,41 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ pushEventActi
 После правок `schema.ts` — `bunx drizzle-kit generate` (миграции в `apps/pwa/drizzle/`,
 применяются на старте).
 
-## Авторизация устройства (v1)
+## Авторизация устройства
 
-Одноразовый код проверяется **локально** против `PWA_ACCESS_CODES` (пусто → гейт выключен,
-все подписанные устройства получают пуши). Привязка к `server`'ским `access_tokens` по RPC —
-отдельным ходом позже, когда/если понадобится роль-фильтрация.
+Код проверяет **домен**, не PWA: `device.redeem` берёт из того же пула `access_tokens`, что
+`/user_sign` выдаёт для бота — доступ выдаётся один раз, а не по разу на фронтенд. В ответ
+приходит настоящая роль (`VIEWER`/`USER`/`ADMIN`), её же сервер и проверяет на каждой команде.
+
+Устройство живёт в таблице `devices`, **отдельно от `push_subscriptions`**: авторизация — это
+погашенный код, а не разрешённые уведомления, и браузер меняет push-endpoint без участия
+пользователя. Клиент хранит `deviceId` (переживает переавторизацию) и bearer-токен; на 401
+токен сбрасывается и приложение снова показывает экран кода.
+
+Гейт в `server/auth.ts` — удобство, а не граница безопасности: команда несёт `recipientUuid`,
+и роль перепроверяет сервер. Понижение роли доезжает через `spotter.delivery.recipient`
+([recipientController](src/transport/controllers/recipientController.ts)) — иначе UI до
+переавторизации предлагал бы кнопки, которые всё равно отобьются.
+
+Роли не продублированы: словарь (`ROLES`, `ROLE_RANK`, `satisfies`) живёт в
+`@spotter/transport`.
+
+## HTTP API
+
+`/api/health`, `/api/vapid` открыты; **всё остальное требует bearer-токен**. Лента тоже: она
+несёт снимки из дома, и открытый эндпойнт отдавал бы их любому, кто знает URL.
+
+| Маршрут | Роль | Что делает |
+|---|---|---|
+| `POST /api/auth` | — | гасит код через `device.redeem`, возвращает токен и роль |
+| `GET /api/events`, `/api/events/:id` | authorized | лента и карточка события |
+| `GET /api/cameras` | authorized | каталог камер |
+| `GET /api/status` | authorized | heartbeat'ы сервисов |
+| `POST /api/snapshot` | USER | кадр с камеры |
+| `POST /api/clip` | USER | запрос видео события |
+
+Снимок и клип **не возвращают медиа в ответе**: запрос уходит в конвейер, а результат
+приходит пушем, как обычное событие. Кнопка подтверждает приём запроса, не ждёт файл.
 
 ## Версии и отклонения
 

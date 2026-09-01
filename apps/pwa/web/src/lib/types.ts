@@ -21,6 +21,22 @@ export type FeedEntry = {
   clipUrl?: string
 }
 
+export type Role = 'VIEWER' | 'USER' | 'ADMIN'
+
+/** One camera from the NVR catalog. */
+export type CameraEntry = { code: string; label: string }
+
+/** A service's last heartbeat, as the status screen shows it. */
+export type ServiceStatus = {
+  node: string
+  service: string
+  version: string
+  at: number
+  online: boolean
+  uptime: number
+  details?: Record<string, string>
+}
+
 export type SubscriptionStatus = {
   endpoint: string
   authorized: boolean

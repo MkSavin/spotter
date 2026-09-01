@@ -29,6 +29,12 @@ export const recipients = sqliteTable('recipients', {
   uuid: text('uuid').primaryKey(),
   role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
   tgUserId: text('tg_user_id').unique(),
+  /**
+   * A PWA install that redeemed a code. Mutually exclusive with `tgUserId` in
+   * practice: one identifies a Telegram account, the other a browser install,
+   * and a recipient is created by whichever redeemed the code.
+   */
+  deviceId: text('device_id').unique(),
   username: text('username'),
   authorizedAt,
 })

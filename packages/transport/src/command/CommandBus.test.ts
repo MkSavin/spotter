@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { defaultLogger } from 'stenograph'
 import {
   type CommandReply,
   type CommandRequest,
   deliveryStreams,
-} from '@spotter/transport'
-import { defaultLogger } from 'stenograph'
+} from '../schema/delivery'
 import { CommandBus } from './CommandBus'
 
 type Entry = [string, string[]]

@@ -1,5 +1,11 @@
 import type { CoreContext } from '../context'
 import { authHandler } from './handlers/auth'
+import {
+  camerasHandler,
+  clipHandler,
+  snapshotHandler,
+  statusHandler,
+} from './handlers/commands'
 import { eventHandler, eventsHandler } from './handlers/events'
 import {
   subscribeHandler,
@@ -28,8 +34,12 @@ export const createServer = (context: CoreContext) =>
       '/api/unsubscribe': { POST: (req) => unsubscribeHandler(req, context) },
       '/api/test-push': { POST: (req) => testPushHandler(req, context) },
       '/api/auth': { POST: (req) => authHandler(req, context) },
-      '/api/events': () => eventsHandler(context),
-      '/api/events/:id': (req) => eventHandler(req.params.id, context),
+      '/api/events': (req) => eventsHandler(req, context),
+      '/api/events/:id': (req) => eventHandler(req, req.params.id, context),
+      '/api/cameras': (req) => camerasHandler(req, context),
+      '/api/status': (req) => statusHandler(req, context),
+      '/api/snapshot': { POST: (req) => snapshotHandler(req, context) },
+      '/api/clip': { POST: (req) => clipHandler(req, context) },
     },
     fetch: (request) => serveStatic(request),
     error: (error) => {

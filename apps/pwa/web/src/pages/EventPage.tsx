@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Camera, Clock, Gauge, ImageOff, Tag } from 'lucide-react'
+import {
+  ArrowLeft,
+  Camera,
+  Clock,
+  Gauge,
+  ImageOff,
+  LoaderCircle,
+  Tag,
+  Video,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { AspectRatio } from '@/components/ui/aspect-ratio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, ApiError } from '@/lib/api'
 import { navigate } from '@/lib/router'
+import { hasRole } from '@/lib/session'
 import { clockTime } from '@/lib/time'
 import type { FeedEntry } from '@/lib/types'
 
@@ -87,9 +98,54 @@ export function EventPage({ id }: { id: string }) {
   )
 }
 
+/**
+ * Asks for the clip and reports back. Like a snapshot, the video does not
+ * arrive in this response — it is transcoded and delivered as a push, so the
+ * button's job is to say the request was accepted and then stay out of the way.
+ */
+function ClipButton({ eventId }: { eventId: string }) {
+  const [requested, setRequested] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const request = async () => {
+    setBusy(true)
+    try {
+      await api.clip(eventId)
+      setRequested(true)
+      toast.success('Видео запрошено', {
+        description: 'Придёт уведомлением, когда будет готово',
+      })
+    } catch {
+      toast.error('Не удалось запросить видео')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Button
+      variant="secondary"
+      className="w-full"
+      disabled={busy || requested}
+      onClick={request}
+    >
+      {busy ? (
+        <LoaderCircle className="size-4 animate-spin" />
+      ) : (
+        <Video className="size-4" />
+      )}
+      {requested ? 'Видео запрошено' : 'Запросить видео'}
+    </Button>
+  )
+}
+
 function EventDetail({ entry }: { entry: FeedEntry }) {
   const { event, snapshotUrl, clipUrl } = entry
   const duration = event.endTime ? event.endTime - event.startTime : null
+
+  // Only worth offering once the event is over and the NVR says it has one.
+  const mayRequestClip =
+    !clipUrl && event.hasClip && event.endTime !== null && hasRole('USER')
 
   return (
     <>
@@ -120,6 +176,8 @@ function EventDetail({ entry }: { entry: FeedEntry }) {
           )}
         </AspectRatio>
       </Card>
+
+      {mayRequestClip && <ClipButton eventId={entry.eventId} />}
 
       <Card>
         <CardContent>

@@ -1,14 +1,16 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import type { CoreContext } from '../../context'
-import { subscriptionsRepo } from '../../db/repository'
-import { json, notFound, parseBody } from '../http'
+import { devicesRepo } from '../../db/repository'
+import { json, parseBody } from '../http'
 import { authBody } from '../schemas'
 
 /**
- * Binds a device to a recipient after it presents a valid one-time code.
- * v1 validates the code locally against `PWA_ACCESS_CODES`; an empty list
- * means the gate is off and every subscribed device is authorized on subscribe.
- * Wiring this to the server's `access_tokens` over RPC is a later step.
+ * Redeems an access code and authorizes this install.
+ *
+ * The code is checked by the domain, not here: `device.redeem` draws on the
+ * same pool `/user_sign` mints for the bot, so access is granted once rather
+ * than once per frontend, and the role that comes back is the real one the
+ * server will enforce on every later command.
  */
 export const authHandler = async (
   request: Request,
@@ -17,15 +19,37 @@ export const authHandler = async (
   const parsed = await parseBody(request, authBody)
   if (!parsed.ok) return parsed.response
 
-  const { endpoint, code } = parsed.data
+  const { deviceId, code, label } = parsed.data
 
-  if (!context.config.accessCodes.includes(code)) {
+  let reply: Awaited<ReturnType<typeof context.commandBus.send>>
+
+  try {
+    reply = await context.commandBus.send('device.redeem', { code, deviceId })
+  } catch (error) {
+    context.logger.warn('device.redeem did not answer', error)
+    return json({ ok: false, error: 'unavailable' }, { status: 503 })
+  }
+
+  if (!reply.ok) {
     return json({ ok: false, error: 'invalid code' }, { status: 401 })
   }
 
-  const subscription = subscriptionsRepo.findByEndpoint(context.db, endpoint)
-  if (!subscription) return notFound('subscription not found')
+  const { recipientUuid, role } = reply.data as {
+    recipientUuid: string
+    role: string
+  }
 
-  subscriptionsRepo.bindRecipient(context.db, endpoint, randomUUID())
-  return json({ ok: true, authorized: true })
+  // Stored as-is rather than hashed: unlike a password it is high-entropy and
+  // single-purpose, and revoking means deleting the row either way.
+  const token = randomBytes(32).toString('hex')
+
+  devicesRepo.authorize(context.db, {
+    deviceId,
+    token,
+    recipientUuid,
+    role,
+    label,
+  })
+
+  return json({ ok: true, token, role })
 }

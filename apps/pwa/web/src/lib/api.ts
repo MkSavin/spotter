@@ -1,4 +1,11 @@
-import type { FeedEntry, SubscriptionStatus } from './types'
+import { forget, token } from './session'
+import type {
+  CameraEntry,
+  FeedEntry,
+  Role,
+  ServiceStatus,
+  SubscriptionStatus,
+} from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -10,14 +17,25 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    headers: init?.body ? { 'content-type': 'application/json' } : undefined,
-    ...init,
-  })
+  const headers: Record<string, string> = {}
+  if (init?.body) headers['content-type'] = 'application/json'
+
+  const bearer = token()
+  if (bearer) headers.Authorization = `Bearer ${bearer}`
+
+  const response = await fetch(path, { ...init, headers })
+
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
+    // The grant is gone (revoked, or the service lost its database): drop it
+    // so the app asks for a code instead of retrying forever.
+    if (response.status === 401) forget()
+
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string
+    }
     throw new ApiError(response.status, body.error ?? response.statusText)
   }
+
   return response.json() as Promise<T>
 }
 
@@ -58,9 +76,29 @@ export const api = {
       body: JSON.stringify({ endpoint }),
     }),
 
-  authorize: (endpoint: string, code: string) =>
-    request<{ ok: boolean; authorized: boolean }>('/api/auth', {
+  authorize: (deviceId: string, code: string, label?: string) =>
+    request<{ ok: boolean; token: string; role: Role }>('/api/auth', {
       method: 'POST',
-      body: JSON.stringify({ endpoint, code }),
+      body: JSON.stringify({ deviceId, code, label }),
+    }),
+
+  cameras: () =>
+    request<{ cameras: CameraEntry[] }>('/api/cameras').then((r) => r.cameras),
+
+  status: () =>
+    request<{ services: ServiceStatus[] }>('/api/status').then(
+      (r) => r.services,
+    ),
+
+  snapshot: (camera: string) =>
+    request<{ ok: boolean }>('/api/snapshot', {
+      method: 'POST',
+      body: JSON.stringify({ camera }),
+    }),
+
+  clip: (eventId: string) =>
+    request<{ ok: boolean }>('/api/clip', {
+      method: 'POST',
+      body: JSON.stringify({ eventId }),
     }),
 }

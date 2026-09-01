@@ -1,5 +1,7 @@
 import type {
   CatalogCache,
+  CommandBus,
+  HeartbeatRegistry,
   RedisConnection,
   StreamProducer,
 } from '@spotter/transport'
@@ -21,6 +23,10 @@ export type CoreContext = {
   coalescer: PushCoalescer
   producer: StreamProducer
   subscriber: RedisConnection
+  /** Domain-mutating requests to server, awaiting a correlated reply. */
+  commandBus: CommandBus
+  /** Latest heartbeat per service, for the status screen. */
+  heartbeats: HeartbeatRegistry
 }
 
 /** Context handed to every stream controller (same shape as CoreContext). */

@@ -1,6 +1,8 @@
 import { desc, eq, sql } from 'drizzle-orm'
 import type { PwaDatabase } from './client'
 import {
+  type DeviceRow,
+  devices,
   notifiedEvents,
   type PushSubscriptionRow,
   pushSubscriptions,
@@ -9,6 +11,57 @@ import {
 } from './schema'
 
 export type PushKeys = { endpoint: string; p256dh: string; auth: string }
+
+export const devicesRepo = {
+  /** Records an authorized install, replacing any earlier grant for it. */
+  authorize: (
+    db: PwaDatabase,
+    input: {
+      deviceId: string
+      token: string
+      recipientUuid: string
+      role: string
+      label?: string | null
+    },
+  ): DeviceRow =>
+    db
+      .insert(devices)
+      .values(input)
+      .onConflictDoUpdate({
+        target: devices.deviceId,
+        set: {
+          token: input.token,
+          recipientUuid: input.recipientUuid,
+          role: input.role,
+          seenAt: new Date(),
+        },
+      })
+      .returning()
+      .get(),
+
+  findByToken: (db: PwaDatabase, token: string): DeviceRow | undefined =>
+    db.select().from(devices).where(eq(devices.token, token)).get(),
+
+  /** Applies a role change pushed by the domain. */
+  setRole: (db: PwaDatabase, recipientUuid: string, role: string): void => {
+    db.update(devices)
+      .set({ role })
+      .where(eq(devices.recipientUuid, recipientUuid))
+      .run()
+  },
+
+  /** Drops every install of a revoked recipient. */
+  revoke: (db: PwaDatabase, recipientUuid: string): void => {
+    db.delete(devices).where(eq(devices.recipientUuid, recipientUuid)).run()
+  },
+
+  touch: (db: PwaDatabase, deviceId: string): void => {
+    db.update(devices)
+      .set({ seenAt: new Date() })
+      .where(eq(devices.deviceId, deviceId))
+      .run()
+  },
+}
 
 export const subscriptionsRepo = {
   /** Upserts a device subscription by endpoint, returning the stored row. */

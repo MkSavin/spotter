@@ -4,13 +4,30 @@ import type { CoreContext } from '../context'
 import { createDatabase } from '../db/client'
 import { createServer } from './createServer'
 
+defaultLogger.disable()
+
+/** Stands in for the server: accepts one code, refuses everything else. */
+const commandBus = {
+  send: async (kind: string, args: Record<string, unknown>) => {
+    if (kind !== 'device.redeem') return { requestId: '1', ok: true }
+    return args.code === 'LETMEIN'
+      ? {
+          requestId: '1',
+          ok: true,
+          data: { recipientUuid: 'r-1', role: 'ADMIN' },
+        }
+      : { requestId: '1', ok: false, error: 'not-found' }
+  },
+}
+
+const published: Array<{ stream: string; payload: unknown }> = []
+
 const makeContext = (): CoreContext =>
   ({
     config: {
       port: 0,
       vapid: { publicKey: 'PUBKEY', privateKey: 'x', subject: 'mailto:a@b.c' },
       presignExpiry: 3600,
-      accessCodes: ['LETMEIN'],
       source: 'frigate',
       timezone: 'Europe/Moscow',
     },
@@ -18,11 +35,29 @@ const makeContext = (): CoreContext =>
     db: createDatabase(':memory:'),
     s3: { presign: (key: string) => `https://s3/${key}` },
     push: { send: async () => ({ ok: true }) },
+    commandBus,
+    catalog: { cameras: () => [{ code: 'front', label: '🎥 front' }] },
+    heartbeats: { all: () => [] },
+    producer: {
+      publish: async (stream: string, payload: unknown) => {
+        published.push({ stream, payload })
+        return '1-0'
+      },
+    },
   }) as unknown as CoreContext
 
 describe('createServer', () => {
   const server = createServer(makeContext())
   const base = server.url.href.replace(/\/$/, '')
+
+  /** Redeems the shared code and returns the bearer it hands back. */
+  const authorizeDevice = async (deviceId = 'device-1'): Promise<string> => {
+    const response = await fetch(`${base}/api/auth`, {
+      method: 'POST',
+      body: JSON.stringify({ deviceId, code: 'LETMEIN' }),
+    })
+    return ((await response.json()) as { token: string }).token
+  }
 
   afterAll(() => server.stop(true))
 
@@ -36,41 +71,91 @@ describe('createServer', () => {
     expect(await res.json()).toEqual({ publicKey: 'PUBKEY' })
   })
 
-  test('subscribe → auth → unauthorized code flow', async () => {
-    const subscription = {
-      endpoint: 'https://push.example/abc',
-      p256dh: 'p',
-      auth: 'a',
-    }
-
-    const sub = await fetch(`${base}/api/subscribe`, {
+  test('a rejected code yields no token', async () => {
+    const res = await fetch(`${base}/api/auth`, {
       method: 'POST',
-      body: JSON.stringify({ subscription, deviceLabel: 'phone' }),
-    })
-    expect(await sub.json()).toMatchObject({
-      endpoint: subscription.endpoint,
-      authorized: false,
+      body: JSON.stringify({ deviceId: 'device-x', code: 'nope' }),
     })
 
-    const bad = await fetch(`${base}/api/auth`, {
-      method: 'POST',
-      body: JSON.stringify({ endpoint: subscription.endpoint, code: 'nope' }),
-    })
-    expect(bad.status).toBe(401)
-
-    const good = await fetch(`${base}/api/auth`, {
-      method: 'POST',
-      body: JSON.stringify({
-        endpoint: subscription.endpoint,
-        code: 'LETMEIN',
-      }),
-    })
-    expect(await good.json()).toMatchObject({ authorized: true })
+    expect(res.status).toBe(401)
+    expect(await res.json()).not.toHaveProperty('token')
   })
 
-  test('GET /api/events returns an (empty) list', async () => {
-    const res = await fetch(`${base}/api/events`)
+  test('a redeemed code returns a bearer and the domain role', async () => {
+    const res = await fetch(`${base}/api/auth`, {
+      method: 'POST',
+      body: JSON.stringify({ deviceId: 'device-2', code: 'LETMEIN' }),
+    })
+
+    const body = (await res.json()) as { role: string; token: string }
+    expect(body.role).toBe('ADMIN')
+    expect(typeof body.token).toBe('string')
+  })
+
+  test('the feed requires a token', async () => {
+    // It carries snapshots of the house; an open endpoint would serve them to
+    // anyone who knows the URL.
+    expect((await fetch(`${base}/api/events`)).status).toBe(401)
+  })
+
+  test('the feed answers an authorized device', async () => {
+    const token = await authorizeDevice('device-feed')
+
+    const res = await fetch(`${base}/api/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
     expect(await res.json()).toEqual({ events: [] })
+  })
+
+  test('a forged token is refused', async () => {
+    const res = await fetch(`${base}/api/events`, {
+      headers: { Authorization: 'Bearer not-a-real-token' },
+    })
+    expect(res.status).toBe(401)
+  })
+
+  test('a snapshot request reaches the adapter', async () => {
+    const token = await authorizeDevice('device-snap')
+    published.length = 0
+
+    const res = await fetch(`${base}/api/snapshot`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ camera: 'front' }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(published[0]?.stream).toBe('spotter.camera.request.frigate')
+    expect(published[0]?.payload).toMatchObject({ camera: 'front' })
+  })
+
+  test('a snapshot of an unknown camera is refused before publishing', async () => {
+    const token = await authorizeDevice('device-snap2')
+    published.length = 0
+
+    const res = await fetch(`${base}/api/snapshot`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ camera: 'garden' }),
+    })
+
+    expect(res.status).toBe(404)
+    expect(published).toHaveLength(0)
+  })
+
+  test('cameras and status need a token too', async () => {
+    expect((await fetch(`${base}/api/cameras`)).status).toBe(401)
+    expect((await fetch(`${base}/api/status`)).status).toBe(401)
+
+    const token = await authorizeDevice('device-cam')
+    const res = await fetch(`${base}/api/cameras`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(((await res.json()) as { cameras: unknown[] }).cameras).toHaveLength(
+      1,
+    )
   })
 
   test('invalid body → 400', async () => {

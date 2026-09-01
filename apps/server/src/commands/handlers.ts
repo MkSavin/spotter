@@ -36,6 +36,40 @@ const fail = (error: string): Omit<CommandReply, 'requestId'> => ({
   error,
 })
 
+/**
+ * Redeems an access code for a PWA install. Same pool of `/user_sign` codes as
+ * the bot uses — access is granted once, not once per frontend — but the
+ * recipient is keyed by the device rather than a Telegram account, since a
+ * browser install has no `tgUserId`.
+ */
+export const deviceRedeemHandler: CommandHandler = async (args, context) => {
+  const { db } = context
+  const code = String(args.code ?? '').trim()
+  const deviceId = String(args.deviceId ?? '').trim()
+
+  if (!code || !deviceId) {
+    return fail('Missing required args: code, deviceId')
+  }
+
+  const token = tokensRepo.find(db, code)
+  if (!token) return fail('not-found')
+
+  // A code minted for a named Telegram user is not for a device: there is no
+  // username here to match it against.
+  if (token.username) return fail('username-mismatch')
+
+  const uuid = randomBytes(16).toString('hex')
+  const recipient = recipientsRepo.upsertByDeviceId(db, {
+    uuid,
+    deviceId,
+    role: token.role,
+  })
+
+  tokensRepo.consume(db, token.id)
+
+  return ok({ recipientUuid: recipient.uuid, role: recipient.role })
+}
+
 /** Redeems a single-use access code and upserts/returns the recipient. */
 export const loginRedeemHandler: CommandHandler = async (args, context) => {
   const { db } = context
@@ -235,6 +269,7 @@ export const eventClipHandler: CommandHandler = async (args, context) => {
 /** Registry mapping command kind → handler. */
 export const commandHandlers: Record<string, CommandHandler> = {
   'login.redeem': loginRedeemHandler,
+  'device.redeem': deviceRedeemHandler,
   'user.setRole': userSetRoleHandler,
   'user.revoke': userRevokeHandler,
   'user.sign': userSignHandler,
@@ -250,6 +285,7 @@ export const commandHandlers: Record<string, CommandHandler> = {
  */
 export const commandAccess: Record<string, CommandAccess> = {
   'login.redeem': 'anonymous',
+  'device.redeem': 'anonymous',
   'user.setRole': RoleEnum.ADMIN,
   'user.revoke': RoleEnum.ADMIN,
   'user.sign': RoleEnum.ADMIN,

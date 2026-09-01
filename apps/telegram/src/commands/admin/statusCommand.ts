@@ -1,6 +1,6 @@
+import type { ServiceStatus } from '@spotter/transport'
 import Bun from 'bun'
 import type { BotContext } from '../../context'
-import type { ServiceStatus } from '../../status/HeartbeatRegistry'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 const formatUptime = (seconds: number): string => {

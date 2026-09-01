@@ -1,4 +1,12 @@
-import { Monitor, Moon, Radar, Settings, Sun } from 'lucide-react'
+import {
+  Activity,
+  Monitor,
+  Moon,
+  Radar,
+  Settings,
+  Sun,
+  Video,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -35,6 +43,34 @@ export function Header({ status }: { status: Status }) {
         </Link>
 
         <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Камеры"
+                onClick={() => navigate('/cameras')}
+              >
+                <Video className="size-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Камеры</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Состояние сервисов"
+                onClick={() => navigate('/status')}
+              >
+                <Activity className="size-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Состояние сервисов</TooltipContent>
+          </Tooltip>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

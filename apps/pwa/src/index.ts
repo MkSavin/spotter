@@ -1,6 +1,8 @@
 import process from 'node:process'
 import {
   CatalogCache,
+  CommandBus,
+  HeartbeatRegistry,
   RedisConnection,
   type RegulatorHandle,
   StreamProducer,
@@ -36,6 +38,7 @@ const main = async (): Promise<void> => {
   })
 
   const catalog = new CatalogCache(applicationLogger.sub('catalog'))
+  const heartbeats = new HeartbeatRegistry(applicationLogger.sub('status'))
   const push = new PushGateway(config.vapid, applicationLogger.sub('push'))
   const coalescer = new PushCoalescer({
     db: database,
@@ -49,8 +52,20 @@ const main = async (): Promise<void> => {
     config.redis.maxLen,
   )
 
+  // Its own connection: the reply poller blocks on XREAD, and sharing the
+  // regulator's subscriber would stall event delivery behind every command.
+  const commandSubscriber = new RedisConnection(config.redis.url)
+
   await producer.connect()
   await subscriber.connect()
+  await commandSubscriber.connect()
+
+  const commandBus = new CommandBus(
+    producer,
+    commandSubscriber,
+    applicationLogger.sub('command'),
+  )
+  commandBus.start()
 
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'pwa',
@@ -81,6 +96,8 @@ const main = async (): Promise<void> => {
     coalescer,
     producer,
     subscriber,
+    commandBus,
+    heartbeats,
   }
 
   const shutdown = async (signal: NodeJS.Signals) => {
@@ -88,8 +105,10 @@ const main = async (): Promise<void> => {
     stopHeartbeat()
     stopLiveness()
     context.coalescer.stop()
+    commandBus.stop()
     await transport?.stop()
     server?.stop()
+    commandSubscriber.close()
     subscriber.close()
     producer.disconnect()
     database.$client.close()

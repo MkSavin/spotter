@@ -1,13 +1,13 @@
 import { randomBytes } from 'node:crypto'
+import type { Stenograph } from 'stenograph'
+import type { RedisConnection } from '../helpers/RedisConnection'
+import type { StreamProducer } from '../regulator/RedisRegulator'
 import {
   type CommandReply,
   type CommandRequest,
   deliveryStreams,
-  type RedisConnection,
-  type StreamProducer,
   safeParseCommandReply,
-} from '@spotter/transport'
-import type { Stenograph } from 'stenograph'
+} from '../schema/delivery'
 
 const COMMAND_TIMEOUT_MS = 30_000
 const POLL_BLOCK_MS = 2_000
@@ -20,13 +20,13 @@ export type CommandBusOptions = {
 }
 
 /**
- * Sends domain-mutating commands from telegram to server and awaits the
- * correlated reply on `spotter.command.reply`.
+ * Sends domain-mutating commands to server and awaits the correlated reply on
+ * `spotter.command.reply`.
  *
  * A single background reader loop polls the reply stream and dispatches
- * replies to waiting promise callbacks keyed by requestId. Telegram
- * instances that run concurrently each use their own `instanceId`, so they
- * can share the same reply stream without stealing each other's replies.
+ * replies to waiting promise callbacks keyed by requestId. Every frontend
+ * instance uses its own `instanceId`, so any number of them — telegram and pwa
+ * included — share one reply stream without stealing each other's replies.
  */
 export class CommandBus {
   private readonly instanceId: string

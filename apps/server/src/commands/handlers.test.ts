@@ -3,7 +3,11 @@ import type { ServerContext } from '../context'
 import { createDatabase, type ServerDatabase } from '../db/client'
 import { recipientsRepo, tokensRepo } from '../db/repository'
 import { applicationLogger } from '../log'
-import { loginRedeemHandler, userSignHandler } from './handlers'
+import {
+  deviceRedeemHandler,
+  loginRedeemHandler,
+  userSignHandler,
+} from './handlers'
 
 beforeAll(() => {
   applicationLogger.disable()
@@ -12,6 +16,85 @@ beforeAll(() => {
 // Minimal context: login.redeem and user.sign only touch db + logger.
 const makeContext = (db: ServerDatabase): ServerContext =>
   ({ db, logger: applicationLogger }) as unknown as ServerContext
+
+describe('deviceRedeemHandler', () => {
+  let db: ServerDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('missing args → fail', async () => {
+    expect((await deviceRedeemHandler({ code: 'x' }, makeContext(db))).ok).toBe(
+      false,
+    )
+    expect(
+      (await deviceRedeemHandler({ deviceId: 'd1' }, makeContext(db))).ok,
+    ).toBe(false)
+  })
+
+  test('unknown code → not-found', async () => {
+    expect(
+      await deviceRedeemHandler(
+        { code: 'nope', deviceId: 'd1' },
+        makeContext(db),
+      ),
+    ).toEqual({ ok: false, error: 'not-found' })
+  })
+
+  test('redeems a shared code and grants its role to the device', async () => {
+    // The same pool of codes the bot uses: access is granted once, not once
+    // per frontend.
+    tokensRepo.create(db, { id: 'code-d', role: 'USER' })
+
+    const reply = await deviceRedeemHandler(
+      { code: 'code-d', deviceId: 'device-1' },
+      makeContext(db),
+    )
+
+    expect(reply.ok).toBe(true)
+    expect((reply.data as { role: string }).role).toBe('USER')
+
+    // Single-use, exactly as for the bot.
+    expect(tokensRepo.find(db, 'code-d')).toBeUndefined()
+  })
+
+  test('re-redeeming on the same device keeps one recipient', async () => {
+    tokensRepo.create(db, { id: 'c1', role: 'VIEWER' })
+    tokensRepo.create(db, { id: 'c2', role: 'ADMIN' })
+
+    const first = await deviceRedeemHandler(
+      { code: 'c1', deviceId: 'device-1' },
+      makeContext(db),
+    )
+    const second = await deviceRedeemHandler(
+      { code: 'c2', deviceId: 'device-1' },
+      makeContext(db),
+    )
+
+    // Same recipient, upgraded role — not a second identity for one device.
+    expect((second.data as { recipientUuid: string }).recipientUuid).toBe(
+      (first.data as { recipientUuid: string }).recipientUuid,
+    )
+    expect((second.data as { role: string }).role).toBe('ADMIN')
+  })
+
+  test('refuses a code minted for a named Telegram user', async () => {
+    // There is no username on a device to match it against, so honouring it
+    // would hand a personal code to whoever typed it first.
+    tokensRepo.create(db, { id: 'c-named', role: 'ADMIN', username: 'alice' })
+
+    expect(
+      await deviceRedeemHandler(
+        { code: 'c-named', deviceId: 'device-1' },
+        makeContext(db),
+      ),
+    ).toEqual({ ok: false, error: 'username-mismatch' })
+
+    // And the code survives for its intended owner.
+    expect(tokensRepo.find(db, 'c-named')).toBeDefined()
+  })
+})
 
 describe('loginRedeemHandler', () => {
   let db: ServerDatabase

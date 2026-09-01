@@ -3,6 +3,8 @@ import type { ParseModeFlavor } from '@grammyjs/parse-mode'
 import type { RunnerHandle } from '@grammyjs/runner'
 import type {
   CatalogCache,
+  CommandBus,
+  HeartbeatRegistry,
   RedisConnection,
   StreamProducer,
 } from '@spotter/transport'
@@ -18,7 +20,6 @@ import type {
 import type { Message } from 'grammy/types'
 import type { Stenograph } from 'stenograph'
 import type { ClipTracker } from './clip/ClipTracker'
-import type { CommandBus } from './command/CommandBus'
 import type { Config } from './config'
 import type { TelegramDatabase } from './db/client'
 import type {
@@ -26,7 +27,6 @@ import type {
   InnoxiousMediaGroup,
 } from './extension/innoxious/InnoxiousMedia'
 import type { Session } from './session'
-import type { HeartbeatRegistry } from './status/HeartbeatRegistry'
 import type { RolloutWatcher } from './status/RolloutWatcher'
 
 type Methods<R extends RawApi> = string & keyof R

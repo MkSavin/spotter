@@ -4,6 +4,8 @@ import { hydrateReply } from '@grammyjs/parse-mode'
 import { run, sequentialize } from '@grammyjs/runner'
 import {
   CatalogCache,
+  CommandBus,
+  HeartbeatRegistry,
   probeRedisVersion,
   RedisConnection,
   type RegulatorHandle,
@@ -18,7 +20,6 @@ import { registerClipCallback } from './callback/clipCallback'
 import { ClipTracker } from './clip/ClipTracker'
 import { recoverClipWaits } from './clip/recoverClipWaits'
 import { renderClipState } from './clip/renderClipState'
-import { CommandBus } from './command/CommandBus'
 import { commandRegistry } from './commands/commandList'
 import {
   registerCommands,
@@ -41,7 +42,6 @@ import { timeout } from './helpers/timeout'
 import { applicationLogger } from './log'
 import { logging } from './middlewares/bot/logging'
 import type { GlobalSession, UserSession } from './session'
-import { HeartbeatRegistry } from './status/HeartbeatRegistry'
 import { notifyRollout } from './status/notifyRollout'
 import { RolloutWatcher } from './status/RolloutWatcher'
 import { telegramTransport } from './transport/telegramTransport'

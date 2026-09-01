@@ -23,7 +23,21 @@ export const testPushBody = z.object({
 export type TestPushBody = z.infer<typeof testPushBody>
 
 export const authBody = z.object({
-  endpoint: z.string().url(),
+  /** Stable per install; the client generates and keeps it. */
+  deviceId: z.string().min(8).max(128),
   code: z.string().min(1).max(64),
+  label: z.string().max(64).optional(),
 })
 export type AuthBody = z.infer<typeof authBody>
+
+/** Asks the adapter for a camera's latest frame. */
+export const snapshotBody = z.object({
+  camera: z.string().min(1).max(64),
+})
+export type SnapshotBody = z.infer<typeof snapshotBody>
+
+/** Asks for an event's clip to be fetched and transcoded. */
+export const clipBody = z.object({
+  eventId: z.string().min(1).max(128),
+})
+export type ClipBody = z.infer<typeof clipBody>

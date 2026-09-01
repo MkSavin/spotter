@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { HEARTBEAT_STALE_MS, type Heartbeat } from '@spotter/transport'
 import { Stenograph } from 'stenograph'
+import { HEARTBEAT_STALE_MS, type Heartbeat } from '../schema/heartbeat'
 import { HeartbeatRegistry } from './HeartbeatRegistry'
 
 // No transports: the registry only calls debug, and tests assert on state.

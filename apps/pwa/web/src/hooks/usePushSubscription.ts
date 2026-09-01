@@ -87,13 +87,5 @@ export function usePushSubscription() {
     }))
   }, [])
 
-  const authorize = useCallback(async (code: string) => {
-    const endpoint = await currentEndpoint()
-    if (!endpoint) throw new Error('device is not subscribed')
-    const result = await api.authorize(endpoint, code)
-    if (result.authorized) setState((s) => ({ ...s, authorized: true }))
-    return result
-  }, [])
-
-  return { ...state, refresh, subscribe, unsubscribe, authorize }
+  return { ...state, refresh, subscribe, unsubscribe }
 }

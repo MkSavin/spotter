@@ -1,22 +1,10 @@
 import { useState } from 'react'
-import {
-  ArrowLeft,
-  BellRing,
-  Check,
-  KeyRound,
-  Share,
-  Smartphone,
-} from 'lucide-react'
+import { ArrowLeft, BellRing, Check, Share, Smartphone } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from '@/components/ui/input-otp'
 import { usePush } from '@/hooks/pushContext'
 import { api } from '@/lib/api'
 import { currentEndpoint } from '@/lib/push'
@@ -67,7 +55,6 @@ function StepShell({
 
 export function SetupPage() {
   const push = usePush()
-  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
 
   const installed = push.standalone
@@ -86,20 +73,6 @@ export function SetupPage() {
       )
     } finally {
       setBusy(false)
-    }
-  }
-
-  const submitCode = async () => {
-    setBusy(true)
-    try {
-      const result = await push.authorize(code)
-      if (result.authorized) toast.success('Устройство авторизовано')
-      else toast.error('Неверный код')
-    } catch {
-      toast.error('Не удалось проверить код')
-    } finally {
-      setBusy(false)
-      setCode('')
     }
   }
 
@@ -187,43 +160,6 @@ export function SetupPage() {
         )}
       </StepShell>
 
-      <StepShell
-        index={3}
-        title="Авторизовать устройство"
-        icon={KeyRound}
-        done={push.authorized}
-        active={notificationsOn && !push.authorized}
-      >
-        {push.authorized ? (
-          <p className="text-success text-sm">Устройство авторизовано.</p>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-muted-foreground text-sm">
-              Введите код доступа, чтобы получать события.
-            </p>
-            <InputOTP
-              maxLength={6}
-              value={code}
-              onChange={setCode}
-              disabled={busy || !notificationsOn}
-            >
-              <InputOTPGroup>
-                {Array.from({ length: 6 }, (_, i) => (
-                  <InputOTPSlot key={i} index={i} />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
-            <Button
-              className="w-full"
-              disabled={busy || code.length < 6}
-              onClick={submitCode}
-            >
-              Подтвердить
-            </Button>
-          </div>
-        )}
-      </StepShell>
-
       {notificationsOn && (
         <Card>
           <CardHeader>
@@ -232,8 +168,8 @@ export function SetupPage() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Статус</span>
-              <Badge variant={push.authorized ? 'success' : 'warning'}>
-                {push.authorized ? 'Активно' : 'Ожидает кода'}
+              <Badge variant={push.subscribed ? 'success' : 'warning'}>
+                {push.subscribed ? 'Активно' : 'Уведомления выключены'}
               </Badge>
             </div>
             <Button

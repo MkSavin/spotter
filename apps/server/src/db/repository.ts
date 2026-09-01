@@ -60,6 +60,24 @@ export const recipientsRepo = {
       .returning()
       .get(),
 
+  upsertByDeviceId: (
+    db: ServerDatabase,
+    input: {
+      uuid: string
+      deviceId: string
+      role: Role
+    },
+  ): Recipient =>
+    db
+      .insert(recipients)
+      .values(input)
+      .onConflictDoUpdate({
+        target: recipients.deviceId,
+        set: { role: input.role },
+      })
+      .returning()
+      .get(),
+
   setRole: (
     db: ServerDatabase,
     uuid: string,

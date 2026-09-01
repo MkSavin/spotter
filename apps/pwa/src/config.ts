@@ -38,11 +38,6 @@ export type Config = {
   publicUrl: string
   /** Window that collapses a storm of events into one push notification. */
   coalesceMs: number
-  /**
-   * One-time device authorization codes (v1: local check). Empty disables the
-   * gate — any subscribed device receives pushes. See AGENTS.md.
-   */
-  accessCodes: string[]
 }
 
 export const resolveConfig = (): Config => {
@@ -71,7 +66,6 @@ export const resolveConfig = (): Config => {
     port: env.number('PORT', 3000),
     publicUrl: env.string('PUBLIC_URL', ''),
     coalesceMs: env.number('PWA_COALESCE_MS', 45000),
-    accessCodes: env.stringArray('PWA_ACCESS_CODES', []),
   }
 
   requireConfig({
