@@ -40,6 +40,23 @@ export const renderEventNotification = (
   }
 }
 
+/**
+ * A finished (or failed) timelapse. Deliberately not routed through the
+ * coalescer: that collapses a storm of events on one camera, and an export is
+ * a single deliberate request whose result should never be folded away.
+ */
+export const renderTimelapseNotification = (
+  camera: string,
+  outcome: { ready: true } | { ready: false; reason: string },
+): NotificationPayload => ({
+  title: outcome.ready ? `🎞 Таймлапс готов` : `🎞 Таймлапс не собран`,
+  body: outcome.ready ? camera : `${camera} · ${outcome.reason}`,
+  url: '/timelapses',
+  // One tag per camera: a later result replaces an earlier one on the device
+  // rather than stacking up.
+  tag: `timelapse:${camera}`,
+})
+
 /** Builds the collapsed payload when several events fire within one window. */
 export const renderBurstNotification = (
   camera: string,

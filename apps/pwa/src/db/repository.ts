@@ -97,13 +97,17 @@ export const timelapsesRepo = {
    * carries no span — only the camera and the reason — so there is nothing
    * finer to match on; in practice a camera has one export in flight.
    */
-  failRunning: (db: PwaDatabase, camera: string, reason: string): void => {
-    db.update(timelapses)
+  failRunning: (db: PwaDatabase, camera: string, reason: string): number => {
+    const settled = db
+      .update(timelapses)
       .set({ state: 'failed', reason })
       .where(
         and(eq(timelapses.camera, camera), eq(timelapses.state, 'running')),
       )
-      .run()
+      .returning()
+      .all()
+
+    return settled.length
   },
 
   list: (db: PwaDatabase, limit = 50): TimelapseRow[] =>

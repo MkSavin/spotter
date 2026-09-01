@@ -21,10 +21,27 @@ const deliver = (value: unknown) =>
 describe('timelapse controllers', () => {
   let db: PwaDatabase
   let context: TransportContext
+  let pushed: Array<{ title: string; body: string }>
 
   beforeEach(() => {
     db = createDatabase(':memory:')
-    context = { db, logger: defaultLogger } as unknown as TransportContext
+    pushed = []
+
+    db.$client.run(
+      "INSERT INTO push_subscriptions (endpoint, p256dh, auth) VALUES ('https://p/1','p','a')",
+    )
+
+    context = {
+      db,
+      logger: defaultLogger,
+      catalog: { cameraLabel: (_s: string, code: string) => `🎥 ${code}` },
+      push: {
+        send: async (_t: unknown, payload: { title: string; body: string }) => {
+          pushed.push(payload)
+          return { ok: true }
+        },
+      },
+    } as unknown as TransportContext
   })
 
   const startOne = () =>
@@ -115,6 +132,47 @@ describe('timelapse controllers', () => {
 
     // Already delivered: a later failure for the camera must not erase it.
     expect(timelapsesRepo.list(db)[0]?.state).toBe('ready')
+  })
+
+  test('a ready export notifies the device', async () => {
+    startOne()
+
+    await timelapseReadyController(
+      deliver({
+        source: 'frigate',
+        ...span,
+        speed: 'timelapse',
+        videoKey: 'staging/tl.mp4',
+      }),
+      context,
+    )
+
+    expect(pushed).toHaveLength(1)
+    expect(pushed[0].title).toContain('готов')
+    expect(pushed[0].body).toContain('front')
+  })
+
+  test('a failure notifies with a readable reason', async () => {
+    startOne()
+
+    await timelapseFailedController(
+      deliver({ source: 'frigate', camera: 'front', reason: 'empty' }),
+      context,
+    )
+
+    expect(pushed).toHaveLength(1)
+    expect(pushed[0].body).toContain('нет записей')
+  })
+
+  test('a failure nobody was waiting for pushes nothing', async () => {
+    // No running export for this camera: waking a device over it would be
+    // noise about work this instance never requested.
+    await timelapseFailedController(
+      deliver({ source: 'frigate', camera: 'side', reason: 'rejected' }),
+      context,
+    )
+
+    expect(pushed).toHaveLength(0)
   })
 
   test('garbage off the wire is ignored', async () => {
