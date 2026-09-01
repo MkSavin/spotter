@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7-labs
 
 # Debian, not alpine: alpine's ffmpeg is built without NVENC.
-FROM oven/bun:1.3.14-slim AS base
+FROM oven/bun:1.4.0-slim AS base
 
 ARG APP_RELATIVE_PATH
 ARG APP_PACKAGE_NAME
