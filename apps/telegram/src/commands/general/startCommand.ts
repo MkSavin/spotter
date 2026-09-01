@@ -7,6 +7,9 @@ class StartCommand extends SpotterCommand {
   readonly description = 'Начать работу с ботом'
   readonly access = 'all' as const
 
+  // Reads local state only; nothing reaches the NVR.
+  protected readonly throttled = false
+
   async handle(context: BotContext): Promise<void> {
     const payload =
       typeof context.match === 'string' ? context.match.trim() : ''

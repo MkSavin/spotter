@@ -12,6 +12,7 @@ import { sender } from '../../middlewares/command/sender'
 import type { CommandMiddleware } from '../../middlewares/types'
 import { argumentDialog } from './ArgumentDialog'
 import { type Access, accessDenial, canAccess } from './access'
+import { type CommandThrottle, throttleGuard } from './throttle'
 
 type Handler = CommandContext<BotContext>
 
@@ -34,6 +35,16 @@ export abstract class SpotterCommand {
 
   protected readonly requireSender: boolean = true
 
+  /**
+   * Whether repeat runs are rate-limited. Commands that only read local state
+   * (`/me`, `/status`) cost nothing and stay ungated; anything that reaches the
+   * NVR does not.
+   */
+  protected readonly throttled: boolean = true
+
+  /** Overrides the default cooldown for commands that cost the NVR more. */
+  protected readonly cooldownMs: number | undefined = undefined
+
   abstract handle(context: Handler, args: Record<string, string>): unknown
 
   get signature(): string {
@@ -54,8 +65,16 @@ export abstract class SpotterCommand {
     })
   }
 
-  middlewares(): Middleware<Handler>[] {
-    const chain: Middleware<Handler>[] = [accessGuard(this.access)]
+  middlewares(throttle?: CommandThrottle): Middleware<Handler>[] {
+    const chain: Middleware<Handler>[] = []
+
+    // Ahead of the access check: spamming a command you may not run should cost
+    // no more than spamming one you may.
+    if (throttle && this.throttled) {
+      chain.push(throttleGuard(throttle, this.name, this.cooldownMs))
+    }
+
+    chain.push(accessGuard(this.access))
 
     if (this.requireSender) {
       chain.push(sender('present'))
