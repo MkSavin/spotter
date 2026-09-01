@@ -1,5 +1,11 @@
 # @spotter/telegram
 
+## 1.7.1
+
+### Patch Changes
+
+- ce37f5e: Исправлена миграция `sent_at`: SQLite отвергает non-constant DEFAULT в `ALTER TABLE ADD COLUMN`, если в таблице уже есть строки
+
 ## 1.7.0
 
 ### Minor Changes
