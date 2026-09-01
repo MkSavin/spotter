@@ -1,6 +1,9 @@
-import { eventCode, type SpotterEvent } from '@spotter/transport'
+import {
+  eventCode,
+  renderEventTiming,
+  type SpotterEvent,
+} from '@spotter/transport'
 import type { CoreContext } from '../../context'
-import { renderEventTiming } from './renderEventTiming'
 
 /**
  * What the message should say about the event's picture.
