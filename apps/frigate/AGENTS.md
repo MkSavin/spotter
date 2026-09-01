@@ -55,6 +55,14 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 потеря `start` рвёт жизненный цикл — фронтенд не узнаёт message-id и шлёт событие заново на каждой
 следующей доставке (дубли в чате).
 
+### Reviews — вердикт NVR вместо порога score
+
+Адаптер слушает второй топик, `frigate/reviews` ([parseFrigateReview.ts](src/parsing/parseFrigateReview.ts)): Frigate сам делит активность на `alert` и `detection`, уже применив зоны, фильтры объектов и required-zone из своего конфига. Вердикт кладётся в необязательное поле `SpotterEvent.severity`, а решение, что с ним делать, принимает домен (`DELIVERY_POLICY`).
+
+Читать готовый вердикт лучше, чем выводить его заново из `score`: порог в нашем `.env` продублировал бы настройку и при этом ничего не знал бы о зонах, ради которых её и заводят.
+
+`events` и `reviews` — независимые топики без порядка между собой, и review обычно приходит чуть **позже** события. Поэтому [ReviewVerdicts](src/source/ReviewVerdicts.ts) держит вердикты с TTL 5 минут и работает в обе стороны: пришедший раньше штампует событие на выходе, пришедший позже достаётся следующему `update`/`end`. Этого достаточно, потому что уведомление, ради которого всё делается, отправляется на `end`.
+
 ## MediaProvider — доступ к медиа (держатель кредов)
 
 [src/media/FrigateMediaProvider.ts](src/media/FrigateMediaProvider.ts) реализует порт `MediaProvider`:

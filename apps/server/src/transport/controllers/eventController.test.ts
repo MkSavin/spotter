@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import { deliveryStreams, mediaStreams } from '@spotter/transport'
 import type { ServerContext } from '../../context'
 import { createDatabase, type ServerDatabase } from '../../db/client'
+import { eventsRepo } from '../../db/repository'
 import { applicationLogger } from '../../log'
 import { eventController } from './eventController'
 
@@ -11,11 +12,12 @@ beforeAll(() => {
 
 type Published = { stream: string; payload: unknown }
 
-const makeContext = (db: ServerDatabase) => {
+const makeContext = (db: ServerDatabase, policy: 'all' | 'alerts' = 'all') => {
   const published: Published[] = []
   const context = {
     db,
     logger: applicationLogger,
+    config: { delivery: { policy } },
     producer: {
       publish: async (stream: string, payload: unknown) => {
         published.push({ stream, payload })
@@ -111,5 +113,77 @@ describe('eventController media request', () => {
     expect(published.map((entry) => entry.stream)).toContain(
       mediaStreams.mediaRequest('frigate-home'),
     )
+  })
+})
+
+describe('delivery policy', () => {
+  let db: ServerDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('alerts-only drops what the NVR called a detection', async () => {
+    const { context, published } = makeContext(db, 'alerts')
+    await eventController(
+      message(frigateEvent({ severity: 'detection' })),
+      context,
+    )
+
+    expect(published).toHaveLength(0)
+  })
+
+  test('a filtered event is still persisted', async () => {
+    const { context } = makeContext(db, 'alerts')
+    const event = frigateEvent({ severity: 'detection' })
+    await eventController(message(event), context)
+
+    // The feed and /event_info must still find it: the policy governs
+    // delivery, not history.
+    expect(eventsRepo.find(db, event.id as string)).toBeDefined()
+  })
+
+  test('a filtered event does not make the NVR fetch a snapshot', async () => {
+    const { context, published } = makeContext(db, 'alerts')
+    await eventController(
+      message(frigateEvent({ severity: 'detection' })),
+      context,
+    )
+
+    expect(
+      published.some((p) => p.stream.startsWith('spotter.media.request')),
+    ).toBe(false)
+  })
+
+  test('an alert is delivered as usual', async () => {
+    const { context, published } = makeContext(db, 'alerts')
+    await eventController(message(frigateEvent({ severity: 'alert' })), context)
+
+    expect(
+      published.some((p) => p.stream === deliveryStreams.deliveryEvent),
+    ).toBe(true)
+  })
+
+  test('an unclassified event survives alerts-only', async () => {
+    // Frigate's review may simply not have landed yet; going quiet would be
+    // worse than one extra notification.
+    const { context, published } = makeContext(db, 'alerts')
+    await eventController(message(frigateEvent()), context)
+
+    expect(
+      published.some((p) => p.stream === deliveryStreams.deliveryEvent),
+    ).toBe(true)
+  })
+
+  test('the default policy delivers detections too', async () => {
+    const { context, published } = makeContext(db, 'all')
+    await eventController(
+      message(frigateEvent({ severity: 'detection' })),
+      context,
+    )
+
+    expect(
+      published.some((p) => p.stream === deliveryStreams.deliveryEvent),
+    ).toBe(true)
   })
 })

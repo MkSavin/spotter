@@ -6,6 +6,7 @@ import {
   resolveRedisConfig,
 } from '@spotter/transport'
 import information from '../package.json'
+import type { DeliveryPolicy } from './delivery/shouldDeliver'
 import { applicationLogger } from './log'
 
 export type S3Config = {
@@ -26,6 +27,10 @@ export type Config = {
   retention: {
     /** How long persisted events are kept before retention drops them. */
     eventDays: number
+  }
+  delivery: {
+    /** `all` — every event; `alerts` — only what the NVR flagged as an alert. */
+    policy: DeliveryPolicy
   }
   auth: {
     /** How long a minted access code stays redeemable. */
@@ -51,6 +56,9 @@ export const resolveConfig = (): Config => {
     source: env.string('SOURCE_ID', 'frigate'),
     retention: {
       eventDays: env.number('EVENT_RETENTION_DAYS', 30),
+    },
+    delivery: {
+      policy: env.enum('DELIVERY_POLICY', ['all', 'alerts'] as const, 'all'),
     },
     auth: {
       codeTtlMs: env.number('ACCESS_CODE_TTL_HOURS', 24) * 60 * 60 * 1000,

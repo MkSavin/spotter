@@ -59,6 +59,16 @@ spotter.event.media_processed ──▶ eventMediaController
   `delivery.event`; presign делает telegram. И snapshot, и clip приходят отдельными
   `media_processed` → отдельными `delivery.event (media)`.
 
+### Политика доставки и retention
+
+`DELIVERY_POLICY` (`all` по умолчанию, `alerts`) решает, что доходит до получателей. В режиме `alerts` домен пропускает события, которым NVR присвоил `severity: 'detection'` ([shouldDeliver.ts](src/delivery/shouldDeliver.ts)). Три свойства этого фильтра важнее самого условия:
+
+- **Событие всё равно персистится** — фильтруется доставка, а не история: `/event_info` и лента находят его как обычно.
+- **Отфильтрованное событие не дёргает NVR** за снапшотом: незачем гонять камеру ради кадра, который никто не увидит.
+- **Событие без `severity` доставляется всегда.** Адаптер без reviews (или review, который ещё не доехал) не должен молча включать тишину.
+
+`events` подрезается по возрасту (`EVENT_RETENTION_DAYS`, 30 дней) — таблица иначе растёт без предела, а SQLite лежит на одном диске с записями NVR. Просроченные коды доступа чистятся тем же планировщиком.
+
 ## Команды (RPC)
 
 [commandController.ts](src/transport/controllers/commandController.ts) принимает

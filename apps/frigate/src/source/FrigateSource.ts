@@ -3,7 +3,9 @@ import { bufferToJson } from '@spotter/transport'
 import { connectAsync as mqttConnectAsync } from 'mqtt'
 import type { CoreConfig } from '../config'
 import { parseFrigateEvent } from '../parsing/parseFrigateEvent'
+import { parseFrigateReview } from '../parsing/parseFrigateReview'
 import { MqttRegulator } from '../regulators/MqttRegulator'
+import { ReviewVerdicts } from './ReviewVerdicts'
 
 /**
  * Ingests Frigate events over MQTT (`frigate/events`), normalizes them via
@@ -18,6 +20,7 @@ export class FrigateSource extends Source<CoreConfig> {
 
   async run(emit: EventSink): Promise<SourceHandle> {
     const logger = this.logger.sub('source', this.code)
+    const verdicts = new ReviewVerdicts()
 
     const mqtt = await mqttConnectAsync(this.config.source.frigate.broker, {
       connectTimeout: 15 * 1000,
@@ -33,13 +36,25 @@ export class FrigateSource extends Source<CoreConfig> {
 
         try {
           const event = parseFrigateEvent(value)
-          await emit(event)
+          // Frigate's own verdict when it has already reached us; consumers
+          // decide what an `alert` is worth versus a `detection`.
+          const severity = verdicts.severityOf(event.id)
+          await emit(severity ? { ...event, severity } : event)
           logger.sub(topic, event.id).debug('Event emitted')
         } catch (error) {
           // Frigate regularly sends incomplete/buggy events — skip, don't crash.
           logger.warn(error)
           logger.verbose('Event data:', value)
         }
+      })
+      .on('frigate/reviews', async ({ contents }) => {
+        const value = bufferToJson(contents)
+        if (!value) return
+
+        const review = parseFrigateReview(value)
+        if (!review) return
+
+        verdicts.record(review.eventIds, review.severity)
       })
       .run({ mqtt })
 
