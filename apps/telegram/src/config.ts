@@ -27,6 +27,10 @@ export type Config = {
   s3: S3Config
   source: string
   presignExpiry: number
+  retention: {
+    /** How long an event's message links are kept before retention drops them. */
+    messageDays: number
+  }
 }
 
 export const resolveConfig = (): Config => {
@@ -50,6 +54,9 @@ export const resolveConfig = (): Config => {
     },
     source: env.string('SOURCE_ID', 'frigate'),
     presignExpiry: env.number('S3_PRESIGN_EXPIRY', 3600),
+    retention: {
+      messageDays: env.number('MESSAGE_RETENTION_DAYS', 30),
+    },
   }
 
   requireConfig({

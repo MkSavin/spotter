@@ -112,3 +112,32 @@ describe('server db repository', () => {
     expect(eventsRepo.count(db)).toBe(0)
   })
 })
+
+describe('event retention', () => {
+  let db: ServerDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('drops events that started before the cutoff', () => {
+    const nowSeconds = Date.now() / 1000
+    eventsRepo.upsert(
+      db,
+      makeEvent({ id: 'old', startTime: nowSeconds - 40 * 24 * 60 * 60 }),
+    )
+    eventsRepo.upsert(db, makeEvent({ id: 'recent', startTime: nowSeconds }))
+
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    expect(eventsRepo.prune(db, cutoff)).toBe(1)
+    expect(eventsRepo.find(db, 'recent')).toBeDefined()
+    expect(eventsRepo.find(db, 'old')).toBeUndefined()
+  })
+
+  test('a sweep with nothing to drop is a no-op', () => {
+    eventsRepo.upsert(db, makeEvent({ id: 'recent' }))
+    const cutoff = new Date(0)
+    expect(eventsRepo.prune(db, cutoff)).toBe(0)
+    expect(eventsRepo.count(db)).toBe(1)
+  })
+})

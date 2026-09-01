@@ -3,7 +3,7 @@ import {
   normalizeUsername,
   type SpotterEvent,
 } from '@spotter/transport'
-import { count, eq, like } from 'drizzle-orm'
+import { count, eq, like, lt } from 'drizzle-orm'
 import type { ServerDatabase } from './client'
 import {
   type AccessToken,
@@ -126,6 +126,14 @@ export const tokensRepo = {
 
   consume: (db: ServerDatabase, id: string): AccessToken | undefined =>
     db.delete(accessTokens).where(eq(accessTokens.id, id)).returning().get(),
+
+  /** Drops codes nobody redeemed in time, so the table cannot grow unbounded. */
+  prune: (db: ServerDatabase, cutoff: Date): number =>
+    db
+      .delete(accessTokens)
+      .where(lt(accessTokens.createdAt, cutoff))
+      .returning({ id: accessTokens.id })
+      .all().length,
 }
 
 export const eventsRepo = {
@@ -170,4 +178,16 @@ export const eventsRepo = {
 
   clear: (db: ServerDatabase): number =>
     db.delete(events).returning({ id: events.id }).all().length,
+
+  /**
+   * Drops events that started before `cutoff`. Keyed on `start_time` (unix
+   * seconds, straight from the NVR) rather than an insertion stamp: the age
+   * that matters is the event's own, and it needs no extra column.
+   */
+  prune: (db: ServerDatabase, cutoff: Date): number =>
+    db
+      .delete(events)
+      .where(lt(events.startTime, cutoff.getTime() / 1000))
+      .returning({ id: events.id })
+      .all().length,
 }

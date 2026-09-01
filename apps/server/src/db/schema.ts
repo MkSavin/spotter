@@ -1,10 +1,16 @@
-import { ROLES } from '@spotter/transport'
+// Deep import, not the barrel: drizzle-kit runs under Node and the barrel
+// pulls in Bun-only modules.
+import { ROLES } from '@spotter/transport/src/schema/role'
 import { type InferSelectModel, sql } from 'drizzle-orm'
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // The role vocabulary belongs to the contract, not to this database; re-exported
 // so table definitions and their consumers share one import.
-export { ROLE_RANK, ROLES, Role } from '@spotter/transport'
+export {
+  ROLE_RANK,
+  ROLES,
+  Role,
+} from '@spotter/transport/src/schema/role'
 
 const authorizedAt = integer('authorized_at', { mode: 'timestamp_ms' })
   .notNull()

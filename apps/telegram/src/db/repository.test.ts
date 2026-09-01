@@ -120,3 +120,24 @@ describe('telegram db repository', () => {
     expect(eventMessagesRepo.count(db, 'event-2')).toBe(1)
   })
 })
+
+describe('event message retention', () => {
+  let db: TelegramDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('drops links older than the cutoff', () => {
+    eventMessagesRepo.record(db, 'old', [{ id: 1, chatId: 'c1' }])
+    db.$client
+      .query('UPDATE event_messages SET sent_at = ? WHERE event_id = ?')
+      .run(Date.now() - 40 * 24 * 60 * 60 * 1000, 'old')
+    eventMessagesRepo.record(db, 'recent', [{ id: 2, chatId: 'c1' }])
+
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    expect(eventMessagesRepo.prune(db, cutoff)).toBe(1)
+    expect(eventMessagesRepo.count(db, 'recent')).toBe(1)
+    expect(eventMessagesRepo.count(db, 'old')).toBe(0)
+  })
+})

@@ -2,18 +2,21 @@ import process from 'node:process'
 import {
   CatalogCache,
   CommandBus,
+  DEDUP_RETENTION_MS,
   HeartbeatRegistry,
   RedisConnection,
   type RegulatorHandle,
   StreamProducer,
   startHeartbeat,
   startLiveness,
+  startRetention,
 } from '@spotter/transport'
 import { S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
 import { createDatabase, type PwaDatabase } from './db/client'
+import { notifiedEventsRepo } from './db/repository'
 import { applicationLogger } from './log'
 import { PushCoalescer } from './push/Coalescer'
 import { PushGateway } from './push/PushGateway'
@@ -81,6 +84,13 @@ const main = async (): Promise<void> => {
     },
   })
 
+  const stopRetention = startRetention({
+    label: 'dedup ledger',
+    retentionMs: DEDUP_RETENTION_MS,
+    prune: (cutoff) => notifiedEventsRepo.prune(database, cutoff),
+    logger: applicationLogger,
+  })
+
   await catalog.bootstrap(config.source, producer)
 
   let transport: RegulatorHandle | null = null
@@ -104,6 +114,7 @@ const main = async (): Promise<void> => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat()
     stopLiveness()
+    stopRetention()
     context.coalescer.stop()
     commandBus.stop()
     await transport?.stop()

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, lt, sql } from 'drizzle-orm'
 import type { PwaDatabase } from './client'
 import {
   type DeviceRow,
@@ -236,6 +236,17 @@ export const notifiedEventsRepo = {
   release: (db: PwaDatabase, eventId: string): void => {
     db.delete(notifiedEvents).where(eq(notifiedEvents.eventId, eventId)).run()
   },
+
+  /**
+   * Drops ledger rows past the dedup window. The ledger only has to outlive a
+   * redelivery, which reclaim bounds to minutes — anything older is dead weight.
+   */
+  prune: (db: PwaDatabase, cutoff: Date): number =>
+    db
+      .delete(notifiedEvents)
+      .where(lt(notifiedEvents.notifiedAt, cutoff))
+      .returning({ eventId: notifiedEvents.eventId })
+      .all().length,
 }
 
 export const recentEventsRepo = {

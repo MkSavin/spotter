@@ -59,3 +59,26 @@ describe('pwa db repository', () => {
     expect(rows.map((r) => r.eventId)).not.toContain('evt-0')
   })
 })
+
+describe('pwa dedup ledger retention', () => {
+  let db: PwaDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('drops claims past the dedup window', () => {
+    notifiedEventsRepo.claim(db, 'old')
+    db.$client
+      .query('UPDATE notified_events SET notified_at = ? WHERE event_id = ?')
+      .run(Date.now() - 10 * 24 * 60 * 60 * 1000, 'old')
+    notifiedEventsRepo.claim(db, 'recent')
+
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    expect(notifiedEventsRepo.prune(db, cutoff)).toBe(1)
+
+    // The recent claim still blocks a redelivery; the pruned one no longer does.
+    expect(notifiedEventsRepo.claim(db, 'recent')).toBe(false)
+    expect(notifiedEventsRepo.claim(db, 'old')).toBe(true)
+  })
+})

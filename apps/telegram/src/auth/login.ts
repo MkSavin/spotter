@@ -35,11 +35,11 @@ export const loginWithCode = async (
 
   if (!reply.ok) {
     const reason = reply.error
-    await context.reply(
-      reason === 'username-mismatch'
-        ? 'Этот код доступа предназначен другому пользователю'
-        : 'Неверный код доступа',
-    )
+    const denial: Record<string, string> = {
+      'username-mismatch': 'Этот код доступа предназначен другому пользователю',
+      expired: 'Срок действия кода истёк — попросите администратора новый',
+    }
+    await context.reply((reason && denial[reason]) ?? 'Неверный код доступа')
     logger.sub(tgUserId).debug(`Failed to redeem access code (${reason})`)
     return
   }

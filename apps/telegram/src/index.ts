@@ -12,6 +12,7 @@ import {
   StreamProducer,
   startHeartbeat,
   startLiveness,
+  startRetention,
 } from '@spotter/transport'
 import { S3Client } from 'bun'
 import { Bot, session } from 'grammy'
@@ -33,6 +34,7 @@ import { createDatabase, type TelegramDatabase } from './db/client'
 import {
   clipWaitsRepo,
   dialogStatesRepo,
+  eventMessagesRepo,
   tgBindingsRepo,
 } from './db/repository'
 import { DIALOG_TTL_MS } from './dialog/Dialog'
@@ -194,6 +196,20 @@ const polling = async (): Promise<void> => {
     },
   })
 
+  const stopDialogRetention = startRetention({
+    label: 'stale dialog',
+    retentionMs: DIALOG_TTL_MS,
+    prune: (cutoff) => dialogStatesRepo.prune(database, cutoff),
+    logger: applicationLogger,
+  })
+
+  const stopMessageRetention = startRetention({
+    label: 'event message',
+    retentionMs: config.retention.messageDays * 24 * 60 * 60 * 1000,
+    prune: (cutoff) => eventMessagesRepo.prune(database, cutoff),
+    logger: applicationLogger,
+  })
+
   await catalog.bootstrap(config.source, producer)
 
   const commandBus = new CommandBus(
@@ -227,6 +243,8 @@ const polling = async (): Promise<void> => {
     }
     stopHeartbeat()
     stopLiveness()
+    stopDialogRetention()
+    stopMessageRetention()
     rollouts.stop()
     clips.stop()
     commandBus.stop()
@@ -242,13 +260,6 @@ const polling = async (): Promise<void> => {
   process.on('SIGTERM', shutdown)
 
   bot = await initialize(coreContext)
-
-  // Abandoned wizards would otherwise sit in the table forever.
-  const pruned = dialogStatesRepo.prune(
-    database,
-    new Date(Date.now() - DIALOG_TTL_MS),
-  )
-  if (pruned > 0) applicationLogger.debug(`Pruned ${pruned} stale dialog(s)`)
 
   const dialogs = new DialogRegistry()
   for (const command of commandRegistry) {

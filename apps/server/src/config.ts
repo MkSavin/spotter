@@ -23,6 +23,14 @@ export type Config = {
   s3: S3Config
   /** Default source id for catalog bootstrapping and camera commands. */
   source: string
+  retention: {
+    /** How long persisted events are kept before retention drops them. */
+    eventDays: number
+  }
+  auth: {
+    /** How long a minted access code stays redeemable. */
+    codeTtlMs: number
+  }
 }
 
 export const resolveConfig = (): Config => {
@@ -41,6 +49,12 @@ export const resolveConfig = (): Config => {
       bucket: env.string('S3_BUCKET', 'spotter'),
     },
     source: env.string('SOURCE_ID', 'frigate'),
+    retention: {
+      eventDays: env.number('EVENT_RETENTION_DAYS', 30),
+    },
+    auth: {
+      codeTtlMs: env.number('ACCESS_CODE_TTL_HOURS', 24) * 60 * 60 * 1000,
+    },
   }
 
   requireConfig({
