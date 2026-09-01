@@ -28,25 +28,19 @@ export type FakeS3 = {
 /**
  * A real 8x8 JPEG. Zero-filled bytes are not an image, and the transcoder
  * rightly refuses them — which would make every media test fail for a reason
- * that has nothing to do with the pipeline.
+ * that has nothing to do with the pipeline. Embedded rather than generated:
+ * `Bun.Image` decodes, it does not synthesise, and the harness should not need
+ * an encoder just to hand the pipeline a valid frame.
  */
+const IMAGE_8X8_JPEG =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD5Z+0Tf89pP++jRRRXT9dxH/PyX3sXKux//9k='
+
 let cachedImage: ArrayBuffer | null = null
 
 const imageBytes = async (): Promise<ArrayBuffer> => {
   if (cachedImage) return cachedImage
 
-  const sharp = (await import('sharp')).default
-  const buffer = await sharp({
-    create: {
-      width: 8,
-      height: 8,
-      channels: 3,
-      background: { r: 20, g: 40, b: 60 },
-    },
-  })
-    .jpeg()
-    .toBuffer()
-
+  const buffer = Buffer.from(IMAGE_8X8_JPEG, 'base64')
   cachedImage = buffer.buffer.slice(
     buffer.byteOffset,
     buffer.byteOffset + buffer.byteLength,

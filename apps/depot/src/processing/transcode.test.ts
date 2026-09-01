@@ -1,10 +1,19 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import type { BunFile } from 'bun'
+import { defaultLogger } from 'stenograph'
+import type { ImageConfig } from '../config'
 import {
   resolveVideoPreset,
   shouldRetryOnCpu,
   TranscodeError,
   toProgressStep,
+  transcodeImage,
 } from './transcode'
+
+defaultLogger.disable()
 
 describe('toProgressStep', () => {
   test('rounds down to tens', () => {
@@ -106,5 +115,95 @@ describe('resolveVideoPreset', () => {
 
     expect(preset.outputParameters).toContain('-preset:v ultrafast')
     expect(preset.outputParameters).toContain('-c:v libx264')
+  })
+})
+
+describe('transcodeImage', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'spotter-transcode-'))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  // A 2x2 PNG: small enough to inline, and a format change proves conversion
+  // actually ran rather than the bytes being copied through.
+  const PNG_2X2 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGP8z4APMOGVHVbSAEZ8ARGYtus0AAAAAElFTkSuQmCC'
+
+  const write = async (name: string) => {
+    const file = Bun.file(path.join(dir, name))
+    await file.write(Buffer.from(PNG_2X2, 'base64'))
+    return file
+  }
+
+  const config = (over: Partial<ImageConfig> = {}): ImageConfig =>
+    ({ quality: 'normal', skipConversion: false, ...over }) as ImageConfig
+
+  test('converts a source image to jpeg', async () => {
+    const raw = await write('convert-raw.png')
+    const processed = Bun.file(path.join(dir, 'convert-out.jpg'))
+
+    await transcodeImage(raw, processed, config(), defaultLogger)
+
+    expect(await processed.exists()).toBe(true)
+    const meta = await Bun.file(processed.name as string)
+      .image()
+      .metadata()
+    expect(meta.format).toBe('jpeg')
+    expect(meta.width).toBe(2)
+    expect(meta.height).toBe(2)
+  })
+
+  test('copies the source untouched when conversion is skipped', async () => {
+    const raw = await write('skip-raw.png')
+    const processed = Bun.file(path.join(dir, 'skip-out.png'))
+
+    await transcodeImage(
+      raw,
+      processed,
+      config({ skipConversion: true }),
+      defaultLogger,
+    )
+
+    // Still a PNG: the flag has to bypass the encoder entirely.
+    const meta = await Bun.file(processed.name as string)
+      .image()
+      .metadata()
+    expect(meta.format).toBe('png')
+    expect(await processed.bytes()).toEqual(await raw.bytes())
+  })
+
+  test('a lower quality setting yields a smaller file', async () => {
+    const raw = await write('quality-raw.png')
+    const best = Bun.file(path.join(dir, 'quality-best.jpg'))
+    const awful = Bun.file(path.join(dir, 'quality-awful.jpg'))
+
+    await transcodeImage(raw, best, config({ quality: 'best' }), defaultLogger)
+    await transcodeImage(
+      raw,
+      awful,
+      config({ quality: 'awful' }),
+      defaultLogger,
+    )
+
+    expect(awful.size).toBeLessThan(best.size)
+  })
+
+  test('rejects when the file paths are not assigned', async () => {
+    const raw = await write('unassigned-raw.png')
+    // An in-memory blob carries no path for the encoder to write to.
+    const detached = new Blob([]) as unknown as BunFile
+    expect(
+      transcodeImage(raw, detached, config(), defaultLogger),
+    ).rejects.toThrow('Image files is not assigned correctly')
+  })
+
+  test('rejects on a source that is not an image', async () => {
+    const raw = Bun.file(path.join(dir, 'broken-raw.jpg'))
+    await raw.write('<html>404 not found</html>')
+    const processed = Bun.file(path.join(dir, 'broken-out.jpg'))
+
+    // Cameras do hand back error pages; the failure has to surface, not pass
+    // a corrupt file downstream.
+    expect(
+      transcodeImage(raw, processed, config(), defaultLogger),
+    ).rejects.toThrow()
   })
 })

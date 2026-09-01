@@ -1,6 +1,5 @@
 import type { BunFile } from 'bun'
 import ffmpeg from 'fluent-ffmpeg'
-import sharp from 'sharp'
 import type { Stenograph } from 'stenograph'
 import type { ImageConfig, VideoConfig } from '../config'
 
@@ -361,17 +360,23 @@ export const transcodeImage = async (
     return
   }
 
-  const output = await sharp(rawPath)
-    .jpeg({ quality: resolveImageQuality(image.quality) })
-    .toFile(processedPath)
+  const source = Bun.file(rawPath).image()
+  // Dimensions come from the source: conversion never resizes, and reading
+  // them back off disk would cost a second decode.
+  const { width, height } = await source.metadata()
+
+  // Progressive encoding is what keeps the output on par with libvips: Bun has
+  // no `optimiseCoding` knob, and without it the same quality lands ~18%
+  // heavier.
+  const encoded = await source
+    .jpeg({ quality: resolveImageQuality(image.quality), progressive: true })
+    .bytes()
+
+  await processed.write(encoded)
 
   logger.verbose('Processed image parameters', {
-    format: output.format,
-    processed: {
-      size: output.size,
-      width: output.width,
-      height: output.height,
-    },
+    format: 'jpeg',
+    processed: { size: encoded.length, width, height },
     original: { size: raw.size },
   })
 }
