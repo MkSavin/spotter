@@ -6,6 +6,9 @@ import { logoutCommand } from './auth/logoutCommand'
 import { meCommand } from './auth/meCommand'
 import type { SpotterCommand } from './framework/SpotterCommand'
 import { startCommand } from './general/startCommand'
+import { muteCommand } from './notify/muteCommand'
+import { nvrSuspendCommand } from './notify/nvrSuspendCommand'
+import { unmuteCommand } from './notify/unmuteCommand'
 import { cameraListCommand } from './nvr/cameraListCommand'
 import { cameraSnapshotCommand } from './nvr/cameraSnapshotCommand'
 import { timelapseCommand } from './nvr/timelapseCommand'
@@ -24,6 +27,9 @@ export const commandRegistry: SpotterCommand[] = [
   cameraListCommand,
   cameraSnapshotCommand,
   timelapseCommand,
+  muteCommand,
+  unmuteCommand,
+  nvrSuspendCommand,
   userSignCommand,
   userRevokeCommand,
   userPromoteCommand,

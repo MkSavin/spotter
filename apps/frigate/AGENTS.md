@@ -74,6 +74,14 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 
 Опрос и стейджинг ведёт `TimelapseTracker` в `@spotter/sink`, а не контроллер: экспорт суток идёт дольше `REDIS_RECLAIM_MIN_IDLE_MS` (5 мин), и удержание записи в PEL привело бы к повторной выдаче и второму экспорту того же интервала. Запущенные экспорты пишутся в `TIMELAPSE_STATE_PATH` (том `frigate-state`) и подхватываются при старте — иначе рестарт оставил бы NVR кодировать файл, которого никто не ждёт.
 
+## NotificationSuspender — тишина на стороне NVR
+
+[FrigateNotificationSuspender](src/notifications/FrigateNotificationSuspender.ts) реализует опциональный порт `NotificationSuspender` поверх MQTT: минуты публикуются в `frigate/<camera>/notifications/suspend`, `all` бьёт по глобальному `frigate/notifications/suspend`. Снятие делается не отдельным топиком, а публикацией `ON` в `notifications/set` — своего «unsuspend» у Frigate нет.
+
+Соединение открывается **лениво, при первом обращении**, и дальше переиспользуется: приглушают редко, и постоянный второй коннект рядом с сокетом источника окупался бы только там, где команду не вызывают вовсе. Ошибки не глушатся — проброс наружу оставляет запись в PEL, и reaper повторит; suspend, не доехавший до брокера, обязан повториться.
+
+Это **не** то же, что `/mute` в боте: тот глушит один чат и живёт в telegram. Здесь замолкает сам NVR — для всех каналов и получателей сразу.
+
 ## Catalog — таксономия
 
 [src/catalog/FrigateCatalog.ts](src/catalog/FrigateCatalog.ts) реализует порт `Catalog`: тянет

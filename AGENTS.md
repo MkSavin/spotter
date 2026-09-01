@@ -67,6 +67,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | `spotter.camera.request.<source>` | telegram, pwa | frigate | Запрос кадра камеры |
 | `spotter.camera.staged` | frigate | depot | Кадр застейджен |
 | `spotter.camera.frame_processed` | depot | telegram, pwa | Ключ обработанного кадра |
+| `spotter.notifications.suspend.<source>` | telegram | frigate | Приглушить уведомления самого NVR |
 | `spotter.timelapse.request.<source>` | telegram, pwa | frigate | Запрос экспорта таймлапса |
 | `spotter.timelapse.ready` | frigate | telegram, pwa | Экспорт готов, ключ в S3 |
 | `spotter.timelapse.failed` | frigate | telegram, pwa | Экспорт не состоится, с причиной |
@@ -246,4 +247,4 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - [apps/frigate/AGENTS.md](apps/frigate/AGENTS.md) — NVR-адаптер: `Source`/`MediaProvider`/`Catalog` на `@spotter/sink`.
 - [apps/test/AGENTS.md](apps/test/AGENTS.md) — синтетический адаптер: REPL + локальные фикстуры (офлайн-разработка).
 - [packages/transport](packages/transport) — общий слой: контракты стримов, `RedisRegulator`, `RedisConnection`, `CommandBus`, `CatalogCache`, `HeartbeatRegistry`, словарь ролей.
-- [packages/sink](packages/sink) — фреймворк адаптера (`runSink`, порты `Source`/`MediaProvider`/`Catalog`/`TimelapseProvider`, стейджинг в S3).
+- [packages/sink](packages/sink) — фреймворк адаптера (`runSink`, порты `Source`/`MediaProvider`/`Catalog`/`TimelapseProvider`/`NotificationSuspender`, стейджинг в S3).

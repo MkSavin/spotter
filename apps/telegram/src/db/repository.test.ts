@@ -141,3 +141,41 @@ describe('event message retention', () => {
     expect(eventMessagesRepo.count(db, 'old')).toBe(0)
   })
 })
+
+describe('chat mute', () => {
+  let db: TelegramDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+    tgChatsRepo.upsert(db, 'c1')
+    tgChatsRepo.upsert(db, 'c2')
+  })
+
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id).sort()
+
+  test('an unmuted chat is deliverable', () => {
+    expect(ids(tgChatsRepo.listDeliverableIds(db))).toEqual(['c1', 'c2'])
+  })
+
+  test('a muted chat drops out of delivery', () => {
+    tgChatsRepo.setMuted(db, 'c1', new Date(Date.now() + 60_000))
+    expect(ids(tgChatsRepo.listDeliverableIds(db))).toEqual(['c2'])
+  })
+
+  test('muting one chat does not silence another', () => {
+    tgChatsRepo.setMuted(db, 'c1', new Date(Date.now() + 60_000))
+    // The whole point of a per-chat mute: everyone else keeps their alerts.
+    expect(ids(tgChatsRepo.listDeliverableIds(db))).toContain('c2')
+  })
+
+  test('a lapsed mute needs no cleanup to expire', () => {
+    tgChatsRepo.setMuted(db, 'c1', new Date(Date.now() - 1000))
+    expect(ids(tgChatsRepo.listDeliverableIds(db))).toEqual(['c1', 'c2'])
+  })
+
+  test('unmute restores delivery immediately', () => {
+    tgChatsRepo.setMuted(db, 'c1', new Date(Date.now() + 60_000))
+    tgChatsRepo.setMuted(db, 'c1', null)
+    expect(ids(tgChatsRepo.listDeliverableIds(db))).toEqual(['c1', 'c2'])
+  })
+})

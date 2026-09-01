@@ -16,6 +16,7 @@ import {
   eventStreams,
   heartbeatStream,
   mediaStreams,
+  notificationStreams,
   timelapseStreams,
 } from '@spotter/transport'
 
@@ -52,6 +53,8 @@ export const downStreams = (sources: string[]): string[] => [
     mediaStreams.mediaRequest(source),
     mediaStreams.cameraRequest(source),
     timelapseStreams.request(source),
+    // Admin asking the NVR itself to go quiet; only the adapter can do it.
+    notificationStreams.suspend(source),
   ]),
   eventStreams.testSeed,
   // A restarted cloud consumer asking the adapter to republish its catalog.

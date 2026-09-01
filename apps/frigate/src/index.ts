@@ -5,6 +5,7 @@ import { FrigateCatalog } from './catalog/FrigateCatalog'
 import { resolveConfig } from './config'
 import { applicationLogger } from './log'
 import { FrigateMediaProvider } from './media/FrigateMediaProvider'
+import { FrigateNotificationSuspender } from './notifications/FrigateNotificationSuspender'
 import { probeDetails } from './probeDetails'
 import { constructSource } from './source/constructSource'
 import { eventTestController } from './stream/controllers/eventTestController'
@@ -21,6 +22,10 @@ const source = constructSource(config.source.type, config, applicationLogger)
 const mediaProvider = new FrigateMediaProvider(config.frigate)
 const catalog = new FrigateCatalog(config, applicationLogger)
 const timelapseProvider = new FrigateTimelapseProvider(config.frigate)
+const notificationSuspender = new FrigateNotificationSuspender(
+  config,
+  applicationLogger,
+)
 
 runSink({
   config,
@@ -31,6 +36,7 @@ runSink({
   mediaProvider,
   catalog,
   timelapseProvider,
+  notificationSuspender,
   timelapseStatePath: config.timelapseStatePath,
   controllers: [
     { stream: eventStreams.testSeed, controller: eventTestController },

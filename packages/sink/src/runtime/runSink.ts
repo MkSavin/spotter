@@ -2,6 +2,7 @@ import process from 'node:process'
 import {
   catalogRequestStream,
   mediaStreams,
+  notificationStreams,
   RedisConnection,
   RedisRegulator,
   type StreamMessageController,
@@ -23,6 +24,8 @@ import { publishEvent } from '../helpers/publishEvent'
 import { createCameraController } from '../media/createCameraController'
 import { createMediaController } from '../media/createMediaController'
 import type { MediaProvider } from '../media/MediaProvider'
+import { createSuspendController } from '../notifications/createSuspendController'
+import type { NotificationSuspender } from '../notifications/NotificationSuspender'
 import type { Source, SourceHandle } from '../source/Source'
 import { createTimelapseController } from '../timelapse/createTimelapseController'
 import { FileTimelapseStore } from '../timelapse/FileTimelapseStore'
@@ -53,6 +56,8 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
   catalog?: Catalog
   /** Exports spans of recordings; enables the timelapse consumer. */
   timelapseProvider?: TimelapseProvider
+  /** Suspends the NVR's own notifications; enables the suspend consumer. */
+  notificationSuspender?: NotificationSuspender
   /** Where in-flight exports are remembered across restarts. */
   timelapseStatePath?: string
   /** Extra stream subscriptions (e.g. a test-seed controller). */
@@ -82,6 +87,7 @@ export const runSink = async <TConfig extends SinkConfig>(
     mediaProvider,
     catalog,
     timelapseProvider,
+    notificationSuspender,
     controllers = [],
   } = options
 
@@ -210,6 +216,13 @@ export const runSink = async <TConfig extends SinkConfig>(
     regulator.message(
       timelapseStreams.request(sourceId),
       createTimelapseController<TConfig>(timelapse),
+    )
+  }
+
+  if (notificationSuspender) {
+    regulator.message(
+      notificationStreams.suspend(sourceId),
+      createSuspendController<TConfig>(notificationSuspender),
     )
   }
 

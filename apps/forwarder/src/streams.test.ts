@@ -5,6 +5,7 @@ import {
   eventStreams,
   heartbeatStream,
   mediaStreams,
+  notificationStreams,
   timelapseStreams,
 } from '@spotter/transport'
 import { downStreams, UP_STREAMS } from './streams'
@@ -38,9 +39,18 @@ describe('forwarder stream map', () => {
       mediaStreams.mediaRequest('frigate'),
       mediaStreams.cameraRequest('frigate'),
       timelapseStreams.request('frigate'),
+      notificationStreams.suspend('frigate'),
       eventStreams.testSeed,
       catalogRequestStream,
     ])
+  })
+
+  test('bridges NVR suspend, which only the adapter can carry out', () => {
+    // Split deployment: the admin runs the command on the cloud node, but the
+    // MQTT broker it has to reach lives on ingest.
+    expect(downStreams(['frigate'])).toContain(
+      notificationStreams.suspend('frigate'),
+    )
   })
 
   test('bridges the timelapse round trip', () => {
