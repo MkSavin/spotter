@@ -57,9 +57,12 @@ export const eventMessages = sqliteTable(
     messageId: integer('message_id').notNull(),
     // Only ever read by retention: the rows stop being useful once the message
     // is too old to still be edited, but nothing else knows when that was.
+    // Defaulted in the application, not the column: SQLite rejects a
+    // non-constant DEFAULT on ALTER TABLE ADD COLUMN once the table has rows,
+    // which is every deployment that has ever sent a message.
     sentAt: integer('sent_at', { mode: 'timestamp_ms' })
       .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+      .$defaultFn(() => new Date()),
   },
   (table) => [primaryKey({ columns: [table.eventId, table.tgChatId] })],
 )
