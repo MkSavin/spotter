@@ -23,7 +23,9 @@ export const createDatabase = (file: string): ServerDatabase => {
   const sqlite = new Database(file, { create: true })
 
   sqlite.run('PRAGMA journal_mode = WAL;')
-  sqlite.run('PRAGMA foreign_keys = ON;')
+  // No `PRAGMA foreign_keys`: nothing in this schema declares a foreign key.
+  // The relations that matter cross service boundaries — a `recipient_uuid`
+  // lives in another service's database — so SQLite cannot enforce them anyway.
 
   const db = drizzle(sqlite, { schema }) as ServerDatabase
 
