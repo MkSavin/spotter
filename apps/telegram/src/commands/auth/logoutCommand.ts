@@ -7,6 +7,9 @@ class LogoutCommand extends SpotterCommand {
   readonly description = 'Деавторизация из бота'
   readonly access = 'authorized' as const
 
+  // Reads local state only; nothing reaches the NVR.
+  protected readonly throttled = false
+
   async handle(context: BotContext): Promise<void> {
     const logger = context.logger.sub('auth')
 

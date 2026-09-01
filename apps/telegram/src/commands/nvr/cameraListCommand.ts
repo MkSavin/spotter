@@ -6,6 +6,9 @@ class CameraListCommand extends SpotterCommand {
   readonly description = 'Получить список камер'
   readonly access = 'USER' as const
 
+  // Reads local state only; nothing reaches the NVR.
+  protected readonly throttled = false
+
   async handle(context: BotContext): Promise<void> {
     const cameras = context.catalog.cameras(context.config.source)
 

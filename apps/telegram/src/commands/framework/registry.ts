@@ -2,14 +2,16 @@ import type { Bot, Middleware } from 'grammy'
 import type { BotApi, BotContext } from '../../context'
 import { isVisible } from './access'
 import type { SpotterCommand } from './SpotterCommand'
+import type { CommandThrottle } from './throttle'
 
 export const registerCommands = (
   bot: Bot<BotContext, BotApi>,
   registry: SpotterCommand[],
+  throttle?: CommandThrottle,
 ): void => {
   const privateChats = bot.chatType('private')
   for (const command of registry) {
-    privateChats.command(command.name, ...command.middlewares())
+    privateChats.command(command.name, ...command.middlewares(throttle))
   }
 }
 

@@ -24,6 +24,10 @@ class TimelapseCommand extends SpotterCommand {
   readonly description = 'Собрать таймлапс за период'
   readonly access = 'USER' as const
 
+  // An export occupies the NVR for minutes, so it gets a longer gate than the
+  // commands that merely fetch a frame.
+  protected readonly cooldownMs = 60_000
+
   readonly args = [
     {
       name: 'camera',

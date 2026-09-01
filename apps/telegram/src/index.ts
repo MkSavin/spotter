@@ -26,6 +26,10 @@ import {
   registerCommands,
   syncCommandMenu,
 } from './commands/framework/registry'
+import {
+  CommandThrottle,
+  THROTTLE_SWEEP_MS,
+} from './commands/framework/throttle'
 import { registerUnknownCommand } from './commands/framework/unknownCommand'
 import { resolveConfig } from './config'
 import type { BotApi, BotContext, CoreContext } from './context'
@@ -203,6 +207,18 @@ const polling = async (): Promise<void> => {
     logger: applicationLogger,
   })
 
+  const throttle = new CommandThrottle()
+
+  // The map only holds one entry per (chat, command) inside its window, but a
+  // busy bot still accumulates them; sweeping keeps it bounded.
+  const stopThrottleSweep = startRetention({
+    label: 'throttle entry',
+    retentionMs: THROTTLE_SWEEP_MS,
+    prune: () => throttle.sweep(THROTTLE_SWEEP_MS),
+    logger: applicationLogger,
+    intervalMs: THROTTLE_SWEEP_MS,
+  })
+
   const stopMessageRetention = startRetention({
     label: 'event message',
     retentionMs: config.retention.messageDays * 24 * 60 * 60 * 1000,
@@ -245,6 +261,7 @@ const polling = async (): Promise<void> => {
     stopLiveness()
     stopDialogRetention()
     stopMessageRetention()
+    stopThrottleSweep()
     rollouts.stop()
     clips.stop()
     commandBus.stop()
@@ -272,7 +289,7 @@ const polling = async (): Promise<void> => {
     renderClipState(bot.api, database, clipLogger, eventId, outcome),
   ).catch((error) => clipLogger.warn(`Clip wait recovery failed: ${error}`))
 
-  registerCommands(bot, commandRegistry)
+  registerCommands(bot, commandRegistry, throttle)
   registerClipCallback(bot)
   dialogs.callbacks(bot)
   // Before unknownCommand, which would otherwise swallow the reply.

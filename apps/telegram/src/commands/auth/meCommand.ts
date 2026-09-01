@@ -8,6 +8,9 @@ class MeCommand extends SpotterCommand {
   readonly description = 'Информация об авторизации'
   readonly access = 'authorized' as const
 
+  // Reads local state only; nothing reaches the NVR.
+  protected readonly throttled = false
+
   async handle(context: BotContext): Promise<void> {
     if (!context.chatId || !context.from) return
 
