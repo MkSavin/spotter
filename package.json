@@ -19,7 +19,8 @@
     "sign:token": "bun apps/server/src/cli.ts sign",
     "changeset:conventional": "bun .integration/conventional.ts",
     "publish": "changeset git-tag",
-    "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d"
+    "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d",
+    "test:e2e": "bun test ./.e2e/"
   },
   "private": "true",
   "keywords": [],
@@ -38,7 +39,10 @@
     "lefthook": "^2.1.10",
     "typescript": "7.0.2"
   },
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "dependencies": {
     "@types/node": "^25.9.3"
   }
