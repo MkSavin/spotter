@@ -18,5 +18,5 @@ export type DeliveryPolicy = 'all' | 'alerts'
  */
 export const shouldDeliver = (
   event: Pick<SpotterEvent, 'severity'>,
-  policy: DeliveryPolicy,
-): boolean => policy === 'all' || event.severity !== 'detection'
+  policy: DeliveryPolicy | undefined,
+): boolean => policy !== 'alerts' || event.severity !== 'detection'
