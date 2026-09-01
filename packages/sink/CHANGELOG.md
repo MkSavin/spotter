@@ -1,5 +1,22 @@
 # @spotter/sink
 
+## 1.5.0
+
+### Minor Changes
+
+- 2b590c2: feat: add silence controls. `/mute` and `/unmute` silence a single chat, and `/nvr_suspend` (ADMIN) suspends the NVR's own notifications through the new `NotificationSuspender` port
+- 152ccba: feat: stop failing long timelapses on the clock. A 12 h deadline (`TIMELAPSE_DEADLINE_HOURS`) and a check against the NVR before giving up, plus live status and a `/timelapse_status` command
+
+### Patch Changes
+
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 1.4.0
 
 ### Minor Changes

@@ -1,5 +1,23 @@
 # @spotter/pwa
 
+## 0.3.0
+
+### Minor Changes
+
+- 3ed7822: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
+
+### Patch Changes
+
+- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- 049f333: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 0.2.0
 
 ### Minor Changes

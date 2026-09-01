@@ -1,5 +1,18 @@
 # @spotter/depot
 
+## 1.3.1
+
+### Patch Changes
+
+- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 1.3.0
 
 ### Minor Changes
