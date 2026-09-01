@@ -2,7 +2,7 @@
 
 # Build on glibc: Vite 8 rollup native bindings fail on musl/alpine.
 # Install in-place so Bun's symlink store stays intact for rollup bindings.
-FROM oven/bun:1.3.14 AS bundle
+FROM oven/bun:1.4.0 AS bundle
 
 ARG APP_RELATIVE_PATH
 ARG APP_PACKAGE_NAME
@@ -24,7 +24,7 @@ COPY . .
 RUN cd ${APP_RELATIVE_PATH} && bun --bun vite build web
 RUN bun build --entrypoints ${APP_RELATIVE_PATH}/src/index.ts --outdir ${APP_RELATIVE_PATH}/dist --target bun --env disable
 
-FROM oven/bun:1.3.14-alpine AS release
+FROM oven/bun:1.4.0-alpine AS release
 
 ARG APP_RELATIVE_PATH
 WORKDIR /app
