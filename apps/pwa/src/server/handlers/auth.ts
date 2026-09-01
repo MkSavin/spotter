@@ -31,7 +31,13 @@ export const authHandler = async (
   }
 
   if (!reply.ok) {
-    return json({ ok: false, error: 'invalid code' }, { status: 401 })
+    // Pass the domain's reason through: "bound to a Telegram account" and
+    // "expired" are different problems with different fixes, and collapsing
+    // them into one message leaves the user guessing which they hit.
+    return json(
+      { ok: false, error: reply.error ?? 'not-found' },
+      { status: 401 },
+    )
   }
 
   const { recipientUuid, role } = reply.data as {

@@ -231,19 +231,23 @@ export const userSignHandler: CommandHandler = async (args, context) => {
   const usernameArg = args.username
     ? normalizeUsername(String(args.username))
     : null
+
+  // Defaults to the least privilege: a code handed out without a stated role
+  // should not quietly grant more than the safest one.
+  const role = args.role ? parseRole(String(args.role)) : RoleEnum.VIEWER
+  if (!role) return fail('unknown-role')
+
   const code = randomBytes(9).toString('base64url')
 
-  tokensRepo.create(db, {
-    id: code,
-    role: RoleEnum.VIEWER,
-    username: usernameArg,
-  })
+  tokensRepo.create(db, { id: code, role, username: usernameArg })
 
   context.logger
     .sub('auth')
-    .info(`Access code minted${usernameArg ? ` bound to @${usernameArg}` : ''}`)
+    .info(
+      `Access code minted as ${role}${usernameArg ? ` bound to @${usernameArg}` : ''}`,
+    )
 
-  return ok({ code })
+  return ok({ code, role })
 }
 
 /** Returns event data by short code (for /event_info). */
