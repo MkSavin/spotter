@@ -1,5 +1,17 @@
 # @spotter/email
 
+## 0.1.5
+
+### Patch Changes
+
+- 32d9796: chore: upgrade the runtime to Bun 1.4
+- Updated dependencies [6fb558c]
+- Updated dependencies [714cf4e]
+- Updated dependencies [044e6ae]
+- Updated dependencies [fdd83e2]
+- Updated dependencies [18a45ec]
+  - @spotter/transport@1.7.0
+
 ## 0.1.4
 
 ### Patch Changes

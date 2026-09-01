@@ -1,6 +1,6 @@
 {
   "name": "@spotter/pwa",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "PWA frontend: delivery consumer that sends Web Push and serves the web app",
   "main": "index.js",
   "scripts": {

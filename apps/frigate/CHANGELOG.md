@@ -1,5 +1,22 @@
 # @spotter/sink
 
+## 1.4.1
+
+### Patch Changes
+
+- 32d9796: chore: upgrade the runtime to Bun 1.4
+- a7de7d7: fix: drop disabled cameras from the catalog
+  
+  A camera turned off in Frigate stayed in `camera_list`, and a snapshot or timelapse requested against it would never be answered. Disabling a camera does not remove it from `/api/config` — Frigate marks it with `enabled: false` and keeps the section — and the catalog read every key it found there.
+  
+  Object types are still collected from every camera, disabled ones included: the taxonomy also renders events a camera left behind before it was turned off.
+- Updated dependencies [6fb558c]
+- Updated dependencies [714cf4e]
+- Updated dependencies [044e6ae]
+- Updated dependencies [fdd83e2]
+- Updated dependencies [18a45ec]
+  - @spotter/transport@1.7.0
+
 ## 1.4.0
 
 ### Minor Changes
