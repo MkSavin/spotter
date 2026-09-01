@@ -22,6 +22,20 @@ const guessLabel = (): string => {
  * The gate. Everything else needs a token, so this is what an unauthorized
  * install sees instead of the feed.
  */
+/** Why the code was refused, in terms of what the person can do about it. */
+const DENIALS: Record<string, string> = {
+  'username-mismatch':
+    'Этот код выдан для Telegram-аккаунта — для веб-приложения попросите код без привязки к @username.',
+  expired: 'Срок действия кода истёк — попросите новый.',
+  'not-found': 'Неверный или уже использованный код.',
+}
+
+const loginError = (caught: unknown): string => {
+  if (!(caught instanceof ApiError)) return 'Не удалось войти. Попробуйте ещё раз.'
+  if (caught.status === 503) return 'Сервис недоступен. Попробуйте позже.'
+  return DENIALS[caught.message] ?? 'Неверный или уже использованный код.'
+}
+
 export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,11 +53,7 @@ export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
       remember({ token: result.token, role: result.role })
       onAuthorized()
     } catch (caught) {
-      setError(
-        caught instanceof ApiError && caught.status === 503
-          ? 'Сервис недоступен. Попробуйте позже.'
-          : 'Неверный или уже использованный код',
-      )
+      setError(loginError(caught))
     } finally {
       setBusy(false)
     }

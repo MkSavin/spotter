@@ -225,6 +225,75 @@ describe('loginRedeemHandler', () => {
   })
 })
 
+describe('userSignHandler roles', () => {
+  let db: ServerDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('defaults to the least privilege', async () => {
+    const reply = await userSignHandler({}, makeContext(db))
+    expect((reply.data as { role: string }).role).toBe('VIEWER')
+  })
+
+  test('mints the requested role', async () => {
+    const reply = await userSignHandler({ role: 'ADMIN' }, makeContext(db))
+
+    expect((reply.data as { role: string }).role).toBe('ADMIN')
+    const code = (reply.data as { code: string }).code
+    expect(tokensRepo.find(db, code)?.role).toBe('ADMIN')
+  })
+
+  test('accepts the role in any case', async () => {
+    const reply = await userSignHandler({ role: 'admin' }, makeContext(db))
+    expect((reply.data as { role: string }).role).toBe('ADMIN')
+  })
+
+  test('refuses a role that does not exist', async () => {
+    const reply = await userSignHandler({ role: 'owner' }, makeContext(db))
+
+    expect(reply.ok).toBe(false)
+    expect(reply.error).toBe('unknown-role')
+  })
+
+  test('the granted role survives redemption', async () => {
+    const signed = await userSignHandler({ role: 'USER' }, makeContext(db))
+    const code = (signed.data as { code: string }).code
+
+    const redeemed = await deviceRedeemHandler(
+      { code, deviceId: 'd1' },
+      makeContext(db),
+    )
+
+    expect((redeemed.data as { role: string }).role).toBe('USER')
+  })
+
+  test('an unbound code is redeemable by a device', async () => {
+    // The PWA case: no username to match, so the code must not be bound.
+    const signed = await userSignHandler({}, makeContext(db))
+    const code = (signed.data as { code: string }).code
+
+    expect(
+      (await deviceRedeemHandler({ code, deviceId: 'd1' }, makeContext(db))).ok,
+    ).toBe(true)
+  })
+
+  test('a bound code is refused for a device, with the reason', async () => {
+    const signed = await userSignHandler({ username: '@ivan' }, makeContext(db))
+    const code = (signed.data as { code: string }).code
+
+    const reply = await deviceRedeemHandler(
+      { code, deviceId: 'd1' },
+      makeContext(db),
+    )
+
+    expect(reply.ok).toBe(false)
+    // The PWA turns this into "ask for a code without a @username".
+    expect(reply.error).toBe('username-mismatch')
+  })
+})
+
 describe('access code expiry', () => {
   let db: ServerDatabase
 
