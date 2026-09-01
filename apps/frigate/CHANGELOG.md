@@ -1,5 +1,24 @@
 # @spotter/sink
 
+## 1.5.0
+
+### Minor Changes
+
+- 2b590c2: Управление тишиной: `/mute` и `/unmute` глушат отдельный чат, `/nvr_suspend` (ADMIN) приглушает уведомления самого NVR через новый порт `NotificationSuspender`
+- 93d636e: Фильтрация по вердикту NVR: адаптер читает `frigate/reviews` и проставляет событию `severity`, а `DELIVERY_POLICY=alerts` оставляет пуши только для алертов
+- 152ccba: Долгие таймлапсы больше не падают по часам: дедлайн 12 ч (`TIMELAPSE_DEADLINE_HOURS`) и проверка у NVR перед отказом. Добавлен живой статус и команда `/timelapse_status`
+
+### Patch Changes
+
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+  - @spotter/sink@1.5.0
+
 ## 1.4.1
 
 ### Patch Changes

@@ -1,5 +1,18 @@
 # @spotter/depot
 
+## 1.3.1
+
+### Patch Changes
+
+- 0ecd990: Глубина очередей едет в heartbeat и видна в `/status`: сколько записей ждёт, сколько в работе и возраст старейшей незакрытой
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 1.3.0
 
 ### Minor Changes

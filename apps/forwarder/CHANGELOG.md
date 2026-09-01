@@ -1,5 +1,19 @@
 # @spotter/forwarder
 
+## 1.4.7
+
+### Patch Changes
+
+- 2b590c2: Управление тишиной: `/mute` и `/unmute` глушат отдельный чат, `/nvr_suspend` (ADMIN) приглушает уведомления самого NVR через новый порт `NotificationSuspender`
+- 152ccba: Долгие таймлапсы больше не падают по часам: дедлайн 12 ч (`TIMELAPSE_DEADLINE_HOURS`) и проверка у NVR перед отказом. Добавлен живой статус и команда `/timelapse_status`
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 1.4.6
 
 ### Patch Changes

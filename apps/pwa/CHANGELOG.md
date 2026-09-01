@@ -1,5 +1,23 @@
 # @spotter/pwa
 
+## 0.3.0
+
+### Minor Changes
+
+- 3ed7822: Ограничен рост таблиц: события, дедуп-леджеры и ссылки на сообщения подрезаются по возрасту. Коды доступа получили срок годности (`ACCESS_CODE_TTL_HOURS`, по умолчанию сутки)
+
+### Patch Changes
+
+- 0ecd990: Глубина очередей едет в heartbeat и видна в `/status`: сколько записей ждёт, сколько в работе и возраст старейшей незакрытой
+- 049f333: `/user_sign` принимает роль (по умолчанию VIEWER), а PWA объясняет, почему код не подошёл, вместо общего «неверный или уже использованный»
+- Updated dependencies [2b590c2]
+- Updated dependencies [0ecd990]
+- Updated dependencies [3ed7822]
+- Updated dependencies [93d636e]
+- Updated dependencies [b389438]
+- Updated dependencies [152ccba]
+  - @spotter/transport@1.8.0
+
 ## 0.2.0
 
 ### Minor Changes
