@@ -1,5 +1,40 @@
 # @spotter/server
 
+## 1.3.0
+
+### Minor Changes
+
+- d5ad59b: feat: timelapses and user management in the PWA
+  
+  Both of the remaining gaps between the PWA and the bot, now that a command channel exists.
+  
+  **Timelapses** get their own screen: camera and speed as buttons, a period as ready-made choices or a custom range. Started exports are recorded in SQLite rather than held in memory, because an export runs for minutes and a restart in between would otherwise lose it — the video would be staged and nobody would be waiting for it. The adapter's `ready` message carries no request id, so correlation is by `camera:start:end`, and making that the row id means a redelivery updates the row instead of adding a duplicate. An export that finishes after the request was lost is recorded anyway. A failure notice carries only the camera, so it settles whatever that camera still has running — never an export already delivered.
+  
+  **User management** forwards to the domain: list, change role, revoke, mint a code. Nothing is written to domain tables from here, and the admin check in the PWA is a convenience the server re-does against the real recipient. Revoking yourself is refused, since the last admin would lock themselves out.
+  
+  Two things the domain was missing for this. There was no way to *read* the list of recipients over the bus at all — `user.list` adds it. And `findByRef` resolved a recipient only by Telegram id or username, which a PWA-created recipient has neither of: it could be created and then never managed or revoked. It now also resolves by uuid.
+- 6fb558c: feat: make the PWA a real client, not a read-only feed
+  
+  The PWA could show events and nothing else. It published nothing to the bus, so every action the bot offers — a camera snapshot, a clip, the camera list, service status — simply did not exist there. What blocked all of them was the same missing piece: a way to send a command and hear back.
+  
+  `CommandBus` was telegram-local despite depending on nothing telegram-specific, so it moves to `@spotter/transport` alongside `HeartbeatRegistry` and a role vocabulary that was already copied into two services and about to be copied into a third.
+  
+  **Access is granted once, not once per frontend.** A device now redeems a code through the domain (`device.redeem`) from the same pool `/user_sign` mints for the bot, and gets back the real role the server enforces on every later command. Previously the PWA checked codes against a local `PWA_ACCESS_CODES` list that carried no role at all — which is why nothing beyond reading could have worked even with a channel. A code minted for a named Telegram user is refused: there is no username on a device to match it against, and honouring it would hand a personal code to whoever typed it first.
+  
+  An authorized install lives in its own `devices` table rather than hanging off a push subscription: being authorized is a redeemed code, not permission to send notifications, and browsers rotate a push endpoint without the user doing anything. A role change or revocation reaches the device over `spotter.delivery.recipient`, so a demoted user stops being offered buttons that would only fail.
+  
+  The feed is now behind the same token. It carries snapshots of the house, and serving it to anyone who knows the URL was never intended.
+
+### Patch Changes
+
+- 32d9796: Обновление рантайма до Bun 1.4
+- Updated dependencies [6fb558c]
+- Updated dependencies [714cf4e]
+- Updated dependencies [044e6ae]
+- Updated dependencies [fdd83e2]
+- Updated dependencies [18a45ec]
+  - @spotter/transport@1.7.0
+
 ## 1.2.7
 
 ### Patch Changes
