@@ -1,6 +1,18 @@
 import { z } from 'zod'
 
 /**
+ * How much attention an event deserves, as judged by the NVR rather than by a
+ * score threshold here: it already knows the zones, object filters and times of
+ * day the owner configured.
+ *
+ * `alert` — worth waking someone; `detection` — worth recording. Optional
+ * because an NVR without the concept simply never sets it, and everything then
+ * behaves as it did before.
+ */
+export const eventSeveritySchema = z.enum(['alert', 'detection'])
+export type EventSeverity = z.infer<typeof eventSeveritySchema>
+
+/**
  * Canonical cross-service event contract.
  *
  * Every NVR adapter (sink) must emit objects conforming to this schema onto the
@@ -11,6 +23,7 @@ import { z } from 'zod'
 export const spotterEventSchema = z.object({
   id: z.string().min(1),
   source: z.string().min(1).optional(),
+  severity: eventSeveritySchema.optional(),
   camera: z.string().min(1),
   label: z.string().nullable(),
   startTime: z.number(),

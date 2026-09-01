@@ -22,7 +22,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
                                           command.request/reply (telegram ⇄ server)
 ```
 
-1. Frigate шлёт MQTT-событие → **frigate** (адаптер) парсит (`parseFrigateEvent`) → публикует в `spotter.event`; каталог камер/объектов — в `spotter.catalog.<source>`.
+1. Frigate шлёт MQTT-событие → **frigate** (адаптер) парсит (`parseFrigateEvent`) → публикует в `spotter.event`; каталог камер/объектов — в `spotter.catalog.<source>`. Параллельно адаптер слушает `frigate/reviews` и штампует событию `severity` (`alert`/`detection`) — вердикт самого NVR, уже с учётом зон и фильтров из его конфига.
 2. **server** (headless-домен) слушает `spotter.event`, персистит в БД (SQLite), публикует `spotter.delivery.event` (create/update). На `end` публикует `spotter.media.request.<source>` (`{eventId, source, want:[snapshot]}`) — **только фото eager, клип по запросу** — без обращения к NVR.
 3. **frigate** ловит `*.request.<source>`, резолвит медиа (URL-схема + JWT живут **только** тут), стейджит сырьё в S3 и публикует `*.staged` (ключи S3).
 4. **depot** ловит `*.staged`, берёт сырьё из S3 по ключу, транскодит (ffmpeg/`Bun.Image`), кладёт результат в S3, отвечает `*_processed` (ключи S3). NVR не знает. Снапшоты и клипы едут **разными стримами** (`spotter.media.staged` / `spotter.media.staged.clip`), чтобы долгий транскод видео не задерживал фото — какие читать, задаёт `DEPOT_LANE` (см. [apps/depot/AGENTS.md](apps/depot/AGENTS.md)).
@@ -77,6 +77,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | `spotter.command.reply` | server | telegram, pwa | Ответ, корреляция по `requestId` |
 | `spotter.heartbeat` | все сервисы | telegram, pwa | Живость и версия (`/status`) |
 | `frigate/events` *(MQTT)* | Frigate | frigate | Сырые события NVR |
+| `frigate/reviews` *(MQTT)* | Frigate | frigate | Вердикт NVR: alert или detection |
 
 В распределённом деплое стримы зеркалирует `forwarder` — направление задаётся картой в
 [apps/forwarder/src/streams.ts](apps/forwarder/src/streams.ts). Забыть стрим там значит,

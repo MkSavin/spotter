@@ -12,6 +12,7 @@ import {
 } from '@spotter/transport'
 import type { ServerContext } from '../../context'
 import { eventsRepo } from '../../db/repository'
+import { shouldDeliver } from '../../delivery/shouldDeliver'
 
 export const eventController: StreamMessageController<ServerContext> = async (
   payload,
@@ -49,6 +50,15 @@ export const eventController: StreamMessageController<ServerContext> = async (
 
   const action: DeliveryEvent['action'] =
     event.type === 'start' ? 'create' : 'update'
+
+  // Persisted either way — the policy governs delivery, not history, so a
+  // filtered event still shows up in /event_info and the feed. Returning here
+  // also skips the eager snapshot below, which is the point: there is no reason
+  // to make the NVR fetch a frame nobody will be shown.
+  if (!shouldDeliver(event, context.config.delivery.policy)) {
+    logger.debug('Skipped delivery: NVR classified it as a detection')
+    return
+  }
 
   const delivery: DeliveryEvent = { eventId: event.id, event, action }
 
