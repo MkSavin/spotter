@@ -13,6 +13,13 @@ describe('shouldDeliver', () => {
     expect(shouldDeliver({ severity: 'alert' }, 'alerts')).toBe(true)
   })
 
+  test('a missing policy behaves like the default', () => {
+    // The e2e harness builds the context by hand; reading an absent field must
+    // not be what stops events from being delivered.
+    expect(shouldDeliver({ severity: 'detection' }, undefined)).toBe(true)
+    expect(shouldDeliver({ severity: 'alert' }, undefined)).toBe(true)
+  })
+
   test('an unclassified event is delivered even under alerts-only', () => {
     // An NVR that does not classify must not go silently quiet, and neither
     // must one whose review simply has not arrived yet.

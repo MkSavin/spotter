@@ -55,7 +55,7 @@ export const eventController: StreamMessageController<ServerContext> = async (
   // filtered event still shows up in /event_info and the feed. Returning here
   // also skips the eager snapshot below, which is the point: there is no reason
   // to make the NVR fetch a frame nobody will be shown.
-  if (!shouldDeliver(event, context.config.delivery.policy)) {
+  if (!shouldDeliver(event, context.config.delivery?.policy)) {
     logger.debug('Skipped delivery: NVR classified it as a detection')
     return
   }

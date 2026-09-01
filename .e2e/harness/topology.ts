@@ -63,6 +63,7 @@ export const runServer = async (
       source: 'frigate',
       presignExpiry: 60,
       s3: { bucket: 'test', stagingPrefix: 'staging' },
+      delivery: { policy: 'all' as const },
     },
     logger: defaultLogger,
     db,
