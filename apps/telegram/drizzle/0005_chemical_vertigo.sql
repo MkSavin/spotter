@@ -1,0 +1,1 @@
+ALTER TABLE `event_messages` ADD `sent_at` integer DEFAULT (unixepoch() * 1000) NOT NULL;

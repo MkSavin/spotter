@@ -7,12 +7,14 @@ import {
   StreamProducer,
   startHeartbeat,
   startLiveness,
+  startRetention,
 } from '@spotter/transport'
 import { S3Client } from 'bun'
 import information from '../package.json'
 import { resolveConfig } from './config'
 import type { ServerContext } from './context'
 import { createDatabase, type ServerDatabase } from './db/client'
+import { eventsRepo, tokensRepo } from './db/repository'
 import { applicationLogger } from './log'
 import { serverTransport } from './transport/serverTransport'
 
@@ -59,6 +61,20 @@ const run = async (): Promise<void> => {
     },
   })
 
+  const stopRetention = startRetention({
+    label: 'event',
+    retentionMs: config.retention.eventDays * 24 * 60 * 60 * 1000,
+    prune: (cutoff) => eventsRepo.prune(database, cutoff),
+    logger: applicationLogger,
+  })
+
+  const stopTokenRetention = startRetention({
+    label: 'expired access code',
+    retentionMs: config.auth.codeTtlMs,
+    prune: (cutoff) => tokensRepo.prune(database, cutoff),
+    logger: applicationLogger,
+  })
+
   await catalog.bootstrap(config.source, producer)
 
   const context: ServerContext = {
@@ -77,6 +93,8 @@ const run = async (): Promise<void> => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat()
     stopLiveness()
+    stopRetention()
+    stopTokenRetention()
     await transport?.stop()
     subscriber.close()
     producer.disconnect()

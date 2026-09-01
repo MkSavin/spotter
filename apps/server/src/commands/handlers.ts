@@ -36,6 +36,13 @@ const fail = (error: string): Omit<CommandReply, 'requestId'> => ({
   error,
 })
 
+/** Whether a minted code has outlived its window and can no longer be redeemed. */
+const isExpired = (
+  token: { createdAt: Date },
+  context: ServerContext,
+): boolean =>
+  Date.now() - token.createdAt.getTime() > context.config.auth.codeTtlMs
+
 /**
  * Redeems an access code for a PWA install. Same pool of `/user_sign` codes as
  * the bot uses — access is granted once, not once per frontend — but the
@@ -53,6 +60,10 @@ export const deviceRedeemHandler: CommandHandler = async (args, context) => {
 
   const token = tokensRepo.find(db, code)
   if (!token) return fail('not-found')
+  if (isExpired(token, context)) {
+    tokensRepo.consume(db, token.id)
+    return fail('expired')
+  }
 
   // A code minted for a named Telegram user is not for a device: there is no
   // username here to match it against.
@@ -88,6 +99,13 @@ export const loginRedeemHandler: CommandHandler = async (args, context) => {
 
   if (!token) {
     return fail('not-found')
+  }
+
+  // Expired codes are consumed rather than left to linger: a code that cannot
+  // be redeemed has no reason to stay in the table.
+  if (isExpired(token, context)) {
+    tokensRepo.consume(db, token.id)
+    return fail('expired')
   }
 
   if (token.username && token.username !== username) {

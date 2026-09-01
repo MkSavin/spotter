@@ -189,6 +189,17 @@ export const eventMessagesRepo = {
       )
       .run()
   },
+
+  /**
+   * Drops message links for events past `cutoff`. Their messages are far too
+   * old to be edited by then, so the rows only serve to grow the file.
+   */
+  prune: (db: TelegramDatabase, cutoff: Date): number =>
+    db
+      .delete(eventMessages)
+      .where(lt(eventMessages.sentAt, cutoff))
+      .returning({ eventId: eventMessages.eventId })
+      .all().length,
 }
 
 export const serviceVersionsRepo = {

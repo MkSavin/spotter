@@ -1,10 +1,16 @@
-import { ROLES } from '@spotter/transport'
+// Deep import, not the barrel: drizzle-kit runs under Node and the barrel
+// pulls in Bun-only modules.
+import { ROLES } from '@spotter/transport/src/schema/role'
 import { type InferSelectModel, sql } from 'drizzle-orm'
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // The role vocabulary belongs to the contract, not to this database; re-exported
 // so table definitions and their consumers share one import.
-export { ROLE_RANK, ROLES, Role } from '@spotter/transport'
+export {
+  ROLE_RANK,
+  ROLES,
+  Role,
+} from '@spotter/transport/src/schema/role'
 
 /**
  * Authorized Telegram chats. Every chat that has redeemed an access code gets
@@ -46,6 +52,11 @@ export const eventMessages = sqliteTable(
     eventId: text('event_id').notNull(),
     tgChatId: text('tg_chat_id').notNull(),
     messageId: integer('message_id').notNull(),
+    // Only ever read by retention: the rows stop being useful once the message
+    // is too old to still be edited, but nothing else knows when that was.
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
   },
   (table) => [primaryKey({ columns: [table.eventId, table.tgChatId] })],
 )

@@ -14,9 +14,16 @@ beforeAll(() => {
   applicationLogger.disable()
 })
 
-// Minimal context: login.redeem and user.sign only touch db + logger.
-const makeContext = (db: ServerDatabase): ServerContext =>
-  ({ db, logger: applicationLogger }) as unknown as ServerContext
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// Minimal context: login.redeem and user.sign only touch db + logger + the
+// access-code TTL.
+const makeContext = (db: ServerDatabase, codeTtlMs = DAY_MS): ServerContext =>
+  ({
+    db,
+    logger: applicationLogger,
+    config: { auth: { codeTtlMs } },
+  }) as unknown as ServerContext
 
 describe('deviceRedeemHandler', () => {
   let db: ServerDatabase
@@ -215,6 +222,65 @@ describe('loginRedeemHandler', () => {
     )
     expect(ok.ok).toBe(true)
     expect(tokensRepo.find(db, 'bound')).toBeUndefined()
+  })
+})
+
+describe('access code expiry', () => {
+  let db: ServerDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  const ageCode = (id: string, ageMs: number): void => {
+    tokensRepo.create(db, { id, role: 'VIEWER' })
+    db.$client
+      .query('UPDATE access_tokens SET created_at = ? WHERE id = ?')
+      .run(Date.now() - ageMs, id)
+  }
+
+  test('a code past its TTL is refused and consumed', async () => {
+    ageCode('stale', 2 * DAY_MS)
+
+    const reply = await loginRedeemHandler(
+      { code: 'stale', tgUserId: '1', tgChatId: '1' },
+      makeContext(db),
+    )
+
+    expect(reply.ok).toBe(false)
+    expect(reply.error).toBe('expired')
+    // Refusing it is not enough: an unusable code must not linger.
+    expect(tokensRepo.find(db, 'stale')).toBeUndefined()
+  })
+
+  test('a code inside its TTL still works', async () => {
+    ageCode('fresh', DAY_MS / 2)
+
+    const reply = await loginRedeemHandler(
+      { code: 'fresh', tgUserId: '1', tgChatId: '1' },
+      makeContext(db),
+    )
+
+    expect(reply.ok).toBe(true)
+  })
+
+  test('device redemption honours the same window', async () => {
+    ageCode('stale', 2 * DAY_MS)
+
+    const reply = await deviceRedeemHandler(
+      { code: 'stale', deviceId: 'd1' },
+      makeContext(db),
+    )
+
+    expect(reply.error).toBe('expired')
+  })
+
+  test('retention drops codes nobody redeemed', () => {
+    ageCode('old', 2 * DAY_MS)
+    tokensRepo.create(db, { id: 'new', role: 'VIEWER' })
+
+    expect(tokensRepo.prune(db, new Date(Date.now() - DAY_MS))).toBe(1)
+    expect(tokensRepo.find(db, 'new')).toBeDefined()
   })
 })
 
