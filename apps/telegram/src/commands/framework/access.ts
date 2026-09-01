@@ -1,23 +1,13 @@
-import { ROLE_RANK, type Role } from '../../db/schema'
+import { type Requirement, satisfies } from '@spotter/transport'
+import type { Role } from '../../db/schema'
 
-export type Access = 'all' | 'anonymous' | 'authorized' | Role
+/** `Requirement` plus `all`, which the bot uses for always-visible commands. */
+export type Access = 'all' | Requirement
 
 type CurrentRole = Role | null | undefined
 
-const rankOf = (role: CurrentRole): number => (role ? ROLE_RANK[role] : 0)
-
-export const canAccess = (access: Access, role: CurrentRole): boolean => {
-  switch (access) {
-    case 'all':
-      return true
-    case 'anonymous':
-      return !role
-    case 'authorized':
-      return !!role
-    default:
-      return rankOf(role) >= ROLE_RANK[access]
-  }
-}
+export const canAccess = (access: Access, role: CurrentRole): boolean =>
+  access === 'all' ? true : satisfies(access, role)
 
 export const isVisible = (access: Access, role: CurrentRole): boolean =>
   canAccess(access, role)

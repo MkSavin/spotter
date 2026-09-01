@@ -1,20 +1,10 @@
+import { ROLES } from '@spotter/transport'
 import { type InferSelectModel, sql } from 'drizzle-orm'
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-export const ROLES = ['VIEWER', 'USER', 'ADMIN'] as const
-export type Role = (typeof ROLES)[number]
-
-export const Role = {
-  VIEWER: 'VIEWER',
-  USER: 'USER',
-  ADMIN: 'ADMIN',
-} as const satisfies Record<Role, Role>
-
-export const ROLE_RANK: Record<Role, number> = {
-  VIEWER: 1,
-  USER: 2,
-  ADMIN: 3,
-}
+// The role vocabulary belongs to the contract, not to this database; re-exported
+// so table definitions and their consumers share one import.
+export { ROLE_RANK, ROLES, Role } from '@spotter/transport'
 
 const authorizedAt = integer('authorized_at', { mode: 'timestamp_ms' })
   .notNull()

@@ -1,8 +1,8 @@
+import { normalizeUsername } from '@spotter/transport'
 import { InputFile } from 'grammy'
 import { renderQr } from '../../auth/qr'
 import { deepLink } from '../../auth/token'
 import type { BotContext } from '../../context'
-import { normalizeUsername } from '../../helpers/username'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 class UserSignCommand extends SpotterCommand {

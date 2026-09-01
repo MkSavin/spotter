@@ -1,5 +1,5 @@
+import { isNumericId, normalizeUsername } from '@spotter/transport'
 import { and, count, eq, inArray, lt, sql } from 'drizzle-orm'
-import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { TelegramDatabase } from './client'
 import {
   type CatalogSnapshotRow,

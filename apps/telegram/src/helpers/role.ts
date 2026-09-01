@@ -1,7 +1,8 @@
-import { ROLES, type Role } from '../db/schema'
+import type { Role } from '../db/schema'
 
 export type { Role }
 
+/** Russian role names for the bot's UI; the vocabulary itself lives in transport. */
 export const ROLE_TITLES: Record<Role, string> = {
   VIEWER: 'наблюдатель',
   USER: 'пользователь',
@@ -9,10 +10,3 @@ export const ROLE_TITLES: Record<Role, string> = {
 }
 
 export const roleTitle = (role: Role): string => ROLE_TITLES[role]
-
-export const parseRole = (value: string): Role | undefined => {
-  const upper = value.trim().toUpperCase()
-  return (ROLES as readonly string[]).includes(upper)
-    ? (upper as Role)
-    : undefined
-}

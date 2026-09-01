@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { isRole, ROLE_RANK, satisfies } from './role'
+import { isRole, parseRole, ROLE_RANK, satisfies } from './role'
 
 describe('role vocabulary', () => {
   test('ranks ascend from viewer to admin', () => {
@@ -27,5 +27,11 @@ describe('role vocabulary', () => {
     expect(isRole('ADMIN')).toBe(true)
     expect(isRole('admin')).toBe(false)
     expect(isRole(undefined)).toBe(false)
+  })
+
+  test('parseRole accepts user input in any case', () => {
+    expect(parseRole('admin')).toBe('ADMIN')
+    expect(parseRole('  User  ')).toBe('USER')
+    expect(parseRole('owner')).toBeUndefined()
   })
 })

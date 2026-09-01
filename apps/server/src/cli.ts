@@ -1,12 +1,11 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { normalizeUsername, parseRole } from '@spotter/transport'
 import { program } from 'commander'
 import information from '../package.json'
 import { createDatabase } from './db/client'
 import { tokensRepo } from './db/repository'
-import { parseRole } from './helpers/role'
-import { normalizeUsername } from './helpers/username'
 
 // Anchored to the bundle, never above it: `../data` resolves to /data in the
 // image, which is root-owned and unwritable. In development the sources sit one

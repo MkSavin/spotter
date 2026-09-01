@@ -1,6 +1,9 @@
-import type { SpotterEvent } from '@spotter/transport'
+import {
+  isNumericId,
+  normalizeUsername,
+  type SpotterEvent,
+} from '@spotter/transport'
 import { count, eq, like } from 'drizzle-orm'
-import { isNumericId, normalizeUsername } from '../helpers/username'
 import type { ServerDatabase } from './client'
 import {
   type AccessToken,
