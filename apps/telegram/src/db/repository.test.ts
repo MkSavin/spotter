@@ -126,6 +126,39 @@ describe('telegram db repository', () => {
   })
 })
 
+describe('event message stamping', () => {
+  let db: TelegramDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('a recorded message is stamped without a column default', () => {
+    // The stamp comes from the application: SQLite will not accept a
+    // non-constant DEFAULT added to a table that already has rows.
+    eventMessagesRepo.record(db, 'ev-1', [{ id: 1, chatId: 'c1' }])
+
+    const row = db.$client
+      .query('SELECT sent_at FROM event_messages WHERE event_id = ?')
+      .get('ev-1') as { sent_at: number }
+
+    expect(row.sent_at).toBeGreaterThan(0)
+  })
+
+  test('re-recording keeps the row stamped', () => {
+    eventMessagesRepo.record(db, 'ev-1', [{ id: 1, chatId: 'c1' }])
+    eventMessagesRepo.record(db, 'ev-1', [{ id: 2, chatId: 'c1' }])
+
+    const row = db.$client
+      .query('SELECT sent_at FROM event_messages WHERE event_id = ?')
+      .get('ev-1') as { sent_at: number | null }
+
+    // An upsert that dropped the stamp would make the row invisible to
+    // retention and it would live forever.
+    expect(row.sent_at).toBeGreaterThan(0)
+  })
+})
+
 describe('event message retention', () => {
   let db: TelegramDatabase
 
