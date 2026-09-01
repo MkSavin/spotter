@@ -6,14 +6,23 @@ import { renderEventNotification } from '../../render/notification'
 
 const RECENT_LIMIT = 200
 
+/**
+ * Media keys arrive one delivery at a time — the snapshot first, the clip once
+ * transcoding finishes — and each carries only its own. Merging rather than
+ * replacing keeps the earlier key: overwriting left every event that had a
+ * video with no image to show.
+ */
 const cacheEvent = (
   context: TransportContext,
   delivery: DeliveryEvent,
 ): void => {
+  const previous = recentEventsRepo.get(context.db, delivery.eventId)
+    ?.payload as FeedEntryStored | undefined
+
   const stored: FeedEntryStored = {
     event: delivery.event,
-    clipKey: delivery.clipKey,
-    snapshotKey: delivery.snapshotKey,
+    clipKey: delivery.clipKey ?? previous?.clipKey,
+    snapshotKey: delivery.snapshotKey ?? previous?.snapshotKey,
   }
   recentEventsRepo.save(context.db, delivery.eventId, stored, RECENT_LIMIT)
 }

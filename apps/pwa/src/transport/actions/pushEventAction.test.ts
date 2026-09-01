@@ -77,6 +77,29 @@ describe('pushEventAction', () => {
     expect(ctx.sent).toHaveLength(1)
   })
 
+  test('a later clip does not erase the snapshot already cached', async () => {
+    // Snapshot and clip arrive as separate `media` deliveries, the clip last
+    // (transcoding a video takes longer). Overwriting the row wholesale left
+    // the card with no image at all — the feed showed a placeholder for every
+    // event that happened to have a video.
+    await pushEventAction(
+      { ...delivery('media'), snapshotKey: 'processed/snap.jpg' },
+      ctx.context,
+    )
+    await pushEventAction(
+      { ...delivery('media'), clipKey: 'processed/clip.mp4' },
+      ctx.context,
+    )
+
+    const stored = recentEventsRepo.get(ctx.db, event.id)?.payload as {
+      snapshotKey?: string
+      clipKey?: string
+    }
+
+    expect(stored.snapshotKey).toBe('processed/snap.jpg')
+    expect(stored.clipKey).toBe('processed/clip.mp4')
+  })
+
   test('update caches but never pushes', async () => {
     await pushEventAction(delivery('update'), ctx.context)
 
