@@ -80,11 +80,7 @@ describeIfDocker('recovery', () => {
     await redis?.stop()
   }, 30_000)
 
-  // KNOWN FAILURE — kept as the reproduction, not deleted to make the suite
-  // green. Destroying and recreating the Redis *container* (what an update
-  // does) leaves the consumer stuck: `FLUSHALL` alone recovers, losing the
-  // connection as well does not. See .e2e/README.md.
-  test.failing('a service outlives Redis going away entirely', async () => {
+  test('a service outlives Redis going away entirely', async () => {
     await connection.producer.publish(eventStreams.event, event('before'))
     await until(async () => (await countDeliveries(connection)) >= 1, 'first')
 

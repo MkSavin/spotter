@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import type { RedisClient } from 'bun'
 import type { Stenograph } from 'stenograph'
+import { RedisConnection } from '../helpers/RedisConnection'
 import {
   RedisRegulator,
   type StreamMessagePayload,
@@ -329,4 +330,66 @@ describe('RedisRegulator reclaim', () => {
 
     expect(producerClient.callsOf('XGROUP')).toHaveLength(1)
   })
+})
+
+describe('RedisRegulator stalled reads', () => {
+  test('a read that never settles is abandoned and the connection replaced', async () => {
+    // The failure this guards against: when the Redis container is destroyed,
+    // an in-flight blocking read neither resolves nor rejects. Awaiting it
+    // parks the loop forever — no error, no recovery, and the process looks
+    // perfectly healthy while consuming nothing.
+    const producerClient = new FakeRedis()
+    const subscriber = new FakeRedis()
+
+    let reads = 0
+    subscriber.on('XREADGROUP', () => {
+      reads += 1
+      // First read hangs for good; later ones behave.
+      if (reads === 1) return new Promise<Reply>(() => undefined)
+      return new Promise((resolve) => setTimeout(() => resolve([]), 5))
+    })
+
+    let replaced = 0
+    const connection = {
+      ...subscriber,
+      connected: true,
+      send: (command: string, args: string[]) => subscriber.send(command, args),
+      close: () => subscriber.close(),
+      replace: async () => {
+        replaced += 1
+        return null
+      },
+    }
+    Object.setPrototypeOf(connection, RedisConnection.prototype)
+
+    const producer = new StreamProducer(
+      producerClient as unknown as RedisClient,
+    )
+
+    const handle = await new RedisRegulator<never>()
+      .message('stream.a', async () => undefined)
+      .run(
+        {
+          subscriber: connection as never,
+          producer,
+          logger: silentLogger(),
+        } as never,
+        {
+          group: 'g',
+          consumer: 'c',
+          // A 10ms block means the deadline is 10ms + grace; the test only has
+          // to outlast that, not the production five seconds.
+          blockMs: 10,
+          count: 1,
+          reaperIntervalMs: 60_000,
+        },
+      )
+    handles.push(handle)
+
+    await Bun.sleep(5_200)
+
+    expect(replaced).toBeGreaterThanOrEqual(1)
+    // And it kept reading afterwards rather than staying parked.
+    expect(reads).toBeGreaterThan(1)
+  }, 15_000)
 })

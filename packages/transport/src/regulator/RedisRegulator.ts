@@ -109,6 +109,15 @@ export class StreamProducer {
  * that as fatal killed the service on exactly the restart it was meant to
  * survive, so the group creation waits it out instead.
  */
+/** Marks a read that never came back, so the loop can tell it apart. */
+const STALLED_READ = 'spotter: read stalled'
+
+/**
+ * How long past `BLOCK` a read may take before it counts as stalled. Covers
+ * the round trip and a slow server without misreading an ordinary empty read.
+ */
+const READ_DEADLINE_GRACE_MS = 5_000
+
 const createGroup = async (
   producer: StreamProducer,
   stream: string,
@@ -292,10 +301,40 @@ export class RedisRegulator<Context extends BaseContext> {
       ...streams.map(() => '>'),
     ]
 
+    /**
+     * A blocking read that is in flight when the server dies never settles —
+     * it neither resolves nor rejects, so awaiting it parks the loop forever
+     * and no error is ever raised to recover from. The process stays healthy
+     * to every outside check while consuming nothing at all.
+     *
+     * The deadline turns that silence into an error the loop can act on. It is
+     * generous relative to `BLOCK`: a read that merely found nothing returns
+     * on its own well before this fires.
+     */
+    const readDeadlineMs = blockMs + READ_DEADLINE_GRACE_MS
+
+    const readWithDeadline = async (): Promise<unknown> => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+
+      try {
+        return await Promise.race([
+          subscriber.send('XREADGROUP', readArgs),
+          new Promise((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(STALLED_READ)),
+              readDeadlineMs,
+            )
+          }),
+        ])
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
+    }
+
     const loop = async (): Promise<void> => {
       while (running) {
         try {
-          const reply = await subscriber.send('XREADGROUP', readArgs)
+          const reply = await readWithDeadline()
           for (const record of parseReadGroupReply(reply)) {
             await dispatch(record)
           }
@@ -304,9 +343,24 @@ export class RedisRegulator<Context extends BaseContext> {
             break
           }
 
+          const message = String((error as Error)?.message ?? error)
+
+          // The connection is wedged rather than erroring. Replacing the client
+          // is the only way back: the old one is attached to a socket whose
+          // server no longer exists and will never answer.
+          if (message.includes(STALLED_READ)) {
+            log.warn('Read stalled — replacing the connection')
+            if (subscriber instanceof RedisConnection) {
+              await subscriber
+                .replace(error)
+                .catch((replaceError) => log.error(replaceError))
+            }
+            continue
+          }
+
           // A Redis that came back empty (lost volume, FLUSHALL) has no groups,
           // and every read fails the same way until they are made again.
-          if (String((error as Error)?.message ?? error).includes('NOGROUP')) {
+          if (message.includes('NOGROUP')) {
             log.warn('Consumer group missing — recreating')
             for (const stream of streams) {
               await createGroup(producer, stream, group, loadingDelayMs).catch(
