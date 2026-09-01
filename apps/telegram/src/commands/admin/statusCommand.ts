@@ -19,6 +19,31 @@ const DETAIL_LABELS: Record<string, string> = {
   acceleration: 'ускорение',
 }
 
+/** Strips the shared prefix: `spotter.media.staged.clip` → `media.staged.clip`. */
+const shortStream = (stream: string): string => stream.replace(/^spotter\./, '')
+
+/**
+ * Backlog, shown only when there is one. A queue at zero is the normal state
+ * and printing it on every service would bury the line that matters.
+ */
+const renderQueues = (service: ServiceStatus): string => {
+  const queues = service.queues ?? []
+  if (queues.length === 0) return ''
+
+  const lines = queues.map((queue) => {
+    const parts = [`${queue.lag} ждут`]
+    if (queue.pending > 0) {
+      const age = queue.oldestPendingMs
+        ? ` (старейшей ${formatUptime(Math.round(queue.oldestPendingMs / 1000))})`
+        : ''
+      parts.push(`${queue.pending} в работе${age}`)
+    }
+    return `    📥 <code>${shortStream(queue.stream)}</code>: ${parts.join(', ')}`
+  })
+
+  return `\n${lines.join('\n')}`
+}
+
 const renderService = (service: ServiceStatus): string => {
   const mark = service.online ? '✅' : '⚠️'
   const state = service.online
@@ -30,7 +55,7 @@ const renderService = (service: ServiceStatus): string => {
 
   return `${mark} <code>${service.service}</code> <b>${service.version}</b> — ${state}${
     extras ? `\n    <i>${extras}</i>` : ''
-  }`
+  }${renderQueues(service)}`
 }
 
 class StatusCommand extends SpotterCommand {

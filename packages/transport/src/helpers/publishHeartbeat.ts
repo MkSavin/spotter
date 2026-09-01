@@ -3,6 +3,7 @@ import {
   HEARTBEAT_INTERVAL_MS,
   type Heartbeat,
   heartbeatStream,
+  type QueueDepth,
 } from '../schema/heartbeat'
 
 type Producer = {
@@ -14,6 +15,11 @@ export type HeartbeatOptions = {
   version: string
   /** Extras worth showing next to the version, e.g. the NVR build. */
   details?: () => Promise<Record<string, string>> | Record<string, string>
+  /**
+   * Backlog of the streams this service consumes, re-read on every beat —
+   * unlike `details`, this is runtime state and stale numbers are useless.
+   */
+  queues?: () => Promise<QueueDepth[]>
 }
 
 /**
@@ -22,7 +28,7 @@ export type HeartbeatOptions = {
  */
 export const startHeartbeat = (
   producer: Producer,
-  { service, version, details }: HeartbeatOptions,
+  { service, version, details, queues }: HeartbeatOptions,
 ): (() => void) => {
   const startedAt = Date.now()
   const node = process.env.SPOTTER_MODE ?? 'single'
@@ -38,6 +44,8 @@ export const startHeartbeat = (
 
   const beat = async (): Promise<void> => {
     const collected = await collect()
+    // A failed probe must not cost the beat: liveness matters more than depth.
+    const depths = queues ? await queues().catch(() => []) : []
     const payload: Heartbeat = {
       service,
       version,
@@ -45,6 +53,7 @@ export const startHeartbeat = (
       uptime: Math.round((Date.now() - startedAt) / 1000),
       at: Date.now(),
       ...(collected ? { details: collected } : {}),
+      ...(depths.length > 0 ? { queues: depths } : {}),
     }
     // A failed heartbeat must never take the service down with it.
     await producer.publish(heartbeatStream, payload).catch(() => undefined)

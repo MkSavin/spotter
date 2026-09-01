@@ -6,6 +6,7 @@ import {
   HeartbeatRegistry,
   RedisConnection,
   type RegulatorHandle,
+  readQueueDepths,
   StreamProducer,
   startHeartbeat,
   startLiveness,
@@ -70,8 +71,17 @@ const main = async (): Promise<void> => {
   )
   commandBus.start()
 
+  // Declared before the heartbeat that reads it: the first beat fires
+  // immediately, and a `let` further down would still be in its dead zone.
+  let transport: RegulatorHandle | null = null
+
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'pwa',
+    // Read at beat time: the regulator is created after this call.
+    queues: async () =>
+      transport
+        ? readQueueDepths(producer, transport.streams, config.redis.group)
+        : [],
     version: information.version,
   })
 
@@ -93,7 +103,6 @@ const main = async (): Promise<void> => {
 
   await catalog.bootstrap(config.source, producer)
 
-  let transport: RegulatorHandle | null = null
   let server: ReturnType<typeof createServer> | null = null
 
   const context: CoreContext = {

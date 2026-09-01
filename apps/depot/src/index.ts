@@ -3,6 +3,7 @@ import {
   mediaStreams,
   RedisConnection,
   RedisRegulator,
+  readQueueDepths,
   StreamProducer,
   startHeartbeat,
   startLiveness,
@@ -70,12 +71,6 @@ const run = async (): Promise<void> => {
   await producer.connect()
   await subscriber.connect()
 
-  stopHeartbeat = startHeartbeat(producer, {
-    service: 'depot',
-    version: information.version,
-    details: () => probeDetails(config),
-  })
-
   // Healthcheck signal: refreshed only while Redis actually answers, so a
   // wedged-but-running container fails its healthcheck and gets restarted.
   stopLiveness = startLiveness({
@@ -101,6 +96,16 @@ const run = async (): Promise<void> => {
   applicationLogger.info(
     `Consuming lane "${config.lane}": ${regulator.streams.join(', ')}`,
   )
+
+  stopHeartbeat = startHeartbeat(producer, {
+    service: 'depot',
+    version: information.version,
+    details: () => probeDetails(config),
+    // Reported per lane: a depot on `clips` says nothing about the snapshot
+    // backlog, which is the whole reason the lanes are separate.
+    queues: () =>
+      readQueueDepths(producer, regulator.streams, config.redis.group),
+  })
 
   transport = await regulator.run(
     {
