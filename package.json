@@ -20,7 +20,9 @@
     "changeset:conventional": "bun .integration/conventional.ts",
     "publish": "changeset git-tag",
     "docker:dev": "docker compose --project-directory . -f .deployment/compose/development.yml up -d",
-    "test:e2e": "bun test ./.e2e/"
+    "test:e2e": "bun test ./.e2e/delivery.test.ts ./.e2e/recovery.test.ts",
+    "smoke:build": "bun .e2e/smoke/build.ts",
+    "test:smoke": "bun test ./.e2e/smoke.test.ts"
   },
   "private": "true",
   "keywords": [],

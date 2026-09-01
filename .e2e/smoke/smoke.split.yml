@@ -1,0 +1,154 @@
+# Split-node smoke: ingest and cloud on separate Redis instances, bridged by
+# the forwarder — the shape a real two-machine deployment runs.
+#
+# The single-node file cannot show what this one does: a stream missing from
+# the forwarder's map never crosses, and every service still looks healthy
+# while the product silently does nothing.
+name: spotter-smoke-split
+
+x-app: &app
+  restart: 'no'
+  networks: [smoke]
+  env_file: [./smoke.env]
+
+x-health: &health
+  test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+  interval: 5s
+  timeout: 3s
+  retries: 12
+  start_period: 20s
+
+services:
+  # --- ingest node ---------------------------------------------------------
+  local-redis:
+    image: redis:7-alpine
+    networks: [smoke]
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # --- cloud node ----------------------------------------------------------
+  cloud-redis:
+    image: redis:7-alpine
+    networks: [smoke]
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  minio:
+    image: minio/minio
+    networks: [smoke]
+    environment:
+      MINIO_ROOT_USER: spotter
+      MINIO_ROOT_PASSWORD: spotter-smoke
+    command: ['server', '/data']
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  minio-init:
+    image: minio/mc
+    networks: [smoke]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 spotter spotter-smoke; do sleep 1; done;
+      mc mb --ignore-existing local/spotter;
+      "
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    networks: [smoke]
+    command: ['mosquitto', '-c', '/mosquitto-no-auth.conf']
+    healthcheck:
+      test: ['CMD-SHELL', 'mosquitto_sub -t healthcheck -E -W 1 || exit 1']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  nvr:
+    build: .
+    networks: [smoke]
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:8080/api/version || exit 1']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # See the note in smoke.single.yml: named volumes start root-owned.
+  volume-permissions:
+    image: alpine
+    networks: [smoke]
+    user: root
+    volumes:
+      - frigate-data:/data/frigate
+      - server-data:/data/server
+    command: ['sh', '-c', 'chown -R 1000:1000 /data/frigate /data/server']
+
+  spotter-frigate:
+    <<: *app
+    image: spotter-smoke/frigate:test
+    environment:
+      REDIS_URL: redis://local-redis:6379
+      SOURCE_TYPE: frigate
+    healthcheck: *health
+    volumes:
+      - frigate-data:/app/data
+    depends_on:
+      local-redis: { condition: service_healthy }
+      nvr: { condition: service_healthy }
+      mosquitto: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      volume-permissions: { condition: service_completed_successfully }
+
+  spotter-depot:
+    <<: *app
+    image: spotter-smoke/depot:test
+    environment:
+      REDIS_URL: redis://local-redis:6379
+    healthcheck: *health
+    depends_on:
+      local-redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+
+  spotter-forwarder:
+    <<: *app
+    image: spotter-smoke/forwarder:test
+    environment:
+      REDIS_LOCAL_URL: redis://local-redis:6379
+      REDIS_REMOTE_URL: redis://cloud-redis:6379
+      FORWARDER_SOURCES: frigate
+    healthcheck: *health
+    depends_on:
+      local-redis: { condition: service_healthy }
+      cloud-redis: { condition: service_healthy }
+
+  spotter-server:
+    <<: *app
+    image: spotter-smoke/server:test
+    environment:
+      REDIS_URL: redis://cloud-redis:6379
+    healthcheck: *health
+    volumes:
+      - server-data:/app/data
+    depends_on:
+      cloud-redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      volume-permissions: { condition: service_completed_successfully }
+
+volumes:
+  frigate-data:
+  server-data:
+
+networks:
+  smoke:
+    driver: bridge
