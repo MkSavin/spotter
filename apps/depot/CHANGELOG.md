@@ -1,5 +1,21 @@
 # @spotter/depot
 
+## 1.3.0
+
+### Minor Changes
+
+- 7611adb: Замена sharp на встроенный `Bun.Image`: из образа уходят нативные бинарники libvips
+
+### Patch Changes
+
+- 32d9796: Обновление рантайма до Bun 1.4
+- Updated dependencies [6fb558c]
+- Updated dependencies [714cf4e]
+- Updated dependencies [044e6ae]
+- Updated dependencies [fdd83e2]
+- Updated dependencies [18a45ec]
+  - @spotter/transport@1.7.0
+
 ## 1.2.12
 
 ### Patch Changes

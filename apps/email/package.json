@@ -1,6 +1,6 @@
 {
   "name": "@spotter/email",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Email frontend: delivery consumer that sends SMTP notifications",
   "main": "index.js",
   "scripts": {

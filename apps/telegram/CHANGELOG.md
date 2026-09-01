@@ -1,5 +1,37 @@
 # @spotter/telegram
 
+## 1.6.1
+
+### Patch Changes
+
+- 32d9796: Обновление рантайма до Bun 1.4
+- 6fb558c: feat: make the PWA a real client, not a read-only feed
+  
+  The PWA could show events and nothing else. It published nothing to the bus, so every action the bot offers — a camera snapshot, a clip, the camera list, service status — simply did not exist there. What blocked all of them was the same missing piece: a way to send a command and hear back.
+  
+  `CommandBus` was telegram-local despite depending on nothing telegram-specific, so it moves to `@spotter/transport` alongside `HeartbeatRegistry` and a role vocabulary that was already copied into two services and about to be copied into a third.
+  
+  **Access is granted once, not once per frontend.** A device now redeems a code through the domain (`device.redeem`) from the same pool `/user_sign` mints for the bot, and gets back the real role the server enforces on every later command. Previously the PWA checked codes against a local `PWA_ACCESS_CODES` list that carried no role at all — which is why nothing beyond reading could have worked even with a channel. A code minted for a named Telegram user is refused: there is no username on a device to match it against, and honouring it would hand a personal code to whoever typed it first.
+  
+  An authorized install lives in its own `devices` table rather than hanging off a push subscription: being authorized is a redeemed code, not permission to send notifications, and browsers rotate a push endpoint without the user doing anything. A role change or revocation reaches the device over `spotter.delivery.recipient`, so a demoted user stops being offered buttons that would only fail.
+  
+  The feed is now behind the same token. It carries snapshots of the house, and serving it to anyone who knows the URL was never intended.
+- 7a2849c: fix: accept multi-day timelapse periods and stop the dialog freezing
+  
+  `28.08 09:00 - 31.08 22:00` did nothing at all. Two separate faults met on that input.
+  
+  The period parser only ever understood a window inside a single day, so anything spanning midnight was rejected. It now takes a date on each side — `28.08 09:00 - 31.08 22:00`, or `28.08-31.08` for whole days — and `позавчера` joins the named days.
+  
+  Worse, the rejection was invisible. A dialog step that takes only buttons had no text handler, and the engine passed the message on instead of answering it: no error, no progress, nothing to react to. Since the speed step is button-only, a typed answer there vanished and the dialog looked frozen. Any step without a text handler now replies rather than staying silent, which fixes the whole class rather than this one command.
+  
+  Common periods are offered as buttons — last 24 hours, today, the two days before it, last 6 hours. Each label carries the actual date instead of the word behind it, because "вчера" read a day later means a different day, and an export runs for minutes before anyone finds out it covered the wrong one.
+- Updated dependencies [6fb558c]
+- Updated dependencies [714cf4e]
+- Updated dependencies [044e6ae]
+- Updated dependencies [fdd83e2]
+- Updated dependencies [18a45ec]
+  - @spotter/transport@1.7.0
+
 ## 1.6.0
 
 ### Minor Changes

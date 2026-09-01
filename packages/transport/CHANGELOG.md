@@ -1,5 +1,60 @@
 # @spotter/transport
 
+## 1.7.0
+
+### Minor Changes
+
+- 6fb558c: feat: make the PWA a real client, not a read-only feed
+  
+  The PWA could show events and nothing else. It published nothing to the bus, so every action the bot offers — a camera snapshot, a clip, the camera list, service status — simply did not exist there. What blocked all of them was the same missing piece: a way to send a command and hear back.
+  
+  `CommandBus` was telegram-local despite depending on nothing telegram-specific, so it moves to `@spotter/transport` alongside `HeartbeatRegistry` and a role vocabulary that was already copied into two services and about to be copied into a third.
+  
+  **Access is granted once, not once per frontend.** A device now redeems a code through the domain (`device.redeem`) from the same pool `/user_sign` mints for the bot, and gets back the real role the server enforces on every later command. Previously the PWA checked codes against a local `PWA_ACCESS_CODES` list that carried no role at all — which is why nothing beyond reading could have worked even with a channel. A code minted for a named Telegram user is refused: there is no username on a device to match it against, and honouring it would hand a personal code to whoever typed it first.
+  
+  An authorized install lives in its own `devices` table rather than hanging off a push subscription: being authorized is a redeemed code, not permission to send notifications, and browsers rotate a push endpoint without the user doing anything. A role change or revocation reaches the device over `spotter.delivery.recipient`, so a demoted user stops being offered buttons that would only fail.
+  
+  The feed is now behind the same token. It carries snapshots of the house, and serving it to anyone who knows the URL was never intended.
+
+### Patch Changes
+
+- 714cf4e: fix: recover when Redis disappears mid-read
+  
+  A consumer could stop consuming for good and give no sign of it. Restarting the Redis *container* — an image update, not a blip — left every service alive, healthy to every check, and reading nothing. Events piled up in the streams with nobody to take them.
+  
+  The cause was not the missing consumer groups the earlier fix addressed. A blocking `XREADGROUP` already in flight when the server dies never settles at all: it neither resolves nor rejects, so the read loop parks on the `await` forever. No error is raised, which is why the NOGROUP recovery never ran — it was never reached. The healthcheck could not see it either, since its `PING` runs on a different connection that reconnects perfectly well.
+  
+  The read now carries a deadline of `BLOCK` plus a grace margin, turning silence into an error the loop can act on: the connection is replaced, and the existing NOGROUP branch then recreates the groups the restarted Redis lost. Measured against a real container, recovery goes from never to a few seconds, and the whole sequence is visible in the log.
+  
+  Found by the new end-to-end suite, which was written expecting a different bug.
+- 044e6ae: docs: rewrite the README for people, not machines
+  
+  The README read like a specification: architecture diagrams above the fold, a stream inventory, release mechanics. Everything true, nothing that answers the first question a visitor has — what does this do for me, and why would I run it.
+  
+  It now opens on the thing itself: a person walks through the yard, and seconds later the phone shows which camera, who, and a frame. Then why you would want it over the alternatives, what it looks like in use, and an install that fits in three lines. Badges, a comparison table and the feature tour follow the conventions of the self-hosted projects people actually adopt.
+  
+  The reference material was moved rather than dropped: the stream inventory now lives in `AGENTS.md` beside the rest of the technical detail, where it is also easier to keep honest.
+  
+  Docs were audited against the code in the same pass. `CommandBus` and `HeartbeatRegistry` had moved to `@spotter/transport` but the telegram docs still pointed at deleted files; the PWA's `devices` and `timelapses` tables and the timelapse streams were undocumented; the command tables predated the e2e and smoke suites. Every link in the live docs now resolves.
+- fdd83e2: test: end-to-end suite over a real bus and both deployment shapes
+  
+  Unit tests kept passing while the product broke, because what breaks is the wiring between services — a stream nobody mirrors, a consumer group that never comes back — and none of that exists inside a single service.
+  
+  The suite runs the services' real controllers against a real Redis in Docker, in both shapes Spotter is deployed in: one node, and ingest+cloud bridged by the forwarder. The split shape matters most — it uses the forwarder's own stream map, so a stream left out of it fails here exactly as in production, by silently never arriving. Only what we do not own is faked: the NVR, S3, Telegram and web-push. Without Docker the suite skips rather than fails, so `bun test` stays green anywhere.
+  
+  Writing it immediately turned up a defect that the earlier reliability work missed. Losing Redis entirely — `docker rm -f` on the container, which is what an image update does — leaves consumers stuck for good: the producer keeps publishing, events pile up, nothing reads them. A `FLUSHALL` recovers, because the connection survives and the NOGROUP branch recreates the groups; destroying the container does not. The reproduction is committed as a `test.failing` rather than deleted to keep the suite green, and the measurements are in `.e2e/README.md`.
+  
+  What this level cannot see: every service's `index.ts` ends in `process.exit`, so the process shell itself is not exercised, and errors in Dockerfiles, env or compose stay invisible to it.
+- 18a45ec: test: compose-level smoke over the real images
+  
+  The in-process suite composes controllers and never starts a container, so a whole category of failure was invisible to it: a broken Dockerfile, a missing environment variable, a healthcheck that never goes green, a service that cannot reach a dependency by container name. Those are deployment bugs, and they only appear at deployment.
+  
+  The smoke brings up both shapes — single-node, and ingest+cloud bridged by the forwarder — from the same Dockerfiles that ship, on a real Redis, MinIO and mosquitto, with real migrations. Only the NVR is faked, as a container the services reach by name like any other. It checks that every service becomes healthy on its own healthcheck, that none crash-loops, that the adapter reaches the NVR and publishes its catalog, and that the catalog arrives at the domain — which on the split shape holds only if the forwarder really carries the stream.
+  
+  `spotter-telegram` is deliberately excluded: grammY is built with a bare token and no `apiRoot`, so the container would dial api.telegram.org for real. Adding production configuration solely to make a test possible is the wrong trade, and the bot's logic is already covered in-process.
+  
+  Kept out of `bun test` — it takes minutes and needs images built first (`bun run smoke:build`, then `bun run test:smoke`). Without them it skips with a hint rather than failing.
+
 ## 1.6.0
 
 ### Minor Changes
