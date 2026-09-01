@@ -19,7 +19,6 @@
   "dependencies": {
     "@spotter/transport": "*",
     "stenograph": "*",
-    "fluent-ffmpeg": "^2.1.3",
-    "sharp": "^0.33.5"
+    "fluent-ffmpeg": "^2.1.3"
   }
 }

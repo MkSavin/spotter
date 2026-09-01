@@ -37,9 +37,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary tooling
-COPY --from=bundle /app/node_modules/@img ./node_modules/@img
-
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/dist/index.js ./
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/package.json ./
 
