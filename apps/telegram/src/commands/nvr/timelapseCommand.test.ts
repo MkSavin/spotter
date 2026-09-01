@@ -132,6 +132,23 @@ describe('timelapse command', () => {
     })
   })
 
+  test('accepts a span crossing midnight into another day', () => {
+    const span = timelapseCommand.args.find((arg) => arg.name === 'span')
+    const context = makeContext().context
+
+    // What a person types for "from the 28th to the 31st".
+    expect(span?.parse?.('28.08 09:00 - 31.08 22:00', context)).toMatchObject({
+      status: 'done',
+    })
+  })
+
+  test('the speed step answers a typed value instead of ignoring it', () => {
+    // Without acceptText the engine silently drops the message and the dialog
+    // looks frozen: no error, no progress.
+    const speed = timelapseCommand.args.find((arg) => arg.name === 'speed')
+    expect(speed?.allowManual).toBe(true)
+  })
+
   test('the signature renders without HTML-unsafe characters', () => {
     // Prompts are sent as HTML; a raw < or > would make Telegram reject them.
     expect(timelapseCommand.signature).not.toMatch(/[<>&]/)

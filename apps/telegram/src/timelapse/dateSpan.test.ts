@@ -72,13 +72,16 @@ describe('parseDateSpan', () => {
     })
   })
 
-  test('accepts bare hours and alternative separators', () => {
+  test('accepts bare hours and slash-separated dates', () => {
     expect(parseDateSpan('15/08/2026 9-18', ZONE, NOW)).toEqual(
       parseDateSpan('15.08.2026 09:00-18:00', ZONE, NOW) as never,
     )
-    expect(parseDateSpan('15-08-26 9-18', ZONE, NOW)).toEqual(
-      parseDateSpan('15.08.2026 09:00-18:00', ZONE, NOW) as never,
-    )
+  })
+
+  test('a dash-separated date is not a date: the dash separates the range', () => {
+    // `15-08-26 9-18` cannot be told apart from a range of two dates, so the
+    // dot and slash forms are the supported ones.
+    expect(parseDateSpan('15-08-26 9-18', ZONE, NOW)).toBeNull()
   })
 
   test('rejects an impossible date instead of rolling it over', () => {
@@ -88,6 +91,43 @@ describe('parseDateSpan', () => {
     expect(parseDateSpan('15.13.2026', ZONE, NOW)).toBeNull()
   })
 
+  test('understands позавчера', () => {
+    expect(parseDateSpan('позавчера', ZONE, NOW)).toEqual(
+      parseDateSpan('13.08.2026', ZONE, NOW) as never,
+    )
+  })
+
+  test('spans several days', () => {
+    // The case that used to be rejected outright.
+    expect(parseDateSpan('28.08 09:00 - 31.08 22:00', ZONE, NOW)).toEqual({
+      start: zonedTime(ZONE, 2026, 8, 28, 9),
+      end: zonedTime(ZONE, 2026, 8, 31, 22),
+    })
+  })
+
+  test('spans whole days when only dates are given', () => {
+    expect(parseDateSpan('28.08-31.08', ZONE, NOW)).toEqual({
+      start: zonedTime(ZONE, 2026, 8, 28),
+      // Inclusive of the last day: through the end of the 31st.
+      end: zonedTime(ZONE, 2026, 9, 1),
+    })
+  })
+
+  test('spans from a named day', () => {
+    expect(parseDateSpan('вчера 20:00 - сегодня', ZONE, NOW)).toBeNull()
+    expect(parseDateSpan('вчера 20:00 - 15.08 08:00', ZONE, NOW)).toEqual({
+      start: zonedTime(ZONE, 2026, 8, 14, 20),
+      end: zonedTime(ZONE, 2026, 8, 15, 8),
+    })
+  })
+
+  test('crosses a month boundary', () => {
+    expect(parseDateSpan('30.07 22:00 - 02.08 06:00', ZONE, NOW)).toEqual({
+      start: zonedTime(ZONE, 2026, 7, 30, 22),
+      end: zonedTime(ZONE, 2026, 8, 2, 6),
+    })
+  })
+
   test('rejects a window that does not move forward', () => {
     expect(parseDateSpan('15.08.2026 18:00-09:00', ZONE, NOW)).toBeNull()
     expect(parseDateSpan('15.08.2026 09:00-09:00', ZONE, NOW)).toBeNull()
@@ -95,7 +135,7 @@ describe('parseDateSpan', () => {
 
   test('rejects nonsense', () => {
     expect(parseDateSpan('', ZONE, NOW)).toBeNull()
-    expect(parseDateSpan('позавчера', ZONE, NOW)).toBeNull()
+    expect(parseDateSpan('когда-то давно', ZONE, NOW)).toBeNull()
     expect(parseDateSpan('15.08.2026 09:00', ZONE, NOW)).toBeNull()
     expect(parseDateSpan('15.08.2026 25:00-26:00', ZONE, NOW)).toBeNull()
   })

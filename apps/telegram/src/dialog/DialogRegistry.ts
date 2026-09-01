@@ -111,7 +111,16 @@ export class DialogRegistry {
       }
 
       const step = definition.steps[state.step]
-      if (!step.acceptText) return next()
+
+      // A step that only takes buttons still owes the user an answer: dropping
+      // the message silently makes the dialog look frozen.
+      if (!step.acceptText) {
+        await applyResult(context, definition, state, {
+          status: 'retry',
+          error: 'Выберите вариант кнопкой',
+        })
+        return
+      }
 
       const result = await step.acceptText(context.message.text, context)
       await applyResult(context, definition, state, result)

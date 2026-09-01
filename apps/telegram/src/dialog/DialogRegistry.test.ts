@@ -140,6 +140,37 @@ describe('DialogRegistry.input', () => {
     expect(next).toHaveBeenCalledTimes(1)
   })
 
+  test('a button-only step says so instead of ignoring the message', async () => {
+    // Silently dropping the text is what makes a dialog look frozen: no error,
+    // no progress, nothing to react to.
+    const complete = mock<DialogComplete>(async () => undefined)
+    const buttonsOnly: DialogDefinition = {
+      kind: 'buttons',
+      steps: [
+        {
+          name: 'choice',
+          render: async () => ({
+            rendered: { text: 'Выберите', acceptsText: false },
+          }),
+        },
+      ],
+      complete,
+    }
+
+    const registry = new DialogRegistry().register(buttonsOnly)
+    const handle = captureInput(registry)
+    const next = mock(async () => undefined)
+
+    const context = makeContext('что-то напечатал')
+    await startDialog(context, buttonsOnly)
+    await handle(context, next)
+
+    // Still on the same step, and the prompt was re-rendered with the notice.
+    expect(complete).not.toHaveBeenCalled()
+    expect(context.session.user.dialog).toBeDefined()
+    expect(next).not.toHaveBeenCalled()
+  })
+
   test('an expired dialog does not swallow the message', async () => {
     const complete = mock<DialogComplete>(async () => undefined)
     const registry = new DialogRegistry().register(definition(complete))

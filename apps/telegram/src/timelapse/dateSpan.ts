@@ -72,13 +72,89 @@ const todayIn = (zone: string, now: Date): [number, number, number] => {
   return [year, month, day]
 }
 
+type CalendarDate = { year: number; month: number; day: number }
+
+/** Shifts a calendar date by whole days, rolling months and years over. */
+const shiftDays = (date: CalendarDate, days: number): CalendarDate => {
+  const moved = new Date(Date.UTC(date.year, date.month - 1, date.day + days))
+  return {
+    year: moved.getUTCFullYear(),
+    month: moved.getUTCMonth() + 1,
+    day: moved.getUTCDate(),
+  }
+}
+
+/** `15.08` / `15.08.2026`, rejecting dates that do not exist. */
+const parseDate = (
+  token: string,
+  zone: string,
+  now: Date,
+): CalendarDate | null => {
+  const match = DATE.exec(token)
+  if (!match) return null
+
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const [currentYear] = todayIn(zone, now)
+
+  const year = match[3]
+    ? Number(match[3]) < 100
+      ? 2000 + Number(match[3])
+      : Number(match[3])
+    : currentYear
+
+  // Reject impossible dates rather than letting Date roll them over: `32.01`
+  // would silently become the 1st of February.
+  const probe = new Date(Date.UTC(year, month - 1, day))
+  if (
+    month < 1 ||
+    month > 12 ||
+    probe.getUTCMonth() + 1 !== month ||
+    probe.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return { year, month, day }
+}
+
+/** `9`, `09:30` → minutes since midnight. */
+const parseTime = (token: string): number | null => {
+  const match = TIME.exec(token)
+  if (!match) return null
+
+  const hour = Number(match[1])
+  const minute = Number(match[2] ?? 0)
+  if (hour > 24 || minute > 59) return null
+
+  return hour * 60 + minute
+}
+
+/** A named day, resolved against `now` in the bot's zone. */
+const KEYWORDS: Record<string, number> = {
+  сегодня: 0,
+  вчера: -1,
+  позавчера: -2,
+}
+
+const atMinutes = (zone: string, date: CalendarDate, minutes: number): number =>
+  zonedTime(
+    zone,
+    date.year,
+    date.month,
+    date.day,
+    Math.floor(minutes / 60),
+    minutes % 60,
+  )
+
 /**
- * Understands what a person would plausibly type for "which day":
+ * Understands what a person would plausibly type for a period:
  *
- *   `сегодня` / `вчера`     — that whole day
- *   `15.08`                 — that day, year inferred
- *   `15.08.2025`            — that day
- *   `15.08 09:00-18:00`     — part of that day
+ *   `сегодня` / `вчера`              — that whole day
+ *   `15.08`                          — that day, year inferred
+ *   `15.08 09:00-18:00`              — part of that day
+ *   `28.08 09:00 - 31.08 22:00`      — across several days
+ *   `28.08-31.08`                    — from the start of one day to the end of another
  *
  * Returns `null` when the text is not a span, so the caller can re-ask.
  */
@@ -90,77 +166,126 @@ export const parseDateSpan = (
   const text = raw.trim().toLowerCase()
   if (!text) return null
 
-  const [head, ...rest] = text.split(/\s+/)
+  // Split on the range dash, tolerating spaces around it. Dots and slashes
+  // inside a date are safe: only a dash separates the two sides.
+  const sides = text.split(/\s*[-–—]\s*/).filter(Boolean)
 
-  let year: number
-  let month: number
-  let day: number
+  // One side and a keyword: a whole named day.
+  if (sides.length === 1) {
+    const single = sides[0]
 
-  if (head === 'сегодня') {
-    ;[year, month, day] = todayIn(zone, now)
-  } else if (head === 'вчера') {
-    const [y, m, d] = todayIn(zone, now)
-    const shifted = new Date(Date.UTC(y, m - 1, d - 1))
-    year = shifted.getUTCFullYear()
-    month = shifted.getUTCMonth() + 1
-    day = shifted.getUTCDate()
-  } else {
-    const match = DATE.exec(head)
-    if (!match) return null
-
-    day = Number(match[1])
-    month = Number(match[2])
-    const [currentYear] = todayIn(zone, now)
-
-    year = match[3]
-      ? Number(match[3]) < 100
-        ? 2000 + Number(match[3])
-        : Number(match[3])
-      : currentYear
-
-    // Reject impossible dates rather than letting Date roll them over: `32.01`
-    // would silently become the 1st of February.
-    const probe = new Date(Date.UTC(year, month - 1, day))
-    if (
-      probe.getUTCMonth() + 1 !== month ||
-      probe.getUTCDate() !== day ||
-      month < 1 ||
-      month > 12
-    ) {
-      return null
+    const offset = KEYWORDS[single]
+    if (offset !== undefined) {
+      const [y, m, d] = todayIn(zone, now)
+      const date = shiftDays({ year: y, month: m, day: d }, offset)
+      return {
+        start: atMinutes(zone, date, 0),
+        end: atMinutes(zone, shiftDays(date, 1), 0),
+      }
     }
-  }
 
-  const window = rest.join('')
+    const date = parseDate(single, zone, now)
+    if (!date) return null
 
-  if (!window) {
     return {
-      start: zonedTime(zone, year, month, day),
       // Exclusive end: the next midnight, so the whole day is covered.
-      end: zonedTime(zone, year, month, day + 1),
+      start: atMinutes(zone, date, 0),
+      end: atMinutes(zone, shiftDays(date, 1), 0),
     }
   }
 
-  const [from, to] = window.split('-')
-  if (!from || !to) return null
+  if (sides.length !== 2) return null
 
-  const fromMatch = TIME.exec(from)
-  const toMatch = TIME.exec(to)
-  if (!fromMatch || !toMatch) return null
+  const [left, right] = sides.map((side) => side.split(/\s+/).filter(Boolean))
 
-  const fromHour = Number(fromMatch[1])
-  const toHour = Number(toMatch[1])
-  const fromMinute = Number(fromMatch[2] ?? 0)
-  const toMinute = Number(toMatch[2] ?? 0)
+  // The left side always starts with a date; a keyword stands in for one.
+  const leftKeyword = KEYWORDS[left[0]]
+  let leftDate: CalendarDate | null
 
-  if (fromHour > 24 || toHour > 24 || fromMinute > 59 || toMinute > 59) {
+  if (leftKeyword !== undefined) {
+    const [y, m, d] = todayIn(zone, now)
+    leftDate = shiftDays({ year: y, month: m, day: d }, leftKeyword)
+  } else {
+    leftDate = parseDate(left[0], zone, now)
+  }
+
+  if (!leftDate) return null
+
+  const leftTime = left[1] ? parseTime(left[1]) : 0
+  if (leftTime === null || left.length > 2) return null
+
+  // The right side may repeat the date (`28.08 09:00 - 31.08 22:00`) or give
+  // only a time, meaning the same day (`15.08 09:00-18:00`).
+  let rightDate: CalendarDate
+  let rightTime: number | null
+
+  if (right.length === 2) {
+    const parsed = parseDate(right[0], zone, now)
+    if (!parsed) return null
+    rightDate = parsed
+    rightTime = parseTime(right[1])
+  } else if (right.length === 1) {
+    const asTime = parseTime(right[0])
+
+    if (asTime !== null) {
+      // A bare time belongs to the starting day.
+      rightDate = leftDate
+      rightTime = asTime
+    } else {
+      // A bare date means the end of that day.
+      const parsed = parseDate(right[0], zone, now)
+      if (!parsed) return null
+      rightDate = shiftDays(parsed, 1)
+      rightTime = 0
+    }
+  } else {
     return null
   }
 
-  const start = zonedTime(zone, year, month, day, fromHour, fromMinute)
-  const end = zonedTime(zone, year, month, day, toHour, toMinute)
+  if (rightTime === null) return null
+
+  const start = atMinutes(zone, leftDate, leftTime)
+  const end = atMinutes(zone, rightDate, rightTime)
 
   return end > start ? { start, end } : null
+}
+
+/**
+ * Ready-made periods offered as buttons. Labels carry the actual dates rather
+ * than the word behind them: "вчера" on a card the user reads tomorrow means
+ * something else, and a timelapse is worth being sure about before it runs for
+ * minutes.
+ */
+export const quickSpans = (
+  zone: string,
+  now: Date = new Date(),
+): Array<{ code: string; label: string }> => {
+  const format = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: zone,
+    day: '2-digit',
+    month: '2-digit',
+  })
+
+  const day = (offset: number): { code: string; label: string } => {
+    const [y, m, d] = todayIn(zone, now)
+    const date = shiftDays({ year: y, month: m, day: d }, offset)
+    const start = atMinutes(zone, date, 0)
+    const end = atMinutes(zone, shiftDays(date, 1), 0)
+    const stamp = format.format(new Date(start * 1000))
+
+    return {
+      code: `${start}-${end}`,
+      label: offset === 0 ? `📅 Сегодня (${stamp})` : `📅 ${stamp}`,
+    }
+  }
+
+  const nowSeconds = Math.floor(now.getTime() / 1000)
+  const hours = (count: number) => ({
+    code: `${nowSeconds - count * 3600}-${nowSeconds}`,
+    label: `🕐 Последние ${count} ч`,
+  })
+
+  return [hours(24), day(0), day(-1), day(-2), hours(6)]
 }
 
 /** Renders a span the way it was most likely typed, for confirmation. */

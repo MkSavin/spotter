@@ -5,7 +5,7 @@ import {
 } from '@spotter/transport'
 import type { BotContext } from '../../context'
 import { escapeHtml } from '../../helpers/html'
-import { formatSpan, parseDateSpan } from '../../timelapse/dateSpan'
+import { formatSpan, parseDateSpan, quickSpans } from '../../timelapse/dateSpan'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 /**
@@ -38,9 +38,12 @@ class TimelapseCommand extends SpotterCommand {
     },
     {
       name: 'span',
-      hint: 'дата',
+      hint: 'период',
       prompt:
-        '📆 <b>За какой период?</b>\n\nНапример: <code>сегодня</code>, <code>вчера</code>, <code>15.08</code> или <code>15.08 09:00-18:00</code>',
+        '📆 <b>За какой период?</b>\n\nВыберите готовый или введите свой:\n<code>15.08</code> · <code>15.08 09:00-18:00</code> · <code>28.08 09:00 - 31.08 22:00</code>',
+      // Buttons for the common periods; anything else is typed.
+      choices: (context: BotContext) => quickSpans(context.config.timezone),
+      allowManual: true,
       parse: (raw: string, context: BotContext) => {
         const span = parseDateSpan(raw, context.config.timezone)
         return span
@@ -59,6 +62,9 @@ class TimelapseCommand extends SpotterCommand {
       hint: 'скорость',
       prompt: '⏱ <b>Выберите скорость</b>',
       choices: () => SPEEDS.map(({ code, label }) => ({ code, label })),
+      // Without this the engine has no text handler for the step and silently
+      // drops anything typed there — the dialog just looks frozen.
+      allowManual: true,
       parse: (raw: string) => {
         const value = raw.trim().toLowerCase()
         const found = SPEEDS.find((speed) => speed.code === value)
