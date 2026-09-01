@@ -15,6 +15,13 @@
       "when": 1788263276997,
       "tag": "0001_odd_lady_ursula",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788265746535,
+      "tag": "0002_bored_longshot",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,13 @@ import {
   testPushHandler,
   unsubscribeHandler,
 } from './handlers/subscriptions'
+import { startTimelapseHandler, timelapsesHandler } from './handlers/timelapses'
+import {
+  revokeHandler,
+  setRoleHandler,
+  signHandler,
+  usersHandler,
+} from './handlers/users'
 import { vapidHandler } from './handlers/vapid'
 import { json } from './http'
 import { serveStatic } from './static'
@@ -40,6 +47,14 @@ export const createServer = (context: CoreContext) =>
       '/api/status': (req) => statusHandler(req, context),
       '/api/snapshot': { POST: (req) => snapshotHandler(req, context) },
       '/api/clip': { POST: (req) => clipHandler(req, context) },
+      '/api/timelapses': {
+        GET: (req) => timelapsesHandler(req, context),
+        POST: (req) => startTimelapseHandler(req, context),
+      },
+      '/api/users': { GET: (req) => usersHandler(req, context) },
+      '/api/users/role': { POST: (req) => setRoleHandler(req, context) },
+      '/api/users/revoke': { POST: (req) => revokeHandler(req, context) },
+      '/api/users/sign': { POST: (req) => signHandler(req, context) },
     },
     fetch: (request) => serveStatic(request),
     error: (error) => {

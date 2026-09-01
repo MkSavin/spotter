@@ -6,6 +6,7 @@ import { applicationLogger } from '../log'
 import {
   deviceRedeemHandler,
   loginRedeemHandler,
+  userListHandler,
   userSignHandler,
 } from './handlers'
 
@@ -93,6 +94,59 @@ describe('deviceRedeemHandler', () => {
 
     // And the code survives for its intended owner.
     expect(tokensRepo.find(db, 'c-named')).toBeDefined()
+  })
+})
+
+describe('userListHandler', () => {
+  let db: ServerDatabase
+
+  beforeEach(() => {
+    db = createDatabase(':memory:')
+  })
+
+  test('lists both kinds of recipient', async () => {
+    recipientsRepo.upsertByTgUserId(db, {
+      uuid: 'u-tg',
+      tgUserId: '42',
+      username: 'alice',
+      role: 'ADMIN',
+    })
+    recipientsRepo.upsertByDeviceId(db, {
+      uuid: 'u-dev',
+      deviceId: 'device-1',
+      role: 'USER',
+    })
+
+    const reply = await userListHandler({}, makeContext(db))
+    const { users } = reply.data as {
+      users: Array<{ uuid: string; deviceId: string | null }>
+    }
+
+    expect(users).toHaveLength(2)
+    // A PWA recipient has no tgUserId; it must still be visible to manage.
+    expect(users.find((user) => user.uuid === 'u-dev')?.deviceId).toBe(
+      'device-1',
+    )
+  })
+
+  test('an empty domain lists nobody rather than failing', async () => {
+    const reply = await userListHandler({}, makeContext(db))
+    expect((reply.data as { users: unknown[] }).users).toEqual([])
+  })
+})
+
+describe('findByRef', () => {
+  test('resolves a device recipient by uuid', () => {
+    const db = createDatabase(':memory:')
+    recipientsRepo.upsertByDeviceId(db, {
+      uuid: 'u-dev',
+      deviceId: 'device-1',
+      role: 'USER',
+    })
+
+    // It has neither a tgUserId nor a username, so the uuid is the only handle
+    // an admin can revoke it by.
+    expect(recipientsRepo.findByRef(db, 'u-dev')?.uuid).toBe('u-dev')
   })
 })
 

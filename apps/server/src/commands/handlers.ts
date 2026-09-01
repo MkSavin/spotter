@@ -115,6 +115,25 @@ export const loginRedeemHandler: CommandHandler = async (args, context) => {
   })
 }
 
+/**
+ * Everyone who has access. Read-only, so any admin frontend can render the
+ * same list the bot would print.
+ */
+export const userListHandler: CommandHandler = async (_args, context) => {
+  const recipients = recipientsRepo.list(context.db)
+
+  return ok({
+    users: recipients.map((recipient) => ({
+      uuid: recipient.uuid,
+      role: recipient.role,
+      username: recipient.username,
+      tgUserId: recipient.tgUserId,
+      deviceId: recipient.deviceId,
+      authorizedAt: recipient.authorizedAt?.getTime?.() ?? null,
+    })),
+  })
+}
+
 /** Changes a recipient's role; publishes a delivery.recipient event. */
 export const userSetRoleHandler: CommandHandler = async (args, context) => {
   const { db, producer } = context
@@ -270,6 +289,7 @@ export const eventClipHandler: CommandHandler = async (args, context) => {
 export const commandHandlers: Record<string, CommandHandler> = {
   'login.redeem': loginRedeemHandler,
   'device.redeem': deviceRedeemHandler,
+  'user.list': userListHandler,
   'user.setRole': userSetRoleHandler,
   'user.revoke': userRevokeHandler,
   'user.sign': userSignHandler,
@@ -286,6 +306,7 @@ export const commandHandlers: Record<string, CommandHandler> = {
 export const commandAccess: Record<string, CommandAccess> = {
   'login.redeem': 'anonymous',
   'device.redeem': 'anonymous',
+  'user.list': RoleEnum.ADMIN,
   'user.setRole': RoleEnum.ADMIN,
   'user.revoke': RoleEnum.ADMIN,
   'user.sign': RoleEnum.ADMIN,

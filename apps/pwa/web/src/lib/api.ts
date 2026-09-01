@@ -2,9 +2,12 @@ import { forget, token } from './session'
 import type {
   CameraEntry,
   FeedEntry,
+  ManagedUser,
   Role,
   ServiceStatus,
   SubscriptionStatus,
+  Timelapse,
+  TimelapseSpeed,
 } from './types'
 
 export class ApiError extends Error {
@@ -100,5 +103,44 @@ export const api = {
     request<{ ok: boolean }>('/api/clip', {
       method: 'POST',
       body: JSON.stringify({ eventId }),
+    }),
+
+  timelapses: () =>
+    request<{ timelapses: Timelapse[] }>('/api/timelapses').then(
+      (r) => r.timelapses,
+    ),
+
+  startTimelapse: (input: {
+    camera: string
+    start: number
+    end: number
+    speed: TimelapseSpeed
+  }) =>
+    request<{ ok: boolean }>('/api/timelapses', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  users: () =>
+    request<{ ok: boolean; data: { users: ManagedUser[] } }>('/api/users').then(
+      (r) => r.data.users,
+    ),
+
+  setUserRole: (ref: string, role: Role) =>
+    request<{ ok: boolean }>('/api/users/role', {
+      method: 'POST',
+      body: JSON.stringify({ ref, role }),
+    }),
+
+  revokeUser: (ref: string) =>
+    request<{ ok: boolean }>('/api/users/revoke', {
+      method: 'POST',
+      body: JSON.stringify({ ref }),
+    }),
+
+  signUser: (role: Role, username?: string) =>
+    request<{ ok: boolean; data: { code: string } }>('/api/users/sign', {
+      method: 'POST',
+      body: JSON.stringify({ role, username }),
     }),
 }

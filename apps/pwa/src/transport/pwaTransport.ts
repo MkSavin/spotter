@@ -5,11 +5,16 @@ import {
   heartbeatStream,
   RedisRegulator,
   type RegulatorHandle,
+  timelapseStreams,
 } from '@spotter/transport'
 import type { CoreContext, TransportContext } from '../context'
 import { deliveryEventController } from './controllers/deliveryEventController'
 import { heartbeatController } from './controllers/heartbeatController'
 import { recipientController } from './controllers/recipientController'
+import {
+  timelapseFailedController,
+  timelapseReadyController,
+} from './controllers/timelapseController'
 
 export const pwaTransport = async (
   context: CoreContext,
@@ -21,6 +26,8 @@ export const pwaTransport = async (
     .message(deliveryStreams.deliveryRecipient, recipientController)
     .message(catalogUpdatedStream, catalogController)
     .message(heartbeatStream, heartbeatController)
+    .message(timelapseStreams.ready, timelapseReadyController)
+    .message(timelapseStreams.failed, timelapseFailedController)
     .run(
       { ...context, logger },
       {

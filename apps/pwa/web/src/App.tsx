@@ -4,13 +4,15 @@ import type { Status } from '@/components/StatusDot'
 import { Toaster } from '@/components/ui/sonner'
 import { PushProvider, usePush } from '@/hooks/pushContext'
 import { navigate, usePathname } from '@/lib/router'
-import { isAuthorized } from '@/lib/session'
+import { hasRole, isAuthorized } from '@/lib/session'
 import { CamerasPage } from '@/pages/CamerasPage'
 import { EventPage } from '@/pages/EventPage'
 import { FeedPage } from '@/pages/FeedPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { SetupPage } from '@/pages/SetupPage'
 import { StatusPage } from '@/pages/StatusPage'
+import { TimelapsePage } from '@/pages/TimelapsePage'
+import { UsersPage } from '@/pages/UsersPage'
 
 const toStatus = (push: ReturnType<typeof usePush>): Status => {
   if (push.permission === 'denied') return 'blocked'
@@ -26,6 +28,11 @@ function Routes({ status }: { status: Status }) {
   if (pathname === '/setup') return <SetupPage />
   if (pathname === '/cameras') return <CamerasPage />
   if (pathname === '/status') return <StatusPage />
+  if (pathname === '/timelapses') return <TimelapsePage />
+  // Not merely hidden: the routes behind it are refused without ADMIN anyway.
+  if (pathname === '/users') {
+    return hasRole('ADMIN') ? <UsersPage /> : <FeedPage status={status} />
+  }
   return <FeedPage status={status} />
 }
 

@@ -37,6 +37,29 @@ export type ServiceStatus = {
   details?: Record<string, string>
 }
 
+export type TimelapseSpeed = 'realtime' | 'timelapse'
+
+export type Timelapse = {
+  id: string
+  camera: string
+  start: number
+  end: number
+  speed: TimelapseSpeed
+  state: 'running' | 'ready' | 'failed'
+  reason?: string
+  videoUrl?: string
+  createdAt: number
+}
+
+export type ManagedUser = {
+  uuid: string
+  role: Role
+  username: string | null
+  tgUserId: string | null
+  deviceId: string | null
+  authorizedAt: number | null
+}
+
 export type SubscriptionStatus = {
   endpoint: string
   authorized: boolean

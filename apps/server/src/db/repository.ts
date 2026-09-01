@@ -30,16 +30,32 @@ export const recipientsRepo = {
     db.select().from(recipients).where(eq(recipients.tgUserId, tgUserId)).get(),
 
   /** Resolves by numeric tg_user_id or @username (first match). */
-  findByRef: (db: ServerDatabase, ref: string): Recipient | undefined =>
-    db
+  /**
+   * Resolves a recipient by whatever identifies it: a Telegram id, a username,
+   * or its uuid. The uuid is what a PWA-created recipient has — it has neither
+   * of the others, so without it such a recipient could never be managed.
+   */
+  findByRef: (db: ServerDatabase, ref: string): Recipient | undefined => {
+    const trimmed = ref.trim()
+
+    const byIdentity = db
       .select()
       .from(recipients)
       .where(
-        isNumericId(ref)
-          ? eq(recipients.tgUserId, ref.trim())
-          : eq(recipients.username, normalizeUsername(ref)),
+        isNumericId(trimmed)
+          ? eq(recipients.tgUserId, trimmed)
+          : eq(recipients.username, normalizeUsername(trimmed)),
       )
-      .get(),
+      .get()
+
+    if (byIdentity) return byIdentity
+
+    return db
+      .select()
+      .from(recipients)
+      .where(eq(recipients.uuid, trimmed))
+      .get()
+  },
 
   upsertByTgUserId: (
     db: ServerDatabase,

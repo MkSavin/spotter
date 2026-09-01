@@ -1,10 +1,12 @@
 import {
   Activity,
+  Clapperboard,
   Monitor,
   Moon,
   Radar,
   Settings,
   Sun,
+  Users,
   Video,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,6 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { type Theme, useTheme } from '@/hooks/useTheme'
+import { hasRole } from '@/lib/session'
 import { Link, navigate } from '@/lib/router'
 import { StatusDot, type Status } from './StatusDot'
 
@@ -56,6 +59,36 @@ export function Header({ status }: { status: Status }) {
             </TooltipTrigger>
             <TooltipContent>Камеры</TooltipContent>
           </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Таймлапсы"
+                onClick={() => navigate('/timelapses')}
+              >
+                <Clapperboard className="size-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Таймлапсы</TooltipContent>
+          </Tooltip>
+
+          {hasRole('ADMIN') && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Пользователи"
+                  onClick={() => navigate('/users')}
+                >
+                  <Users className="size-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Пользователи</TooltipContent>
+            </Tooltip>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>

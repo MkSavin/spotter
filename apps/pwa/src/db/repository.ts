@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import type { PwaDatabase } from './client'
 import {
   type DeviceRow,
@@ -8,9 +8,112 @@ import {
   pushSubscriptions,
   type RecentEvent,
   recentEvents,
+  type TimelapseRow,
+  timelapses,
 } from './schema'
 
 export type PushKeys = { endpoint: string; p256dh: string; auth: string }
+
+/**
+ * Identifies an export by what both sides know. The adapter's `ready` message
+ * carries no request id, so the camera and the exact span are the correlation
+ * key — and making it the row id means a redelivery updates the same row
+ * instead of adding a duplicate.
+ */
+export const timelapseId = (
+  camera: string,
+  start: number,
+  end: number,
+): string => `${camera}:${start}:${end}`
+
+export const timelapsesRepo = {
+  start: (
+    db: PwaDatabase,
+    input: {
+      camera: string
+      start: number
+      end: number
+      speed: string
+      requestedBy: string
+    },
+  ): TimelapseRow =>
+    db
+      .insert(timelapses)
+      .values({
+        id: timelapseId(input.camera, input.start, input.end),
+        ...input,
+        state: 'running',
+      })
+      .onConflictDoUpdate({
+        target: timelapses.id,
+        // Asking again for a span that failed should retry it, not show the
+        // old failure forever.
+        set: { state: 'running', reason: null, videoKey: null },
+      })
+      .returning()
+      .get(),
+
+  settle: (
+    db: PwaDatabase,
+    input: {
+      camera: string
+      start: number
+      end: number
+      speed: string
+      state: 'ready' | 'failed'
+      videoKey?: string
+      reason?: string
+    },
+  ): void => {
+    const id = timelapseId(input.camera, input.start, input.end)
+
+    db.insert(timelapses)
+      .values({
+        id,
+        camera: input.camera,
+        start: input.start,
+        end: input.end,
+        speed: input.speed,
+        state: input.state,
+        videoKey: input.videoKey,
+        reason: input.reason,
+        // An export can finish after a restart that lost the request; record
+        // it anyway rather than dropping a video that exists.
+        requestedBy: 'unknown',
+      })
+      .onConflictDoUpdate({
+        target: timelapses.id,
+        set: {
+          state: input.state,
+          videoKey: input.videoKey,
+          reason: input.reason,
+        },
+      })
+      .run()
+  },
+
+  /**
+   * Fails whatever this camera still has running. The adapter's failure notice
+   * carries no span — only the camera and the reason — so there is nothing
+   * finer to match on; in practice a camera has one export in flight.
+   */
+  failRunning: (db: PwaDatabase, camera: string, reason: string): void => {
+    db.update(timelapses)
+      .set({ state: 'failed', reason })
+      .where(
+        and(eq(timelapses.camera, camera), eq(timelapses.state, 'running')),
+      )
+      .run()
+  },
+
+  list: (db: PwaDatabase, limit = 50): TimelapseRow[] =>
+    db
+      .select()
+      .from(timelapses)
+      .orderBy(desc(timelapses.createdAt))
+      .limit(limit)
+      .all(),
+}
 
 export const devicesRepo = {
   /** Records an authorized install, replacing any earlier grant for it. */

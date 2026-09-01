@@ -68,6 +68,32 @@ export const devices = sqliteTable('devices', {
   seenAt: integer('seen_at', { mode: 'timestamp_ms' }).notNull().default(now),
 })
 
+/**
+ * Timelapse exports this instance knows about.
+ *
+ * An export outlives the request that started it by minutes, so a restart in
+ * between would otherwise lose it entirely — the video would be staged and
+ * nobody would be waiting. `video_key` is filled once it is ready.
+ */
+export const timelapses = sqliteTable('timelapses', {
+  id: text('id').primaryKey(),
+  camera: text('camera').notNull(),
+  /** Unix seconds. */
+  start: integer('start').notNull(),
+  end: integer('end').notNull(),
+  speed: text('speed').notNull(),
+  /** `running` → `ready` | `failed`. */
+  state: text('state').notNull(),
+  videoKey: text('video_key'),
+  /** Why it failed, for the card to explain itself. */
+  reason: text('reason'),
+  requestedBy: text('requested_by').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(now),
+})
+
+export type TimelapseRow = InferSelectModel<typeof timelapses>
 export type DeviceRow = InferSelectModel<typeof devices>
 export type PushSubscriptionRow = InferSelectModel<typeof pushSubscriptions>
 export type NotifiedEvent = InferSelectModel<typeof notifiedEvents>

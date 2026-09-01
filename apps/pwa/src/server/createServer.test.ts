@@ -7,16 +7,27 @@ import { createServer } from './createServer'
 defaultLogger.disable()
 
 /** Stands in for the server: accepts one code, refuses everything else. */
+const sentCommands: Array<{ kind: string; args: Record<string, unknown> }> = []
+
 const commandBus = {
   send: async (kind: string, args: Record<string, unknown>) => {
-    if (kind !== 'device.redeem') return { requestId: '1', ok: true }
-    return args.code === 'LETMEIN'
-      ? {
-          requestId: '1',
-          ok: true,
-          data: { recipientUuid: 'r-1', role: 'ADMIN' },
-        }
-      : { requestId: '1', ok: false, error: 'not-found' }
+    sentCommands.push({ kind, args })
+
+    if (kind === 'device.redeem') {
+      return args.code === 'LETMEIN'
+        ? {
+            requestId: '1',
+            ok: true,
+            data: { recipientUuid: 'r-1', role: 'ADMIN' },
+          }
+        : { requestId: '1', ok: false, error: 'not-found' }
+    }
+
+    if (kind === 'user.list') {
+      return { requestId: '1', ok: true, data: { users: [] } }
+    }
+
+    return { requestId: '1', ok: true, data: {} }
   },
 }
 
@@ -142,6 +153,90 @@ describe('createServer', () => {
 
     expect(res.status).toBe(404)
     expect(published).toHaveLength(0)
+  })
+
+  test('a timelapse request reaches the adapter and is recorded', async () => {
+    const token = await authorizeDevice('device-tl')
+    published.length = 0
+
+    const res = await fetch(`${base}/api/timelapses`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        camera: 'front',
+        start: 1_700_000_000,
+        end: 1_700_003_600,
+        speed: 'timelapse',
+      }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(published[0]?.stream).toBe('spotter.timelapse.request.frigate')
+
+    // Recorded as running, so a restart mid-export does not lose it.
+    const list = await fetch(`${base}/api/timelapses`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const body = (await list.json()) as {
+      timelapses: Array<{ state: string; camera: string }>
+    }
+    expect(body.timelapses[0]).toMatchObject({
+      state: 'running',
+      camera: 'front',
+    })
+  })
+
+  test('a backwards period is refused before publishing', async () => {
+    const token = await authorizeDevice('device-tl2')
+    published.length = 0
+
+    const res = await fetch(`${base}/api/timelapses`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        camera: 'front',
+        start: 1_700_003_600,
+        end: 1_700_000_000,
+        speed: 'timelapse',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+    expect(published).toHaveLength(0)
+  })
+
+  test('user management forwards to the domain', async () => {
+    const token = await authorizeDevice('device-admin')
+    sentCommands.length = 0
+
+    await fetch(`${base}/api/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(sentCommands.at(-1)?.kind).toBe('user.list')
+
+    await fetch(`${base}/api/users/role`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ref: 'someone', role: 'USER' }),
+    })
+    expect(sentCommands.at(-1)).toMatchObject({
+      kind: 'user.setRole',
+      args: { ref: 'someone', role: 'USER' },
+    })
+  })
+
+  test('an admin cannot revoke themselves', async () => {
+    // The grant in these tests is recipient r-1; revoking it would lock the
+    // last admin out of the domain.
+    const token = await authorizeDevice('device-admin2')
+
+    const res = await fetch(`${base}/api/users/revoke`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ref: 'r-1' }),
+    })
+
+    expect(res.status).toBe(400)
   })
 
   test('cameras and status need a token too', async () => {
