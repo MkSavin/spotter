@@ -1,6 +1,6 @@
+import { satisfies } from '@spotter/transport'
 import type { ServerDatabase } from '../db/client'
 import { recipientsRepo } from '../db/repository'
-import { ROLE_RANK } from '../db/schema'
 import type { CommandAccess } from './handlers'
 
 export type AuthorizeResult =
@@ -28,9 +28,7 @@ export const authorizeCommand = (
     : undefined
   if (!principal) return { ok: false, error: 'forbidden' }
 
-  if (required === 'authorized') return { ok: true }
-
-  return ROLE_RANK[principal.role] >= ROLE_RANK[required]
+  return satisfies(required, principal.role)
     ? { ok: true }
     : { ok: false, error: 'forbidden' }
 }
