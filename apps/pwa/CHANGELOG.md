@@ -1,5 +1,13 @@
 # @spotter/pwa
 
+## 0.3.1
+
+### Patch Changes
+
+- 762b599: Исправлен вход в PWA: запрос без пригодного заголовка `Host` ронял раздачу статики с `Invalid URL`, и сервер отвечал 500. `CommandBus` больше не крутит горячий цикл, пока Redis грузит AOF
+- Updated dependencies [762b599]
+  - @spotter/transport@1.8.1
+
 ## 0.3.0
 
 ### Minor Changes
