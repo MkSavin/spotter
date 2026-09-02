@@ -1,5 +1,13 @@
 # @spotter/pwa
 
+## 0.3.1
+
+### Patch Changes
+
+- 762b599: fix: stop 500-ing the PWA login. A request without a usable `Host` header broke static serving with `Invalid URL`, and the server answered 500. `CommandBus` no longer spins a hot loop while Redis loads its AOF
+- Updated dependencies [762b599]
+  - @spotter/transport@1.8.1
+
 ## 0.3.0
 
 ### Minor Changes
