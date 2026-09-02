@@ -82,6 +82,29 @@ describe('createServer', () => {
     expect(await res.json()).toEqual({ publicKey: 'PUBKEY' })
   })
 
+  test('GET /api/config reports the debug flag', async () => {
+    const res = await fetch(`${base}/api/config`)
+    // The browser reads this before its first render to decide whether to trace.
+    expect(await res.json()).toEqual({ debug: false })
+  })
+
+  test('/api/config needs no bearer — it is read before login', async () => {
+    const res = await fetch(`${base}/api/config`)
+    expect(res.status).toBe(200)
+  })
+
+  test('a deviceId shorter than the minimum is refused, not passed on', async () => {
+    const before = sentCommands.length
+    const res = await fetch(`${base}/api/auth`, {
+      method: 'POST',
+      body: JSON.stringify({ deviceId: 'short', code: 'LETMEIN' }),
+    })
+
+    expect(res.status).toBe(400)
+    // Nothing reached the domain: a malformed body is rejected at the edge.
+    expect(sentCommands.length).toBe(before)
+  })
+
   test('a rejected code yields no token', async () => {
     const res = await fetch(`${base}/api/auth`, {
       method: 'POST',

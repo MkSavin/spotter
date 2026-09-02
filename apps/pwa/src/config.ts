@@ -38,6 +38,8 @@ export type Config = {
   publicUrl: string
   /** Window that collapses a storm of events into one push notification. */
   coalesceMs: number
+  /** Verbose request/auth tracing, on both the server and the browser. */
+  debug: boolean
 }
 
 export const resolveConfig = (): Config => {
@@ -66,6 +68,7 @@ export const resolveConfig = (): Config => {
     port: env.number('PORT', 3000),
     publicUrl: env.string('PUBLIC_URL', ''),
     coalesceMs: env.number('PWA_COALESCE_MS', 45000),
+    debug: env.string('PWA_DEBUG', '') === 'true',
   }
 
   requireConfig({

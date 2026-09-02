@@ -16,21 +16,31 @@ export const authHandler = async (
   request: Request,
   context: CoreContext,
 ): Promise<Response> => {
+  const trace = context.logger.sub('auth')
+
   const parsed = await parseBody(request, authBody)
-  if (!parsed.ok) return parsed.response
+  if (!parsed.ok) {
+    // A malformed body is the client's fault, but silently 400-ing it leaves
+    // nothing to debug when the shape is subtly wrong (a short deviceId, say).
+    trace.warn('Rejected malformed auth body')
+    return parsed.response
+  }
 
   const { deviceId, code, label } = parsed.data
+  if (context.config.debug)
+    trace.info(`Redeem attempt from ${deviceId} (${label ?? 'no label'})`)
 
   let reply: Awaited<ReturnType<typeof context.commandBus.send>>
 
   try {
     reply = await context.commandBus.send('device.redeem', { code, deviceId })
   } catch (error) {
-    context.logger.warn('device.redeem did not answer', error)
+    trace.warn('device.redeem did not answer', error)
     return json({ ok: false, error: 'unavailable' }, { status: 503 })
   }
 
   if (!reply.ok) {
+    trace.warn(`Redeem refused for ${deviceId}: ${reply.error ?? 'not-found'}`)
     // Pass the domain's reason through: "bound to a Telegram account" and
     // "expired" are different problems with different fixes, and collapsing
     // them into one message leaves the user guessing which they hit.
@@ -57,5 +67,6 @@ export const authHandler = async (
     label,
   })
 
+  trace.info(`Device ${deviceId} authorized as ${role}`)
   return json({ ok: true, token, role })
 }

@@ -1,3 +1,4 @@
+import { log } from './log'
 import { forget, token } from './session'
 import type {
   CameraEntry,
@@ -26,7 +27,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const bearer = token()
   if (bearer) headers.Authorization = `Bearer ${bearer}`
 
-  const response = await fetch(path, { ...init, headers })
+  const method = init?.method ?? 'GET'
+  const started = Date.now()
+  log.debug(`→ ${method} ${path}`, { authorized: !!bearer })
+
+  let response: Response
+  try {
+    response = await fetch(path, { ...init, headers })
+  } catch (error) {
+    // The request never left, or the connection dropped. Distinct from an HTTP
+    // error and easy to mistake for one when only the UI message is visible.
+    log.error(`✗ ${method} ${path} — network failure`, error)
+    throw error
+  }
+
+  log.debug(`← ${response.status} ${method} ${path}`, {
+    ms: Date.now() - started,
+  })
 
   if (!response.ok) {
     // The grant is gone (revoked, or the service lost its database): drop it
@@ -36,6 +53,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = (await response.json().catch(() => ({}))) as {
       error?: string
     }
+    log.warn(`✗ ${method} ${path} → ${response.status}`, body)
     throw new ApiError(response.status, body.error ?? response.statusText)
   }
 

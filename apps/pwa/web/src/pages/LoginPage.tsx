@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api, ApiError } from '@/lib/api'
+import { log } from '@/lib/log'
 import { deviceId, remember } from '@/lib/session'
 
 /** A short, friendly name for the device, so /status is readable later. */
@@ -31,9 +32,18 @@ const DENIALS: Record<string, string> = {
 }
 
 const loginError = (caught: unknown): string => {
-  if (!(caught instanceof ApiError)) return 'Не удалось войти. Попробуйте ещё раз.'
-  if (caught.status === 503) return 'Сервис недоступен. Попробуйте позже.'
-  return DENIALS[caught.message] ?? 'Неверный или уже использованный код.'
+  if (caught instanceof ApiError) {
+    if (caught.status === 503) return 'Сервис недоступен. Попробуйте позже.'
+    return DENIALS[caught.message] ?? 'Неверный или уже использованный код.'
+  }
+
+  // Never reached the server. Naming the cause matters: over plain HTTP the
+  // browser withholds Web Crypto, and the old message ("попробуйте ещё раз")
+  // sent people to retry a code that was never the problem.
+  if (caught instanceof TypeError && /crypto|randomUUID/i.test(caught.message)) {
+    return 'Браузер заблокировал криптографию: откройте приложение по HTTPS.'
+  }
+  return 'Не удалось отправить запрос. Проверьте соединение и адрес (нужен HTTPS).'
 }
 
 export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
@@ -49,10 +59,18 @@ export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
     setError(null)
 
     try {
-      const result = await api.authorize(deviceId(), value, guessLabel())
+      // Resolved before the call so a failure here is distinguishable: minting
+      // the id touches storage and Web Crypto, and when it throws no request is
+      // ever sent — the symptom is a login error with an empty network log.
+      const id = deviceId()
+      log.info('Submitting access code', { deviceId: id, length: value.length })
+
+      const result = await api.authorize(id, value, guessLabel())
       remember({ token: result.token, role: result.role })
+      log.info('Authorized', { role: result.role })
       onAuthorized()
     } catch (caught) {
+      log.error('Login failed', caught)
       setError(loginError(caught))
     } finally {
       setBusy(false)
