@@ -1,5 +1,13 @@
 import type { z } from 'zod'
 
+/**
+ * Query params of a request, whether its URL arrived absolute or as a bare
+ * path — a request without a usable Host header (HTTP/1.0, a bare proxy) leaves
+ * `request.url` relative, and parsing that unguarded throws.
+ */
+export const requestQuery = (url: string): URLSearchParams =>
+  new URL(url, 'http://localhost').searchParams
+
 export const json = (data: unknown, init?: ResponseInit): Response =>
   Response.json(data, init)
 

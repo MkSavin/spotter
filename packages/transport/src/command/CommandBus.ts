@@ -11,6 +11,8 @@ import {
 
 const COMMAND_TIMEOUT_MS = 30_000
 const POLL_BLOCK_MS = 2_000
+/** Pause after a failed poll, so a persistent error cannot spin the loop. */
+const POLL_ERROR_DELAY_MS = 1_000
 
 export type CommandBusOptions = {
   /** How long `send` waits for a correlated reply before giving up. */
@@ -144,9 +146,14 @@ export class CommandBus {
           }
         }
       } catch (error) {
-        if (this.running) {
-          this.logger.warn('CommandBus poll error', error)
-        }
+        if (!this.running) break
+
+        this.logger.warn('CommandBus poll error', error)
+        // Back off before retrying. `XREAD` blocks only on success, so an
+        // erroring poll returns instantly and the loop would spin — hundreds of
+        // thousands of times a second while Redis replays its AOF on restart,
+        // burning CPU and burying the log.
+        await new Promise((resolve) => setTimeout(resolve, POLL_ERROR_DELAY_MS))
       }
     }
   }

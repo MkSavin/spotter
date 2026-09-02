@@ -139,4 +139,65 @@ describe('CommandBus', () => {
 
     expect(() => bus.stop()).not.toThrow()
   })
+
+  test('a failing poll backs off instead of spinning', async () => {
+    // Redis replaying its AOF answers `LOADING` to every read. Without a pause
+    // the loop retried hundreds of thousands of times a second, burning CPU and
+    // burying the log in identical warnings.
+    let polls = 0
+    const failing = {
+      send: async () => {
+        polls += 1
+        throw new Error('LOADING Redis is loading the dataset in memory')
+      },
+    }
+
+    const bus = new CommandBus(
+      { publish: async () => '1-0' } as never,
+      failing as never,
+      defaultLogger,
+      { pollBlockMs: 1 },
+    )
+    buses.push(bus)
+    bus.start()
+
+    await Bun.sleep(120)
+    expect(polls).toBeLessThan(5)
+    expect(polls).toBeGreaterThan(0)
+  })
+
+  test('polling resumes once Redis answers again', async () => {
+    let failuresLeft = 1
+    const subscriber = new FakeSubscriber()
+    const flaky = {
+      send: async (command: string, args: string[]) => {
+        if (failuresLeft > 0) {
+          failuresLeft -= 1
+          throw new Error('LOADING Redis is loading the dataset in memory')
+        }
+        return subscriber.send(command, args)
+      },
+    }
+
+    const bus = new CommandBus(
+      {
+        publish: async (_stream: string, payload: unknown) => {
+          subscriber.published.push(payload as CommandRequest)
+          return '1-0'
+        },
+      } as never,
+      flaky as never,
+      defaultLogger,
+      { timeoutMs: 3000, pollBlockMs: 1 },
+    )
+    buses.push(bus)
+    bus.start()
+
+    const pending = bus.send('login.redeem', { code: 'x' })
+    await Bun.sleep(1200)
+    const requestId = subscriber.published[0].requestId
+    subscriber.queue('1-1', { requestId, ok: true, data: { role: 'VIEWER' } })
+
+    expect((await pending).ok).toBe(true)
+  })
 })
