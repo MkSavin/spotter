@@ -1,7 +1,18 @@
 # Ingest node - the local node that handles the durable buffer, ingestion, and
 # transcoding. One combined .env for this node (see .env.ingest.example).
+# Logs survive a restart and stop eating the disk: the default json-file driver
+# keeps one unbounded file and throws it away when a container is recreated,
+# which is exactly when its history is most wanted. 3 × 10 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
 services:
   local-redis:
+    <<: *logging
     image: redis:7-alpine
     restart: unless-stopped
     networks:
@@ -20,6 +31,7 @@ services:
   # Own broker (OPTIONAL): only when the NVR has none of its own. Skipped with
   # `--external-mqtt`, which points MQTT_BROKER at an existing broker instead.
   mosquitto:
+    <<: *logging
     profiles: [mqtt]
     image: eclipse-mosquitto:2
     container_name: spotter-mosquitto
@@ -38,6 +50,7 @@ services:
       - ./.docker/mosquitto/data:/mosquitto/data
 
   spotter-frigate:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-frigate:latest
     restart: unless-stopped
     healthcheck:
@@ -71,6 +84,7 @@ services:
   # snapshots and camera frames (DEPOT_LANE=snapshots), so a burst of videos
   # never delays the photo that makes a notification informative.
   spotter-depot-1:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-depot:latest
     restart: unless-stopped
     # ffmpeg needs longer than Docker's 10s default to finish or abort cleanly.
@@ -97,6 +111,7 @@ services:
       - local-redis
 
   spotter-depot-2:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-depot:latest
     restart: unless-stopped
     # ffmpeg needs longer than Docker's 10s default to finish or abort cleanly.
@@ -123,6 +138,7 @@ services:
       - local-redis
 
   spotter-depot-snapshots:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-depot:latest
     restart: unless-stopped
     # ffmpeg needs longer than Docker's 10s default to finish or abort cleanly.
@@ -148,6 +164,7 @@ services:
       - local-redis
 
   spotter-forwarder:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-forwarder:latest
     restart: unless-stopped
     healthcheck:
@@ -175,6 +192,7 @@ services:
   # and mosquitto are left alone). Daily by default; --cleanup drops old layers.
   # On by default; disable with `./spotter up --no-watchtower`.
   watchtower:
+    <<: *logging
     image: nickfedor/watchtower
     restart: unless-stopped
     command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}

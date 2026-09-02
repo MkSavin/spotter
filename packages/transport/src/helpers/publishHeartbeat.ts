@@ -4,6 +4,7 @@ import {
   type Heartbeat,
   heartbeatStream,
   type QueueDepth,
+  type SourceActivity,
 } from '../schema/heartbeat'
 
 type Producer = {
@@ -20,6 +21,12 @@ export type HeartbeatOptions = {
    * unlike `details`, this is runtime state and stale numbers are useless.
    */
   queues?: () => Promise<QueueDepth[]>
+  /**
+   * Activity of the NVR source this service owns, re-read on every beat. Only
+   * adapters set it; a source that has gone quiet is indistinguishable from a
+   * healthy one without it.
+   */
+  source?: () => SourceActivity
 }
 
 /**
@@ -28,7 +35,7 @@ export type HeartbeatOptions = {
  */
 export const startHeartbeat = (
   producer: Producer,
-  { service, version, details, queues }: HeartbeatOptions,
+  { service, version, details, queues, source }: HeartbeatOptions,
 ): (() => void) => {
   const startedAt = Date.now()
   const node = process.env.SPOTTER_MODE ?? 'single'
@@ -46,6 +53,14 @@ export const startHeartbeat = (
     const collected = await collect()
     // A failed probe must not cost the beat: liveness matters more than depth.
     const depths = queues ? await queues().catch(() => []) : []
+    // A throwing probe must not cost the beat: liveness matters more.
+    let activity: SourceActivity | undefined
+    try {
+      activity = source?.()
+    } catch {
+      activity = undefined
+    }
+
     const payload: Heartbeat = {
       service,
       version,
@@ -54,6 +69,7 @@ export const startHeartbeat = (
       at: Date.now(),
       ...(collected ? { details: collected } : {}),
       ...(depths.length > 0 ? { queues: depths } : {}),
+      ...(activity ? { source: activity } : {}),
     }
     // A failed heartbeat must never take the service down with it.
     await producer.publish(heartbeatStream, payload).catch(() => undefined)

@@ -6,69 +6,78 @@ const collector = () => {
   const beats: Heartbeat[] = []
   return {
     beats,
-    producer: {
-      publish: async (_stream: string, payload: unknown) => {
-        beats.push(payload as Heartbeat)
-        return '1-0'
-      },
+    publish: async (_stream: string, payload: unknown) => {
+      beats.push(payload as Heartbeat)
+      return '1-0'
     },
   }
 }
 
-describe('startHeartbeat queue depth', () => {
-  test('carries the depths it was given', async () => {
-    const { beats, producer } = collector()
-
-    startHeartbeat(producer, {
-      service: 'depot',
+describe('startHeartbeat: активность источника', () => {
+  test('активность попадает в удар', async () => {
+    const producer = collector()
+    const stop = startHeartbeat(producer, {
+      service: 'frigate',
       version: '1.0.0',
-      queues: async () => [
-        { stream: 'spotter.media.staged', lag: 4, pending: 1 },
-      ],
-    })()
-
+      source: () => ({
+        source: 'frigate',
+        lastEventAt: 1_700_000_000_000,
+        eventCount: 42,
+        since: 3600,
+      }),
+    })
     await Bun.sleep(10)
-    expect(beats[0]?.queues).toHaveLength(1)
-    expect(beats[0]?.queues?.[0].lag).toBe(4)
+    stop()
+
+    expect(producer.beats[0].source).toEqual({
+      source: 'frigate',
+      lastEventAt: 1_700_000_000_000,
+      eventCount: 42,
+      since: 3600,
+    })
   })
 
-  test('omits the field entirely when every queue is quiet', async () => {
-    const { beats, producer } = collector()
-
-    startHeartbeat(producer, {
-      service: 'depot',
+  test('сервисы без источника не шлют поле', async () => {
+    const producer = collector()
+    const stop = startHeartbeat(producer, {
+      service: 'server',
       version: '1.0.0',
-      queues: async () => [],
-    })()
-
+    })
     await Bun.sleep(10)
-    expect(beats[0]?.queues).toBeUndefined()
+    stop()
+
+    expect(producer.beats[0].source).toBeUndefined()
   })
 
-  test('a failing probe costs the depths, not the beat', async () => {
-    // Liveness is the heartbeat's real job; depth is a passenger.
-    const { beats, producer } = collector()
-
-    startHeartbeat(producer, {
-      service: 'depot',
+  test('падение пробы не срывает удар', async () => {
+    const producer = collector()
+    const stop = startHeartbeat(producer, {
+      service: 'frigate',
       version: '1.0.0',
-      queues: async () => {
-        throw new Error('redis unreachable')
+      source: () => {
+        throw new Error('probe exploded')
       },
-    })()
-
+    })
     await Bun.sleep(10)
-    expect(beats).toHaveLength(1)
-    expect(beats[0]?.service).toBe('depot')
-    expect(beats[0]?.queues).toBeUndefined()
+    stop()
+
+    // Liveness matters more than the extra field: the beat must still land.
+    expect(producer.beats).toHaveLength(1)
+    expect(producer.beats[0].service).toBe('frigate')
+    expect(producer.beats[0].source).toBeUndefined()
   })
 
-  test('a service that consumes nothing reports no queues', async () => {
-    const { beats, producer } = collector()
-
-    startHeartbeat(producer, { service: 'forwarder', version: '1.0.0' })()
-
+  test('счётчик перечитывается каждый удар, а не фиксируется на старте', async () => {
+    const producer = collector()
+    let count = 0
+    const stop = startHeartbeat(producer, {
+      service: 'frigate',
+      version: '1.0.0',
+      source: () => ({ source: 'frigate', eventCount: ++count, since: 10 }),
+    })
     await Bun.sleep(10)
-    expect(beats[0]?.queues).toBeUndefined()
+    stop()
+
+    expect(producer.beats[0].source?.eventCount).toBe(1)
   })
 })

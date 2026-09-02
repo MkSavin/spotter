@@ -1,7 +1,18 @@
 # Single machine deployment - all services run on the same host.
 # One combined .env for the whole stack (see .env.example).
+# Logs survive a restart and stop eating the disk: the default json-file driver
+# keeps one unbounded file and throws it away when a container is recreated,
+# which is exactly when its history is most wanted. 3 × 10 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
 services:
   redis:
+    <<: *logging
     image: redis:7-alpine
     restart: unless-stopped
     networks:
@@ -20,6 +31,7 @@ services:
   # Own broker (OPTIONAL): only when the NVR has none of its own. Skipped with
   # `--external-mqtt`, which points MQTT_BROKER at an existing broker instead.
   mosquitto:
+    <<: *logging
     profiles: [mqtt]
     image: eclipse-mosquitto:2
     container_name: spotter-mosquitto
@@ -38,6 +50,7 @@ services:
       - ./.docker/mosquitto/data:/mosquitto/data
 
   spotter-frigate:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-frigate:latest
     restart: unless-stopped
     healthcheck:
@@ -67,6 +80,7 @@ services:
       - redis
 
   spotter-depot:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-depot:latest
     restart: unless-stopped
     # ffmpeg needs longer than Docker's 10s default to finish or abort cleanly.
@@ -94,6 +108,7 @@ services:
 
   # Headless domain: event persistence, media orchestration, command RPC.
   spotter-server:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-server:latest
     container_name: spotter-server
     restart: unless-stopped
@@ -120,6 +135,7 @@ services:
 
   # Telegram frontend: delivery consumer, grammy bot, commands, presigning.
   spotter-telegram:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-telegram:latest
     container_name: spotter-telegram
     restart: unless-stopped
@@ -148,6 +164,7 @@ services:
   # mosquitto are left alone). Daily by default; --cleanup drops old layers.
   # On by default; disable with `./spotter up --no-watchtower`.
   watchtower:
+    <<: *logging
     image: nickfedor/watchtower
     restart: unless-stopped
     command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}

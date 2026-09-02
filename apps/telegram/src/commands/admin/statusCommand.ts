@@ -1,4 +1,4 @@
-import type { ServiceStatus } from '@spotter/transport'
+import { isSourceSilent, type ServiceStatus } from '@spotter/transport'
 import Bun from 'bun'
 import type { BotContext } from '../../context'
 import { SpotterCommand } from '../framework/SpotterCommand'
@@ -44,6 +44,30 @@ const renderQueues = (service: ServiceStatus): string => {
   return `\n${lines.join('\n')}`
 }
 
+/**
+ * How long the NVR behind this adapter has been quiet.
+ *
+ * Shown for every adapter, not only the alarming ones: "last event 5 minutes
+ * ago" is the line that says ingestion is alive, and its absence is what made
+ * a day-long outage invisible.
+ */
+const renderSource = (service: ServiceStatus): string => {
+  const activity = service.source
+  if (!activity) return ''
+
+  if (!activity.lastEventAt) {
+    const waiting = formatUptime(activity.since)
+    const mark = isSourceSilent(activity) ? '🔴' : '⏳'
+    return `\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)`
+  }
+
+  const ago = formatUptime(
+    Math.round((Date.now() - activity.lastEventAt) / 1000),
+  )
+  const mark = isSourceSilent(activity) ? '🔴' : '🎥'
+  return `\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}`
+}
+
 const renderService = (service: ServiceStatus): string => {
   const mark = service.online ? '✅' : '⚠️'
   const state = service.online
@@ -55,7 +79,7 @@ const renderService = (service: ServiceStatus): string => {
 
   return `${mark} <code>${service.service}</code> <b>${service.version}</b> — ${state}${
     extras ? `\n    <i>${extras}</i>` : ''
-  }${renderQueues(service)}`
+  }${renderSource(service)}${renderQueues(service)}`
 }
 
 class StatusCommand extends SpotterCommand {
@@ -88,10 +112,22 @@ class StatusCommand extends SpotterCommand {
 
     const offline = services.filter((service) => !service.online).length
 
+    // Leads the message: an admin opening /status must not have to read past
+    // healthy services to find the source that stopped.
+    const silent = services.filter(
+      (service) => service.source && isSourceSilent(service.source),
+    )
+    const alarm =
+      silent.length > 0
+        ? `🔴 <b>Нет событий от NVR:</b> ${silent
+            .map((service) => `<code>${service.source?.source}</code>`)
+            .join(', ')} — проверь публикацию событий в MQTT\n\n`
+        : ''
+
     await context.replyWithHTML(
       `🧩 <b>Состояние инфраструктуры</b>
 
-${blocks.join('\n\n')}
+${alarm}${blocks.join('\n\n')}
 
 ${offline > 0 ? `⚠️ Не отвечают: ${offline}\n\n` : ''}Платформа: <code>Bun ${Bun.version_with_sha}</code>`,
     )

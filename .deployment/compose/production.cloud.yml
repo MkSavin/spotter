@@ -1,7 +1,18 @@
 # Cloud node - the main node running Redis and the delivery frontends.
 # One combined .env for this node (see .env.cloud.example).
+# Logs survive a restart and stop eating the disk: the default json-file driver
+# keeps one unbounded file and throws it away when a container is recreated,
+# which is exactly when its history is most wanted. 3 × 10 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
 services:
   redis:
+    <<: *logging
     image: redis:7-alpine
     restart: unless-stopped
     networks:
@@ -23,6 +34,7 @@ services:
 
   # Headless domain: event persistence, media orchestration, command RPC.
   spotter-server:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-server:latest
     container_name: spotter-server
     restart: unless-stopped
@@ -49,6 +61,7 @@ services:
 
   # Telegram frontend: delivery consumer, grammy bot, commands, presigning.
   spotter-telegram:
+    <<: *logging
     image: ghcr.io/mksavin/spotter-telegram:latest
     container_name: spotter-telegram
     restart: unless-stopped
@@ -77,6 +90,7 @@ services:
   # alone). Daily by default; --cleanup drops old layers.
   # On by default; disable with `./spotter up --no-watchtower`.
   watchtower:
+    <<: *logging
     image: nickfedor/watchtower
     restart: unless-stopped
     command: --cleanup --label-enable --interval ${WATCHTOWER_INTERVAL:-86400}

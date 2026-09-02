@@ -155,7 +155,15 @@ export const runSink = async <TConfig extends SinkConfig>(
 
   // Pluggable NVR ingestion: one source per sink instance. The source emits
   // canonical SpotterEvents; we stamp the routing source and publish them.
+  // Tracked here rather than inside a source: this is the one point every
+  // event from every adapter must cross, so no source can forget to report.
+  const startedAt = Date.now()
+  let lastEventAt: number | undefined
+  let eventCount = 0
+
   sourceHandle = await source.run(async (event) => {
+    lastEventAt = Date.now()
+    eventCount += 1
     await publishEvent({ ...event, source: sourceId }, producer)
   })
 
@@ -167,6 +175,15 @@ export const runSink = async <TConfig extends SinkConfig>(
     service: information.name.replace(/^@spotter\//, ''),
     version: information.version,
     details: options.heartbeatDetails,
+    // Re-read every beat: a source that stopped publishing looks identical to a
+    // healthy one from the outside, and this is the only signal that separates
+    // them.
+    source: () => ({
+      source: sourceId,
+      lastEventAt,
+      eventCount,
+      since: Math.round((Date.now() - startedAt) / 1000),
+    }),
   })
 
   // Healthcheck signal: refreshed only while Redis actually answers, so a

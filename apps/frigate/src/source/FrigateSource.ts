@@ -26,7 +26,13 @@ export class FrigateSource extends Source<CoreConfig> {
       connectTimeout: 15 * 1000,
     })
 
-    await new MqttRegulator<{ mqtt: typeof mqtt }>()
+    const regulator = new MqttRegulator<{ mqtt: typeof mqtt }>()
+    regulator.onSubscribeError = (topic, error) => {
+      // Degraded, not dead: reviews are optional, events are not. Say which.
+      logger.warn(`MQTT: broker refused "${topic}"`, error)
+    }
+
+    await regulator
       .on('frigate/events', async ({ topic, contents }) => {
         const value = bufferToJson(contents)
 

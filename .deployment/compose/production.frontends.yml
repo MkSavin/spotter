@@ -5,11 +5,22 @@
 # Each rides a compose profile and is off unless asked for: `./spotter up --pwa`
 # / `--email`, persisted to SPOTTER_PROFILES in .env so later `update` and `up`
 # keep them. See .env.example for the settings each one needs.
+# Logs survive a restart and stop eating the disk: the default json-file driver
+# keeps one unbounded file and throws it away when a container is recreated,
+# which is exactly when its history is most wanted. 3 × 10 MB per service.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
 services:
   # PWA frontend (OPTIONAL): installable app and Web Push consumer.
   # Set VAPID_* in .env. Service workers and Web Push require HTTPS, so put it
   # behind a TLS reverse proxy.
   spotter-pwa:
+    <<: *logging
     profiles: [pwa]
     image: ghcr.io/mksavin/spotter-pwa:latest
     container_name: spotter-pwa
@@ -40,6 +51,7 @@ services:
   # Email frontend (OPTIONAL): SMTP consumer of spotter.delivery.event.
   # Set SMTP_* / EMAIL_RECIPIENTS in .env.
   spotter-email:
+    <<: *logging
     profiles: [email]
     image: ghcr.io/mksavin/spotter-email:latest
     container_name: spotter-email
