@@ -260,4 +260,30 @@ describe('createServer', () => {
     })
     expect(res.status).toBe(400)
   })
+
+  test('a request without a usable Host header still serves the app', async () => {
+    // Exactly what broke in production: HTTP/1.0 (a bare proxy, some probes)
+    // leaves `request.url` relative, the static handler threw on it, and the
+    // server's error handler answered 500 — to every page load behind it.
+    const status = await new Promise<string>((resolve) => {
+      let seen = ''
+      void Bun.connect({
+        hostname: String(server.hostname),
+        port: Number(server.port),
+        socket: {
+          open: (socket) => {
+            socket.write('GET / HTTP/1.0\r\n\r\n')
+          },
+          data: (_socket, chunk) => {
+            seen += new TextDecoder().decode(chunk)
+            resolve(seen.split('\r\n')[0])
+          },
+          close: () => resolve(seen.split('\r\n')[0] || 'closed'),
+        },
+      })
+      setTimeout(() => resolve(seen.split('\r\n')[0] || 'timeout'), 2000)
+    })
+
+    expect(status).not.toContain('500')
+  })
 })

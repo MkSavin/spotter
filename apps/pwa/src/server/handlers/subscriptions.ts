@@ -1,6 +1,6 @@
 import type { CoreContext } from '../../context'
 import { subscriptionsRepo } from '../../db/repository'
-import { badRequest, json, notFound, parseBody } from '../http'
+import { badRequest, json, notFound, parseBody, requestQuery } from '../http'
 import { subscribeBody, testPushBody, unsubscribeBody } from '../schemas'
 
 /** Reads the stored status of a device by its `?endpoint=` query param. */
@@ -8,7 +8,7 @@ export const subscriptionStatusHandler = (
   request: Request,
   context: CoreContext,
 ): Response => {
-  const endpoint = new URL(request.url).searchParams.get('endpoint')
+  const endpoint = requestQuery(request.url).get('endpoint')
   if (!endpoint) return badRequest('endpoint is required')
 
   const row = subscriptionsRepo.findByEndpoint(context.db, endpoint)

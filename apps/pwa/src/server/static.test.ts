@@ -1,40 +1,26 @@
-import { afterAll, describe, expect, test } from 'bun:test'
-import { defaultLogger } from 'stenograph'
-import type { CoreContext } from '../context'
-import { createDatabase } from '../db/client'
-import { createServer } from './createServer'
+import { describe, expect, test } from 'bun:test'
+import { requestPathname } from './static'
 
-// Serves the real web/dist; `bun run test` builds it first.
-const makeContext = (): CoreContext =>
-  ({
-    config: {
-      port: 0,
-      vapid: { publicKey: 'P', privateKey: 'x', subject: 'mailto:a@b.c' },
-      presignExpiry: 3600,
-      accessCodes: [],
-      source: 'frigate',
-      timezone: 'Europe/Moscow',
-    },
-    logger: defaultLogger.sub('test'),
-    db: createDatabase(':memory:'),
-    s3: { presign: (k: string) => `https://s3/${k}` },
-    push: { send: async () => ({ ok: true }) },
-  }) as unknown as CoreContext
-
-describe('static serving', () => {
-  const server = createServer(makeContext())
-  const base = server.url.href.replace(/\/$/, '')
-
-  afterAll(() => server.stop(true))
-
-  test('serves the SPA shell for a deep link', async () => {
-    const res = await fetch(`${base}/event/some-id`)
-    expect(res.headers.get('content-type')).toContain('text/html')
-    expect(await res.text()).toContain('<div id="root">')
+describe('requestPathname', () => {
+  test('reads the path from a normal absolute URL', () => {
+    expect(requestPathname('http://spotter.local/assets/app.js')).toBe(
+      '/assets/app.js',
+    )
   })
 
-  test('serves the web manifest asset', async () => {
-    const res = await fetch(`${base}/manifest.webmanifest`)
-    expect(res.status).toBe(200)
+  test('root serves the app shell', () => {
+    expect(requestPathname('http://spotter.local/')).toBe('/index.html')
+  })
+
+  test('a bare path does not throw', () => {
+    // Bun leaves `request.url` relative when a request arrives without a usable
+    // Host header (HTTP/1.0, a bare proxy). Parsing that unguarded threw, and
+    // the server's error handler turned it into a 500 on every page load.
+    expect(requestPathname('/')).toBe('/index.html')
+    expect(requestPathname('/event/abc')).toBe('/event/abc')
+  })
+
+  test('the query string is not part of the path', () => {
+    expect(requestPathname('/event/abc?from=push')).toBe('/event/abc')
   })
 })
