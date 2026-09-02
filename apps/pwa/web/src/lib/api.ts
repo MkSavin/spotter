@@ -62,6 +62,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type PushKeys = { endpoint: string; p256dh: string; auth: string }
 
+/**
+ * Adds the grant to a media URL served by our own API.
+ *
+ * `<img>` and `<video>` cannot send an Authorization header, so the token rides
+ * the query string. Paths that are not ours are returned untouched, so a stored
+ * absolute URL still works.
+ */
+export const mediaSrc = (url: string | undefined): string | undefined => {
+  if (!url?.startsWith('/api/')) return url
+  const bearer = token()
+  return bearer ? `${url}?token=${encodeURIComponent(bearer)}` : url
+}
+
 export const api = {
   vapidPublicKey: () =>
     request<{ publicKey: string }>('/api/vapid').then((r) => r.publicKey),

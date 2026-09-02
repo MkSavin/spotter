@@ -17,7 +17,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, mediaSrc } from '@/lib/api'
 import { navigate } from '@/lib/router'
 import { hasRole } from '@/lib/session'
 import { clockTime } from '@/lib/time'
@@ -141,6 +141,12 @@ function ClipButton({ eventId }: { eventId: string }) {
 
 function EventDetail({ entry }: { entry: FeedEntry }) {
   const { event, snapshotUrl, clipUrl } = entry
+  // A stored key can outlive its object in the bucket. Fall back to the
+  // snapshot, then to the placeholder, instead of a dead player.
+  const [clipFailed, setClipFailed] = useState(false)
+  const [shotFailed, setShotFailed] = useState(false)
+  const clipSrc = clipFailed ? undefined : mediaSrc(clipUrl)
+  const shotSrc = shotFailed ? undefined : mediaSrc(snapshotUrl)
   const duration = event.endTime ? event.endTime - event.startTime : null
 
   // Only worth offering once the event is over and the NVR says it has one.
@@ -151,22 +157,38 @@ function EventDetail({ entry }: { entry: FeedEntry }) {
     <>
       <Card className="overflow-hidden p-0">
         <AspectRatio ratio={16 / 9} className="bg-muted">
-          {clipUrl ? (
-            <video src={clipUrl} controls playsInline className="size-full object-contain" />
-          ) : snapshotUrl ? (
+          {clipSrc ? (
+            <video
+              src={clipSrc}
+              controls
+              playsInline
+              preload="metadata"
+              className="size-full object-contain"
+              onError={() => {
+                log.warn('Clip failed to load', { eventId: entry.eventId })
+                setClipFailed(true)
+              }}
+            />
+          ) : shotSrc ? (
             <Dialog>
               <DialogTrigger asChild>
                 <button type="button" className="size-full">
                   <img
-                    src={snapshotUrl}
+                    src={shotSrc}
                     alt={event.label ?? 'событие'}
                     className="size-full cursor-zoom-in object-cover"
+                    onError={() => {
+                      log.warn('Snapshot failed to load', {
+                        eventId: entry.eventId,
+                      })
+                      setShotFailed(true)
+                    }}
                   />
                 </button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl bg-transparent p-0">
                 <DialogTitle className="sr-only">Кадр события</DialogTitle>
-                <img src={snapshotUrl} alt={event.label ?? 'событие'} className="w-full rounded-xl" />
+                <img src={shotSrc} alt={event.label ?? 'событие'} className="w-full rounded-xl" />
               </DialogContent>
             </Dialog>
           ) : (

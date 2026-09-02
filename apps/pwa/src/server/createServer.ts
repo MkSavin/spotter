@@ -8,6 +8,7 @@ import {
 } from './handlers/commands'
 import { configHandler } from './handlers/config'
 import { eventHandler, eventsHandler } from './handlers/events'
+import { mediaHandler } from './handlers/media'
 import {
   subscribeHandler,
   subscriptionStatusHandler,
@@ -73,6 +74,11 @@ export const createServer = (context: CoreContext) => {
       },
       '/api/events': (req) => eventsHandler(req, context),
       '/api/events/:id': (req) => eventHandler(req, req.params.id, context),
+      // Media is proxied, not presigned: see handlers/media.ts.
+      '/api/events/:id/snapshot': (req) =>
+        mediaHandler(req, req.params.id, 'snapshot', context),
+      '/api/events/:id/clip': (req) =>
+        mediaHandler(req, req.params.id, 'clip', context),
       '/api/cameras': (req) => camerasHandler(req, context),
       '/api/status': (req) => statusHandler(req, context),
       '/api/snapshot': { POST: (req) => snapshotHandler(req, context) },

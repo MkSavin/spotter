@@ -17,6 +17,22 @@ const bearer = (request: Request): string | null => {
 }
 
 /**
+ * The token from `?token=`, for requests a browser makes without our code in
+ * the loop.
+ *
+ * `<img>` and `<video>` cannot carry an Authorization header, so media routes
+ * would be unreachable to the very elements that need them. The query token is
+ * the same grant, and it never leaves the app's own origin — unlike a presigned
+ * S3 URL, which hands out the object itself.
+ */
+const queryToken = (request: Request): string | null => {
+  const value = new URL(request.url, 'http://localhost').searchParams.get(
+    'token',
+  )
+  return value?.trim() || null
+}
+
+/**
  * Resolves the caller from its bearer token and checks its cached role.
  *
  * This gate is a convenience, not the security boundary: every command carries
@@ -28,8 +44,10 @@ export const authorize = (
   request: Request,
   context: CoreContext,
   requirement: Requirement = 'authorized',
+  { allowQueryToken = false }: { allowQueryToken?: boolean } = {},
 ): Authorized => {
-  const token = bearer(request)
+  const token =
+    bearer(request) ?? (allowQueryToken ? queryToken(request) : null)
 
   if (!token) {
     return {

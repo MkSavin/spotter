@@ -1,4 +1,3 @@
-import type { S3Client } from 'bun'
 import type { CoreContext } from '../../context'
 import { recentEventsRepo } from '../../db/repository'
 import type { FeedEntry, FeedEntryStored } from '../../render/feedEntry'
@@ -7,23 +6,19 @@ import { json, notFound } from '../http'
 
 const FEED_LIMIT = 100
 
-const presign = (
-  s3: S3Client,
-  key: string | undefined,
-  expiresIn: number,
-): string | undefined => (key ? s3.presign(key, { expiresIn }) : undefined)
-
-const toFeedEntry = (
-  eventId: string,
-  stored: FeedEntryStored,
-  context: CoreContext,
-): FeedEntry => {
-  const { s3, config } = context
+/**
+ * Media points back at this server rather than at a presigned S3 URL: object
+ * storage does not answer a browser's cross-origin preflight, which leaves
+ * `<img>` blank and `<video>` unplayable. The proxy also keeps the bucket
+ * layout and credentials out of the browser.
+ */
+const toFeedEntry = (eventId: string, stored: FeedEntryStored): FeedEntry => {
+  const path = `/api/events/${encodeURIComponent(eventId)}`
   return {
     eventId,
     event: stored.event,
-    snapshotUrl: presign(s3, stored.snapshotKey, config.presignExpiry),
-    clipUrl: presign(s3, stored.clipKey, config.presignExpiry),
+    snapshotUrl: stored.snapshotKey ? `${path}/snapshot` : undefined,
+    clipUrl: stored.clipKey ? `${path}/clip` : undefined,
   }
 }
 
@@ -37,7 +32,7 @@ export const eventsHandler = (
 
   const rows = recentEventsRepo.list(context.db, FEED_LIMIT)
   const entries = rows.map((row) =>
-    toFeedEntry(row.eventId, row.payload as FeedEntryStored, context),
+    toFeedEntry(row.eventId, row.payload as FeedEntryStored),
   )
   return json({ events: entries })
 }
@@ -52,5 +47,5 @@ export const eventHandler = (
 
   const row = recentEventsRepo.get(context.db, eventId)
   if (!row) return notFound('event not found')
-  return json(toFeedEntry(eventId, row.payload as FeedEntryStored, context))
+  return json(toFeedEntry(eventId, row.payload as FeedEntryStored))
 }

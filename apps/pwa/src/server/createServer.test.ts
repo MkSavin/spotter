@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { defaultLogger } from 'stenograph'
 import type { CoreContext } from '../context'
 import { createDatabase } from '../db/client'
+import { recentEventsRepo } from '../db/repository'
 import { createServer } from './createServer'
 
 defaultLogger.disable()
@@ -33,7 +34,9 @@ const commandBus = {
 
 const published: Array<{ stream: string; payload: unknown }> = []
 
-const makeContext = (): CoreContext =>
+const makeContext = (
+  options: { db?: ReturnType<typeof createDatabase> } = {},
+): CoreContext =>
   ({
     config: {
       port: 0,
@@ -43,8 +46,27 @@ const makeContext = (): CoreContext =>
       timezone: 'Europe/Moscow',
     },
     logger: defaultLogger.sub('test'),
-    db: createDatabase(':memory:'),
-    s3: { presign: (key: string) => `https://s3/${key}` },
+    db: options.db ?? createDatabase(':memory:'),
+    s3: {
+      presign: (key: string) => `https://s3/${key}`,
+      // The proxy streams the object rather than handing out a URL.
+      file: (key: string) => {
+        const bytes = Buffer.from(`bytes-of:${key}`)
+        const make = (buf: Buffer) => ({
+          stream: () =>
+            new ReadableStream({
+              start(controller) {
+                controller.enqueue(new Uint8Array(buf))
+                controller.close()
+              },
+            }),
+          slice: (start: number, end?: number) =>
+            make(buf.subarray(start, end)),
+          stat: async () => ({ size: bytes.length }),
+        })
+        return make(bytes)
+      },
+    },
     push: { send: async () => ({ ok: true }) },
     commandBus,
     catalog: { cameras: () => [{ code: 'front', label: '🎥 front' }] },
@@ -308,5 +330,106 @@ describe('createServer', () => {
     })
 
     expect(status).not.toContain('500')
+  })
+})
+
+describe('медиа через прокси', () => {
+  const mediaDb = createDatabase(':memory:')
+  const server = createServer(makeContext({ db: mediaDb }))
+  const base = server.url.href.replace(/\/$/, '')
+
+  const bearer = async (): Promise<string> => {
+    const res = await fetch(`${base}/api/auth`, {
+      method: 'POST',
+      body: JSON.stringify({ deviceId: 'device-media', code: 'LETMEIN' }),
+    })
+    return ((await res.json()) as { token: string }).token
+  }
+
+  recentEventsRepo.save(
+    mediaDb,
+    'ev-1',
+    {
+      event: {
+        id: 'ev-1',
+        camera: 'front',
+        label: 'person',
+        startTime: 1,
+        endTime: 2,
+        score: 0.9,
+        stationary: false,
+        hasClip: true,
+        hasSnapshot: true,
+        type: 'end',
+      },
+      snapshotKey: 'events/front/ev-1.jpg',
+      clipKey: 'events/front/ev-1.mp4',
+    },
+    100,
+  )
+
+  afterAll(() => server.stop(true))
+
+  test('лента отдаёт ссылки на наш сервер, а не на S3', async () => {
+    const token = await bearer()
+    const res = await fetch(`${base}/api/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const { events } = (await res.json()) as {
+      events: Array<{ snapshotUrl?: string; clipUrl?: string }>
+    }
+
+    // A presigned S3 URL is cross-origin and the bucket answers no preflight,
+    // which is what left <img> blank and <video> unplayable.
+    expect(events[0].snapshotUrl).toBe('/api/events/ev-1/snapshot')
+    expect(events[0].clipUrl).toBe('/api/events/ev-1/clip')
+    expect(events[0].snapshotUrl).not.toContain('http')
+  })
+
+  test('снимок отдаётся с токеном в query', async () => {
+    const token = await bearer()
+    const res = await fetch(
+      `${base}/api/events/ev-1/snapshot?token=${encodeURIComponent(token)}`,
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/jpeg')
+    expect(await res.text()).toBe('bytes-of:events/front/ev-1.jpg')
+  })
+
+  test('без токена медиа не отдаётся', async () => {
+    const res = await fetch(`${base}/api/events/ev-1/snapshot`)
+    expect(res.status).toBe(401)
+  })
+
+  test('видео поддерживает Range — иначе Safari не играет', async () => {
+    const token = await bearer()
+    const res = await fetch(
+      `${base}/api/events/ev-1/clip?token=${encodeURIComponent(token)}`,
+      { headers: { range: 'bytes=0-4' } },
+    )
+
+    expect(res.status).toBe(206)
+    expect(res.headers.get('content-range')).toBe('bytes 0-4/30')
+    expect(await res.text()).toBe('bytes')
+  })
+
+  test('полный запрос видео объявляет accept-ranges', async () => {
+    const token = await bearer()
+    const res = await fetch(
+      `${base}/api/events/ev-1/clip?token=${encodeURIComponent(token)}`,
+    )
+
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('video/mp4')
+    expect(res.headers.get('accept-ranges')).toBe('bytes')
+  })
+
+  test('несуществующее событие — 404, а не 500', async () => {
+    const token = await bearer()
+    const res = await fetch(
+      `${base}/api/events/nope/snapshot?token=${encodeURIComponent(token)}`,
+    )
+    expect(res.status).toBe(404)
   })
 })

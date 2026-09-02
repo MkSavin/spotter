@@ -1,7 +1,10 @@
 import { Camera, ImageOff, Video } from 'lucide-react'
+import { useState } from 'react'
 import { AspectRatio } from '@/components/ui/aspect-ratio'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { mediaSrc } from '@/lib/api'
+import { log } from '@/lib/log'
 import { Link } from '@/lib/router'
 import { relativeTime } from '@/lib/time'
 import type { FeedEntry } from '@/lib/types'
@@ -13,6 +16,10 @@ const scoreVariant = (score: number) =>
 /** One event in the feed: snapshot, object/camera, relative time, score/clip badges. */
 export function EventCard({ entry, isNew }: { entry: FeedEntry; isNew?: boolean }) {
   const { event, snapshotUrl } = entry
+  // A key can outlive its object; show the placeholder rather than a broken
+  // image icon, and leave a line saying which event lost its snapshot.
+  const [failed, setFailed] = useState(false)
+  const src = failed ? undefined : mediaSrc(snapshotUrl)
 
   return (
     <Link href={`/event/${entry.eventId}`} className="block">
@@ -23,12 +30,16 @@ export function EventCard({ entry, isNew }: { entry: FeedEntry; isNew?: boolean 
         )}
       >
         <AspectRatio ratio={16 / 9} className="bg-muted">
-          {snapshotUrl ? (
+          {src ? (
             <img
-              src={snapshotUrl}
+              src={src}
               alt={event.label ?? 'событие'}
               loading="lazy"
               className="size-full object-cover"
+              onError={() => {
+                log.warn('Snapshot failed to load', { eventId: entry.eventId })
+                setFailed(true)
+              }}
             />
           ) : (
             <div className="text-muted-foreground flex size-full items-center justify-center">
