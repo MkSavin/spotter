@@ -77,13 +77,35 @@ const ownsBroker = (): boolean => {
   return !broker || /^mqtts?:\/\/mosquitto[:/]?/.test(broker)
 }
 
+const FRONTENDS = ['pwa', 'email'] as const
+
+/**
+ * Optional frontends to run. A flag turns one on for this command; without any
+ * flag the choice comes from SPOTTER_PROFILES, so `update` and `up` keep what
+ * install set up instead of silently dropping it.
+ */
+const frontendProfiles = (): string[] => {
+  const stored = (readEnv('SPOTTER_PROFILES') ?? '')
+    .split(',')
+    .map((name) => name.trim())
+  const asked = FRONTENDS.filter((name) => has(`--${name}`))
+  if (asked.length === 0)
+    return FRONTENDS.filter((name) => stored.includes(name))
+  // Remember the choice, so the next update does not quietly drop the frontend.
+  if (asked.some((name) => !stored.includes(name)))
+    persistEnv('SPOTTER_PROFILES', asked.join(','))
+  return asked
+}
+
 // GPU is on by default: transcoding is several times faster.
 const composeArgs = (mode: Mode): string[] => {
   const files = [path.join('.deployment', 'compose', `production.${mode}.yml`)]
   if (mode === 'ingest' && !has('--no-gpu'))
     files.push(path.join('.deployment', 'compose', 'production.ingest.gpu.yml'))
-  // Optional frontends live behind compose profiles.
-  const profiles: string[] = ['pwa', 'email'].filter((name) => has(`--${name}`))
+  // Both delivery nodes can host the frontends; ingest has no Redis of its own.
+  if (mode !== 'ingest')
+    files.push(path.join('.deployment', 'compose', 'production.frontends.yml'))
+  const profiles = frontendProfiles()
   // From .env, not a flag: chosen once at install, not repeated every `up`.
   if (ownsBroker()) profiles.push('mqtt')
   return [

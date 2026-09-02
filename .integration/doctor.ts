@@ -369,6 +369,14 @@ export const diagnose = async (
     env.MQTT_NETWORK_EXTERNAL !== 'true' &&
     (!env.MQTT_BROKER || /^mqtts?:\/\/mosquitto[:/]?/.test(env.MQTT_BROKER))
 
+  // Opt-in frontends: expected only once .env says they were switched on.
+  const frontends = ['pwa', 'email'].filter((name) =>
+    (env.SPOTTER_PROFILES ?? '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .includes(name),
+  )
+
   const expected =
     mode === 'ingest'
       ? [
@@ -378,13 +386,19 @@ export const diagnose = async (
           'spotter-forwarder',
         ]
       : mode === 'cloud'
-        ? ['redis', 'spotter-server', 'spotter-telegram']
+        ? [
+            'redis',
+            'spotter-server',
+            'spotter-telegram',
+            ...frontends.map((name) => `spotter-${name}`),
+          ]
         : [
             'redis',
             ...(ownBroker ? ['mosquitto'] : []),
             'spotter-frigate',
             'spotter-server',
             'spotter-telegram',
+            ...frontends.map((name) => `spotter-${name}`),
           ]
 
   const checks: Check[] = [

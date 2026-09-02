@@ -358,6 +358,8 @@ if (mode === 'single' || mode === 'cloud') {
       'PUBLIC_URL',
       await ask('PUBLIC_URL (за TLS-прокси)', 'https://spotter.example.com'),
     )
+    // Persisted, not just passed to `up`: every later `update` reads it back.
+    env = setEnv(env, 'SPOTTER_PROFILES', 'pwa')
     say('  Генерирую VAPID-ключи…')
     try {
       const { publicKey, privateKey } = await generateVapidKeys()

@@ -86,5 +86,5 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ sendEmailActi
 - `applicationLogger = defaultLogger.sub('email')`.
 - Может жить на отдельном веб-хосте и ходить в главный Redis по IP (как отдельный инстанс), а не
   обязательно рядом с server/redis.
-- В `production.cloud.yml` сервис под compose-профилем `email` (opt-in): поднимается флагом
-  `./spotter up --email`, нужна секция `email` в `.env`.
+- В `production.frontends.yml` (общий для узлов `single` и `cloud`) сервис под compose-профилем `email` (opt-in): поднимается флагом
+  `./spotter up --email`, который пишет выбор в `SPOTTER_PROFILES` — дальше `up`/`update` поднимают email без флага. Нужна секция `email` в `.env`.
