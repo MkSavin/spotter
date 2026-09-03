@@ -92,6 +92,8 @@ Transcoding is the demanding part, and `depot` is built to be multiplied: it hol
 
 Switching the NVR between named modes — night, away, guests — over the bus is sketched in the [Frigate profiles spec](docs/frigate-profiles.md); it needs Frigate 0.18, which is still a release candidate.
 
+The test rig fakes the NVR, so the MQTT hop it depends on is never exercised. Driving a real Frigate through a stub detector instead — and what that would take for a genuine end-to-end, Telegram included — is in the [real-NVR testing spec](docs/real-nvr-testing.md).
+
 ## How it works
 
 Services know nothing about each other and talk only over Redis Streams. What travels between them is **S3 keys, not bytes and not tokens** — exactly one adapter holds camera access.
