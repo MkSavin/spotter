@@ -3,6 +3,7 @@ import { eventStreams } from '@spotter/transport'
 import information from '../package.json'
 import { FrigateCatalog } from './catalog/FrigateCatalog'
 import { resolveConfig } from './config'
+import { watchCameraHealth } from './frigate/watchCameraHealth'
 import { applicationLogger } from './log'
 import { FrigateMediaProvider } from './media/FrigateMediaProvider'
 import { FrigateNotificationSuspender } from './notifications/FrigateNotificationSuspender'
@@ -27,6 +28,10 @@ const notificationSuspender = new FrigateNotificationSuspender(
   applicationLogger,
 )
 
+// Polled in the background: the NVR knows a stream dropped within seconds,
+// while silence on our side takes hours to become suspicious.
+const cameraHealth = watchCameraHealth(config, applicationLogger.sub('nvr'))
+
 runSink({
   config,
   logger: applicationLogger,
@@ -43,6 +48,7 @@ runSink({
     { stream: eventStreams.testSeed, controller: eventTestController },
   ],
   heartbeatDetails: () => probeDetails(config),
+  cameraHealth: cameraHealth.current,
 }).catch((error) => {
   applicationLogger.error(error)
   process.exit(1)

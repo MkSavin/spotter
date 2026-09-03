@@ -65,6 +65,46 @@ describe('/status: тишина источника', () => {
     expect(text).not.toContain('Нет событий от NVR')
   })
 
+  test('мёртвая камера видна в шапке и у источника', async () => {
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 60_000,
+      eventCount: 5,
+      since: 90_000,
+      deadCameras: ['front'],
+    })
+
+    // The 1 September failure: the NVR knew within seconds, we did not.
+    expect(text).toContain('NVR не получает видео')
+    expect(text).toContain('нет видео: front')
+  })
+
+  test('камера с видео, но без детекции — отдельная беда', async () => {
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 60_000,
+      eventCount: 5,
+      since: 90_000,
+      stalledCameras: ['front'],
+    })
+
+    expect(text).toContain('нет детекции: front')
+    // Not the same fault as a dead stream, so it must not claim one.
+    expect(text).not.toContain('NVR не получает видео')
+  })
+
+  test('здоровые камеры не печатают лишнего', async () => {
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 60_000,
+      eventCount: 5,
+      since: 90_000,
+    })
+
+    expect(text).not.toContain('нет видео')
+    expect(text).not.toContain('нет детекции')
+  })
+
   test('свежий процесс без событий не тревожит', async () => {
     const text = await render({
       source: 'frigate',

@@ -15,6 +15,8 @@ export const frigateUrls = {
   latestFrame: '{host}/api/{camera}/latest.jpg',
   config: '{host}/api/config',
   version: '{host}/api/version',
+  // Live camera/detector counters: the only way to learn the NVR lost video.
+  stats: '{host}/api/stats',
   // Manual events: real recordings, but no `frigate/events` MQTT update — the
   // caller publishes the canonical event itself.
   createEvent: '{host}/api/events/{camera}/{label}/create',

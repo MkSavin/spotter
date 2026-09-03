@@ -2,7 +2,7 @@ import type { SpotterEvent } from '@spotter/transport'
 import type { Stenograph } from 'stenograph'
 import type { CoreConfig } from '../../config'
 import eventData from '../../data/event.json'
-import { createManualEvent, endManualEvent } from '../../frigate/manualEvent'
+import { createManualEvent } from '../../frigate/manualEvent'
 
 export type RealEventPayload = {
   camera: string
@@ -47,7 +47,10 @@ export const realEventAction = async (
 
   // Frigate needs the footage to exist before the clip can be fetched.
   await Bun.sleep(duration * 1000)
-  await endManualEvent(config.frigate, eventId, logger)
+
+  // Not ended here: the event was created with a duration, so Frigate closes it
+  // itself and refuses a manual end ("has a set duration and can not be ended
+  // manually"), leaving an error in the NVR's log on every test run.
 
   return {
     eventId,

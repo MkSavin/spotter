@@ -90,6 +90,8 @@ sudo ./spotter install ingest   # at home, the wizard sets the tunnel up itself
 
 Transcoding is the demanding part, and `depot` is built to be multiplied: it holds no state, so several already share the work through one Redis consumer group. Spreading them across machines — and adding capacity on demand — is planned in the [depot scaling spec](docs/depot-scaling.md).
 
+Switching the NVR between named modes — night, away, guests — over the bus is sketched in the [Frigate profiles spec](docs/frigate-profiles.md); it needs Frigate 0.18, which is still a release candidate.
+
 ## How it works
 
 Services know nothing about each other and talk only over Redis Streams. What travels between them is **S3 keys, not bytes and not tokens** — exactly one adapter holds camera access.

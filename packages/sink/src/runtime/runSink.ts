@@ -68,6 +68,13 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
   heartbeatDetails?: () =>
     | Promise<Record<string, string>>
     | Record<string, string>
+  /**
+   * Cameras the NVR reports as broken, refreshed on a timer by the adapter.
+   *
+   * Silence alone cannot tell a quiet scene from a dropped stream. Adapters
+   * that can ask their NVR should; the rest leave it unset.
+   */
+  cameraHealth?: () => { dead: string[]; stalled: string[] } | undefined
 }
 
 /**
@@ -178,12 +185,19 @@ export const runSink = async <TConfig extends SinkConfig>(
     // Re-read every beat: a source that stopped publishing looks identical to a
     // healthy one from the outside, and this is the only signal that separates
     // them.
-    source: () => ({
-      source: sourceId,
-      lastEventAt,
-      eventCount,
-      since: Math.round((Date.now() - startedAt) / 1000),
-    }),
+    source: () => {
+      const health = options.cameraHealth?.()
+      return {
+        source: sourceId,
+        lastEventAt,
+        eventCount,
+        since: Math.round((Date.now() - startedAt) / 1000),
+        // Omitted rather than empty: "no dead cameras" and "could not ask"
+        // are different answers, and only one of them is reassuring.
+        ...(health?.dead.length ? { deadCameras: health.dead } : {}),
+        ...(health?.stalled.length ? { stalledCameras: health.stalled } : {}),
+      }
+    },
   })
 
   // Healthcheck signal: refreshed only while Redis actually answers, so a

@@ -39,6 +39,16 @@ export const sourceActivitySchema = z.object({
   eventCount: z.number().nonnegative(),
   /** Seconds the process has been up, so a consumer can tell young from quiet. */
   since: z.number().nonnegative(),
+  /**
+   * Cameras the NVR itself reports as broken, by its own counters.
+   *
+   * Silence alone cannot tell a quiet driveway from a dropped stream; the NVR
+   * knows within seconds. Absent when the adapter cannot read that, which is
+   * not the same as everything being fine.
+   */
+  deadCameras: z.array(z.string().min(1)).optional(),
+  /** Cameras with video the detector never sees — no event can be produced. */
+  stalledCameras: z.array(z.string().min(1)).optional(),
 })
 export type SourceActivity = z.infer<typeof sourceActivitySchema>
 

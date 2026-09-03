@@ -36,6 +36,7 @@ const renderQueues = (service: ServiceStatus): string => {
       const age = queue.oldestPendingMs
         ? ` (старейшей ${formatUptime(Math.round(queue.oldestPendingMs / 1000))})`
         : ''
+
       parts.push(`${queue.pending} в работе${age}`)
     }
     return `    📥 <code>${shortStream(queue.stream)}</code>: ${parts.join(', ')}`
@@ -55,17 +56,24 @@ const renderSource = (service: ServiceStatus): string => {
   const activity = service.source
   if (!activity) return ''
 
+  const faults: string[] = []
+  if (activity.deadCameras?.length)
+    faults.push(`нет видео: ${activity.deadCameras.join(', ')}`)
+  if (activity.stalledCameras?.length)
+    faults.push(`нет детекции: ${activity.stalledCameras.join(', ')}`)
+  const cameraLine = faults.length ? `\n    🔴 ${faults.join('; ')}` : ''
+
   if (!activity.lastEventAt) {
     const waiting = formatUptime(activity.since)
     const mark = isSourceSilent(activity) ? '🔴' : '⏳'
-    return `\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)`
+    return `\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)${cameraLine}`
   }
 
   const ago = formatUptime(
     Math.round((Date.now() - activity.lastEventAt) / 1000),
   )
   const mark = isSourceSilent(activity) ? '🔴' : '🎥'
-  return `\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}`
+  return `\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}${cameraLine}`
 }
 
 const renderService = (service: ServiceStatus): string => {
@@ -114,6 +122,10 @@ class StatusCommand extends SpotterCommand {
 
     // Leads the message: an admin opening /status must not have to read past
     // healthy services to find the source that stopped.
+    const broken = services.flatMap(
+      (service) => service.source?.deadCameras ?? [],
+    )
+
     const silent = services.filter(
       (service) => service.source && isSourceSilent(service.source),
     )
@@ -124,10 +136,17 @@ class StatusCommand extends SpotterCommand {
             .join(', ')} — проверь публикацию событий в MQTT\n\n`
         : ''
 
+    const cameraAlarm =
+      broken.length > 0
+        ? `🔴 <b>NVR не получает видео:</b> ${broken
+            .map((camera: string) => `<code>${camera}</code>`)
+            .join(', ')} — событий по ним не будет\n\n`
+        : ''
+
     await context.replyWithHTML(
       `🧩 <b>Состояние инфраструктуры</b>
 
-${alarm}${blocks.join('\n\n')}
+${cameraAlarm}${alarm}${blocks.join('\n\n')}
 
 ${offline > 0 ? `⚠️ Не отвечают: ${offline}\n\n` : ''}Платформа: <code>Bun ${Bun.version_with_sha}</code>`,
     )
