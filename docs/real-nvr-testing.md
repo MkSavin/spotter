@@ -45,7 +45,7 @@ panic(main thread): unsupported uv function: uv_async_init
 2. **Свой ZMTP поверх `Bun.listen`.** ZMTP 3.1 REP — документированный протокол: greeting, READY-handshake, length-prefixed фреймы. Реализуемо (нужен только REP-сокет с одним пиром), но это несколько сотен строк и свой источник багов ради тестового стенда.
 3. **Дождаться поддержки libuv в Bun.** Срока нет.
 
-Рекомендую (1) и явную пометку в README, почему в этом одном образе Node.
+**Выбран Rust.** Для него есть чистая реализация ZMQ без C-зависимости, поэтому финальный образ — статический бинарь на голом alpine: **9.65 МБ** против ~130 МБ на Node, и второй JS-рантайм рядом с Bun не появляется. Сборка целиком в Docker, на машины ничего не ставится. Подробности — в [`apps/probe/AGENTS.md`](../apps/probe/AGENTS.md).
 
 ## Состав
 
@@ -115,7 +115,7 @@ grammY принимает [`apiRoot`](https://grammy.dev/ref/core/apiclientoptio
 
 ## Порядок
 
-1. `spotter-probe` + ZMQ, без Frigate: проверить протокол `[20,6] float32` отдельно.
+1. ~~`spotter-probe` + ZMQ, без Frigate~~ — **сделано** ([`apps/probe`](../apps/probe/AGENTS.md)): Rust, образ 9.65 МБ, 22 теста, протокол проверен клиентом Frigate.
 2. Frigate + go2rtc в compose стенда, зафиксировать версию образа.
 3. Первый тест: `/detect` → `frigate/events` в брокере → `spotter.event` в Redis.
 4. Заменить `test_delivery`/`test_media` на `/test`, выпилить `test_seed`.

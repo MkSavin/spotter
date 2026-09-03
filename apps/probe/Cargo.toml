@@ -1,0 +1,23 @@
+[package]
+name = "spotter-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Stub object detector that drives a real Frigate through its zmq_ipc plugin"
+
+[dependencies]
+# Pure-Rust ZeroMQ: no libzmq, so the release image is a static binary on bare
+# alpine. The native binding would also rule out a small image.
+zeromq = { version = "0.6", default-features = false, features = [
+  "tokio-runtime",
+  "tcp-transport",
+] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
