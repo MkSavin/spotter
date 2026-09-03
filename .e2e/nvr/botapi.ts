@@ -15,6 +15,14 @@ type Call = { method: string; body: unknown; at: number }
 
 const calls: Call[] = []
 
+/**
+ * Updates queued for the bot to collect, so a test can put words in a user's
+ * mouth — the only way to exercise `/login`, which needs a real message from a
+ * real chat before a recipient exists at all.
+ */
+const updates: unknown[] = []
+let updateId = 1
+
 /** grammY sends multipart for media and JSON for everything else. */
 const readBody = async (request: Request): Promise<unknown> => {
   const type = request.headers.get('content-type') ?? ''
@@ -56,6 +64,40 @@ const server = Bun.serve({
 
     if (pathname === '/__reset') {
       calls.length = 0
+      updates.length = 0
+      return Response.json({ ok: true })
+    }
+
+    // Queue a message as if a person had typed it.
+    if (pathname === '/__send' && request.method === 'POST') {
+      const body = (await request.json()) as {
+        text: string
+        chatId?: number
+        userId?: number
+        username?: string
+      }
+      const chatId = body.chatId ?? 1000
+      const userId = body.userId ?? 2000
+
+      updates.push({
+        update_id: updateId++,
+        message: {
+          message_id: updateId,
+          date: Math.floor(Date.now() / 1000),
+          text: body.text,
+          from: {
+            id: userId,
+            is_bot: false,
+            first_name: 'Rig',
+            username: body.username ?? 'rig_user',
+          },
+          chat: { id: chatId, type: 'private', username: body.username },
+          entities: body.text.startsWith('/')
+            ? [{ type: 'bot_command', offset: 0, length: body.text.split(' ')[0].length }]
+            : [],
+        },
+      })
+
       return Response.json({ ok: true })
     }
 
@@ -78,8 +120,12 @@ const server = Bun.serve({
       })
     }
 
-    // Long polling: answer empty rather than hanging, so the bot idles quietly.
-    if (method === 'getUpdates') return Response.json({ ok: true, result: [] })
+    // Long polling: hand over anything queued, then go quiet again rather than
+    // hanging, so the bot idles cheaply between tests.
+    if (method === 'getUpdates') {
+      const pending = updates.splice(0, updates.length)
+      return Response.json({ ok: true, result: pending })
+    }
 
     calls.push({ method, body: await readBody(request), at: Date.now() })
 

@@ -194,6 +194,40 @@ services:
       minio-init: { condition: service_completed_successfully }
       volume-permissions: { condition: service_completed_successfully }
 
+  # Present so the bot can discover it: the PWA announces its own address in
+  # its heartbeat, and `/user_sign` turns that into a one-tap login link.
+  spotter-pwa:
+    image: spotter-nvr/pwa:test
+    restart: 'no'
+    networks: [nvr]
+    ports: ['8100:3000']
+    environment:
+      REDIS_URL: redis://redis:6379
+      PUBLIC_URL: http://pwa.rig.test
+      S3_HOST: http://minio:9000
+      S3_ACCESS: spotter
+      S3_SECRET: spotter-nvr-rig
+      S3_BUCKET: spotter
+      # A throwaway pair generated for this rig; push is never delivered here.
+      VAPID_SUBJECT: mailto:rig@spotter.test
+      VAPID_PUBLIC_KEY: BHexo0Joll0Y7hfIJST987ajC12RuzL6T86ccGDtzNjA7n5okE0rhhP-K-gxuKhKIW3ONzBY8cgy37knfcSvlRU
+      # Raw 32 bytes, not PKCS#8 — web-push rejects the wrapped form.
+      VAPID_PRIVATE_KEY: 2qu9AhAoCYfIF5jEsDwq57Ef7Zi4D1XJyXVcAVpK8sM
+      LOG_LEVEL: verbose
+      TZ: Europe/Moscow
+    volumes:
+      - pwa-data:/app/data
+    healthcheck:
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+      volume-permissions: { condition: service_completed_successfully }
+
   # Named volumes come up root-owned and the images run as uid 1000.
   volume-permissions:
     image: alpine
@@ -202,11 +236,14 @@ services:
     volumes:
       - server-data:/data/server
       - telegram-data:/data/telegram
-    command: ['sh', '-c', 'chown -R 1000:1000 /data/server /data/telegram']
+      - pwa-data:/data/pwa
+    command:
+      ['sh', '-c', 'chown -R 1000:1000 /data/server /data/telegram /data/pwa']
 
 volumes:
   server-data:
   telegram-data:
+  pwa-data:
 
 networks:
   nvr:

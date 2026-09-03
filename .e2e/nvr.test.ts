@@ -31,7 +31,7 @@ const sourcePresent = async (): Promise<boolean> =>
   await Bun.file(`${import.meta.dir}/nvr/media/source.mp4`).exists()
 
 const adapterBuilt = async (): Promise<boolean> => {
-  for (const app of ['frigate', 'server', 'telegram']) {
+  for (const app of ['frigate', 'server', 'telegram', 'pwa']) {
     const probe = await $`docker image inspect spotter-nvr/${app}:test`
       .quiet()
       .nothrow()
@@ -114,6 +114,21 @@ const recordedEvents = async (): Promise<
   }>
 }
 
+/** What the bot tried to send, as recorded by the fake Bot API. */
+const botCalls = async (
+  method?: string,
+): Promise<Array<{ method: string; body: unknown }>> => {
+  const url = method
+    ? `http://localhost:8090/__calls?method=${method}`
+    : 'http://localhost:8090/__calls'
+  const response = await fetch(url)
+  if (!response.ok) return []
+  const payload = (await response.json()) as {
+    calls: Array<{ method: string; body: unknown }>
+  }
+  return payload.calls
+}
+
 /** Reads a Redis stream from the rig's own container. */
 const streamLength = async (stream: string): Promise<number> => {
   const result = await compose('exec', '-T', 'redis', 'redis-cli', 'XLEN', stream)
@@ -144,7 +159,10 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
   beforeAll(async () => {
     await compose('down', '-v', '--remove-orphans').quiet().nothrow()
 
-    const up = await compose('up', '-d', '--wait').quiet().nothrow()
+    // `--build` matters for the locally-built stand-ins (the probe, the Bot API
+    // recorder): compose reuses a stale image otherwise, and a test then fails
+    // against code that is not the code in the tree.
+    const up = await compose('up', '-d', '--build', '--wait').quiet().nothrow()
     if (up.exitCode !== 0) {
       throw new Error(
         `compose up failed (${up.exitCode}):\n${up.stderr.toString()}\n${up.stdout.toString()}`,
@@ -324,6 +342,111 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
     expect(logs).toContain('Bot is successfully started up!')
     expect(logs).not.toContain('api.telegram.org')
   }, 60_000)
+
+  test('the PWA announces where it lives, so the bot can link to it', async () => {
+    // `/user_sign` builds its one-tap login link from this. Taken off the bus
+    // rather than configured twice, so the two cannot drift apart.
+    await until(
+      async () => {
+        const result = await compose(
+          'exec',
+          '-T',
+          'redis',
+          'redis-cli',
+          'XREVRANGE',
+          'spotter.heartbeat',
+          '+',
+          '-',
+          'COUNT',
+          '30',
+        )
+          .quiet()
+          .nothrow()
+        return result.stdout.toString().includes('"service":"pwa"')
+      },
+      'the pwa to report in',
+      90_000,
+    )
+
+    const beats = await compose(
+      'exec',
+      '-T',
+      'redis',
+      'redis-cli',
+      'XREVRANGE',
+      'spotter.heartbeat',
+      '+',
+      '-',
+      'COUNT',
+      '30',
+    )
+      .quiet()
+      .nothrow()
+
+    expect(beats.stdout.toString()).toContain('http://pwa.rig.test')
+  }, 120_000)
+
+  test('an event reaches a registered recipient as a message', async () => {
+    // The last stretch, and the one a seeded event could never reach: a real
+    // person redeems a real code, and a real event turns into a real send.
+    // Everything before this proves the pipeline; this proves delivery.
+    const CHAT = 777001
+
+    // 1. The domain mints a code, exactly as `/user_sign` would.
+    const minted = await compose(
+      'exec',
+      '-T',
+      'spotter-server',
+      'bun',
+      'spotter',
+      'sign',
+      'admin',
+      '--raw',
+    )
+      .quiet()
+      .nothrow()
+
+    const code = minted.stdout.toString().trim().split('\n').at(-1) ?? ''
+    expect(code).not.toBe('')
+
+    // 2. A person types `/login <code>` — the fake Bot API hands it to the bot
+    // as a genuine update, so the whole grammY path runs.
+    await fetch('http://localhost:8090/__send', {
+      method: 'POST',
+      body: JSON.stringify({ text: `/login ${code}`, chatId: CHAT }),
+    })
+
+    await until(
+      async () =>
+        (await logsOf('spotter-telegram')).includes('redeem') ||
+        (await botCalls('sendMessage')).some((call) =>
+          String(JSON.stringify(call)).includes(String(CHAT)),
+        ),
+      'the bot to answer the login',
+      90_000,
+    )
+
+    // 3. Now a recipient exists, so an event has somewhere to go.
+    await detect({ class_id: 0, score: 0.94, frames: 80 })
+
+    await until(
+      async () => {
+        const sends = await botCalls()
+        return sends.some((call) =>
+          JSON.stringify(call.body).includes(String(CHAT)),
+        )
+      },
+      'the event to be delivered to the chat',
+      180_000,
+    )
+
+    const delivered = (await botCalls()).filter((call) =>
+      JSON.stringify(call.body).includes(String(CHAT)),
+    )
+
+    // More than the login reply: the event itself came through.
+    expect(delivered.length).toBeGreaterThan(1)
+  }, 300_000)
 
   test('the domain reaches the bot', async () => {
     // The catalog crosses server → bot, which is the hop that tells us the two

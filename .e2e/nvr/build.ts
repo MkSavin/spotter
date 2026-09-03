@@ -7,7 +7,7 @@ import { $ } from 'bun'
  * The release pipeline pushes manifests to ghcr and leaves nothing runnable
  * here, so the rig builds the same Dockerfiles with `--load`.
  */
-const APPS = ['frigate', 'server', 'telegram'] as const
+const APPS = ['frigate', 'server', 'telegram', 'pwa'] as const
 
 const root = new URL('../../', import.meta.url).pathname
 
