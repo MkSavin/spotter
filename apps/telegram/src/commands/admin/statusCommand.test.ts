@@ -150,3 +150,34 @@ describe('/status: подменённый детектор', () => {
     )
   })
 })
+
+describe('/status: связь с NVR', () => {
+  const HOUR_MS = 3600_000
+
+  test('обрыв связи виден отдельной строкой', async () => {
+    // Сентябрь 2026: события молчали двое суток, а всё остальное было зелёным.
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 60 * HOUR_MS,
+      lastContactAt: Date.now() - 60 * HOUR_MS,
+      reportsContact: true,
+      eventCount: 100,
+      since: 86_400,
+    })
+
+    expect(text).toContain('NVR не на связи')
+  })
+
+  test('тихая ночь при живой связи не поднимает тревогу', async () => {
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 12 * HOUR_MS,
+      lastContactAt: Date.now() - 20_000,
+      reportsContact: true,
+      eventCount: 100,
+      since: 86_400,
+    })
+
+    expect(text).not.toContain('NVR не на связи')
+  })
+})

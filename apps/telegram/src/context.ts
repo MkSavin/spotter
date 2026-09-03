@@ -28,6 +28,7 @@ import type {
 } from './extension/innoxious/InnoxiousMedia'
 import type { Session } from './session'
 import type { RolloutWatcher } from './status/RolloutWatcher'
+import type { SourceWatcher } from './status/SourceWatcher'
 
 type Methods<R extends RawApi> = string & keyof R
 type Payload<M extends Methods<R>, R extends RawApi> = M extends unknown
@@ -51,6 +52,7 @@ export type CoreContext = {
   catalog: CatalogCache
   heartbeats: HeartbeatRegistry
   rollouts: RolloutWatcher
+  sources: SourceWatcher
   clips: ClipTracker
   s3: S3Client
   subscriber: RedisConnection

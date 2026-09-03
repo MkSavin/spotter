@@ -200,6 +200,16 @@ export const runSink = async <TConfig extends SinkConfig>(
         lastEventAt,
         eventCount,
         since: Math.round((Date.now() - startedAt) / 1000),
+        // Read per beat through the handle, so it reflects the live transport
+        // rather than whatever was true when the heartbeat started.
+        ...(sourceHandle?.lastContactAt
+          ? {
+              reportsContact: true,
+              ...(sourceHandle.lastContactAt() !== undefined
+                ? { lastContactAt: sourceHandle.lastContactAt() }
+                : {}),
+            }
+          : {}),
         // Omitted rather than empty: "no dead cameras" and "could not ask"
         // are different answers, and only one of them is reassuring.
         ...(health?.dead.length ? { deadCameras: health.dead } : {}),

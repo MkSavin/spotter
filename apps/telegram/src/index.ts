@@ -51,7 +51,9 @@ import { applicationLogger } from './log'
 import { logging } from './middlewares/bot/logging'
 import type { GlobalSession, UserSession } from './session'
 import { notifyRollout } from './status/notifyRollout'
+import { notifySourceFault } from './status/notifySourceFault'
 import { RolloutWatcher } from './status/RolloutWatcher'
+import { SourceWatcher } from './status/SourceWatcher'
 import { telegramTransport } from './transport/telegramTransport'
 
 let db: TelegramDatabase | undefined
@@ -172,6 +174,16 @@ const polling = async (): Promise<void> => {
       bot && notifyRollout(bot.api, database, rolloutLogger, changes),
   })
 
+  // On a timer, not on arrival: an NVR that stops publishing sends no message
+  // saying so, and waiting for one is precisely how two days of silence went
+  // unnoticed.
+  const sourceLogger = applicationLogger.sub('source')
+  const sources = new SourceWatcher(sourceLogger, {
+    onAlert: (alert) =>
+      bot && notifySourceFault(bot.api, database, sourceLogger, alert),
+  })
+  sources.start()
+
   const clipLogger = applicationLogger.sub('clip')
   const clips = new ClipTracker(clipLogger, {
     render: (eventId, outcome) =>
@@ -271,6 +283,7 @@ const polling = async (): Promise<void> => {
     catalog,
     heartbeats,
     rollouts,
+    sources,
     clips,
     s3,
     producer,
@@ -291,6 +304,7 @@ const polling = async (): Promise<void> => {
     stopWaitRetention()
     stopThrottleSweep()
     rollouts.stop()
+    sources.stop()
     clips.stop()
     commandBus.stop()
     await transport?.stop()

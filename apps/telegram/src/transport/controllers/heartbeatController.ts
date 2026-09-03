@@ -16,4 +16,5 @@ export const heartbeatController: StreamMessageController<
 
   context.heartbeats.apply(beat)
   context.rollouts.apply(beat)
+  context.sources.apply(beat)
 }

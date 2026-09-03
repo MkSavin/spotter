@@ -273,6 +273,74 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
     expect(await logsOf('spotter-telegram')).toContain('Catalog cached')
   }, 120_000)
 
+  test('the adapter notices when the NVR stops talking', async () => {
+    // September 2026, reproduced: Frigate loses its route to the broker while
+    // the adapter keeps beating happily, and every other signal stays green.
+    //
+    // Asserted on the heartbeat rather than on a delivered alert: the alert
+    // fires after SOURCE_UNREACHABLE_MS, which is a quarter of an hour by
+    // design and far too long to sit through here. What the rig proves is that
+    // the input the watchdog needs is real and stops when the link does; the
+    // decision itself is covered by SourceWatcher's own tests.
+    const contactOf = async (): Promise<number | undefined> => {
+      const result = await compose(
+        'exec',
+        '-T',
+        'redis',
+        'redis-cli',
+        'XREVRANGE',
+        'spotter.heartbeat',
+        '+',
+        '-',
+        'COUNT',
+        '1',
+      )
+        .quiet()
+        .nothrow()
+
+      const found = /"lastContactAt":(\d+)/.exec(result.stdout.toString())
+      return found ? Number(found[1]) : undefined
+    }
+
+    const beatCount = async (): Promise<number> =>
+      Number(
+        (await compose('exec', '-T', 'redis', 'redis-cli', 'XLEN', 'spotter.heartbeat')
+          .quiet()
+          .nothrow()).stdout.toString().trim(),
+      )
+
+    // Frigate publishes stats once a minute, so the first contact takes a while.
+    await until(
+      async () => (await contactOf()) !== undefined,
+      'the adapter to hear from the NVR',
+      180_000,
+    )
+
+    await $`docker network disconnect spotter-nvr_nvr spotter-nvr-frigate-1`
+      .quiet()
+      .nothrow()
+
+    try {
+      // Read the baseline after the cut, not before it: a stats message already
+      // in flight lands a moment later and would look like a live link.
+      await Bun.sleep(10_000)
+      const before = await contactOf()
+      const beatsBefore = await beatCount()
+
+      // Longer than one stats round, so a healthy link would have advanced.
+      await Bun.sleep(90_000)
+
+      expect(await contactOf()).toBe(before as number)
+      // Still beating: this is why the gap needed its own signal instead of
+      // being inferred from a missing heartbeat.
+      expect(await beatCount()).toBeGreaterThan(beatsBefore)
+    } finally {
+      await $`docker network connect spotter-nvr_nvr spotter-nvr-frigate-1`
+        .quiet()
+        .nothrow()
+    }
+  }, 300_000)
+
   test('Frigate records the event as its own', async () => {
     // Not just a message on a topic: the NVR opened, tracked and closed an
     // event, which is what a seeded `test_seed` payload can never demonstrate.

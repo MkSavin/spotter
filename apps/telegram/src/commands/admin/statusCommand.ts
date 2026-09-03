@@ -1,4 +1,8 @@
-import { isSourceSilent, type ServiceStatus } from '@spotter/transport'
+import {
+  isSourceSilent,
+  isSourceUnreachable,
+  type ServiceStatus,
+} from '@spotter/transport'
 import Bun from 'bun'
 import type { BotContext } from '../../context'
 import { SpotterCommand } from '../framework/SpotterCommand'
@@ -56,6 +60,12 @@ const renderSource = (service: ServiceStatus): string => {
   const activity = service.source
   if (!activity) return ''
 
+  // Shown above everything else about the source: while the link is down, the
+  // event figures below describe a past that stopped updating.
+  const contact = isSourceUnreachable(activity)
+    ? `\n    🚨 <b>NVR не на связи</b> — не приходит даже служебных сообщений`
+    : ''
+
   const faults: string[] = []
   if (activity.deadCameras?.length)
     faults.push(`нет видео: ${activity.deadCameras.join(', ')}`)
@@ -66,14 +76,14 @@ const renderSource = (service: ServiceStatus): string => {
   if (!activity.lastEventAt) {
     const waiting = formatUptime(activity.since)
     const mark = isSourceSilent(activity) ? '🔴' : '⏳'
-    return `\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)${cameraLine}`
+    return `${contact}\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)${cameraLine}`
   }
 
   const ago = formatUptime(
     Math.round((Date.now() - activity.lastEventAt) / 1000),
   )
   const mark = isSourceSilent(activity) ? '🔴' : '🎥'
-  return `\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}${cameraLine}`
+  return `${contact}\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}${cameraLine}`
 }
 
 /**

@@ -35,6 +35,16 @@ export const sourceActivitySchema = z.object({
   source: z.string().min(1),
   /** Producer clock, epoch ms. Absent when no event has arrived yet. */
   lastEventAt: z.number().positive().optional(),
+  /**
+   * When the NVR last said anything at all on the transport, event or not.
+   *
+   * The signal `lastEventAt` cannot give: an NVR publishes housekeeping on a
+   * timer regardless of what happens in front of the cameras, so silence here
+   * means the link is down, while silence in events might just be a quiet
+   * night. Absent when the adapter has heard nothing since it started, and for
+   * sources whose transport has no such traffic.
+   */
+  lastContactAt: z.number().positive().optional(),
   /** Events seen since the process started. */
   eventCount: z.number().nonnegative(),
   /** Seconds the process has been up, so a consumer can tell young from quiet. */
@@ -49,6 +59,14 @@ export const sourceActivitySchema = z.object({
   deadCameras: z.array(z.string().min(1)).optional(),
   /** Cameras with video the detector never sees — no event can be produced. */
   stalledCameras: z.array(z.string().min(1)).optional(),
+  /**
+   * Whether this source's transport carries housekeeping traffic at all.
+   *
+   * Without it, "no contact" cannot be told apart from "this adapter never
+   * reports contact", and a consumer would alarm on every source that simply
+   * does not have the concept.
+   */
+  reportsContact: z.boolean().optional(),
 })
 export type SourceActivity = z.infer<typeof sourceActivitySchema>
 
@@ -107,6 +125,43 @@ export const HEARTBEAT_STALE_MS = HEARTBEAT_INTERVAL_MS * 3
  * and a threshold that cries wolf gets ignored precisely when it matters.
  */
 export const SOURCE_SILENT_MS = 6 * 60 * 60 * 1000
+
+/**
+ * How long the NVR may say nothing at all before the link counts as broken.
+ *
+ * Minutes, not hours, and that is the whole point: housekeeping traffic does
+ * not depend on anything happening in front of the cameras, so a few missed
+ * rounds is already an answer.
+ *
+ * Measured, not assumed: Frigate 0.17 publishes `frigate/stats` every 60
+ * seconds. Fifteen minutes leaves room for a restart and a rough patch and
+ * still catches a dropped link within the hour — against six hours for event
+ * silence, which cannot be shortened without crying wolf on every quiet night.
+ */
+export const SOURCE_UNREACHABLE_MS = 15 * 60 * 1000
+
+/**
+ * Whether the NVR has stopped talking to us entirely.
+ *
+ * Distinct from `isSourceSilent`, and stronger: a quiet driveway produces no
+ * events, but it cannot stop the NVR's own housekeeping. This is the check
+ * that would have caught the September 2026 outage within minutes instead of
+ * two days.
+ */
+export const isSourceUnreachable = (
+  activity: SourceActivity,
+  now = Date.now(),
+  thresholdMs = SOURCE_UNREACHABLE_MS,
+): boolean => {
+  // Nothing heard since start is only alarming once we have waited long enough
+  // to have heard something.
+  if (!activity.lastContactAt)
+    return (
+      activity.since * 1000 > thresholdMs && activity.reportsContact === true
+    )
+
+  return now - activity.lastContactAt > thresholdMs
+}
 
 /**
  * Whether a source has been quiet long enough to warn about. A process that has

@@ -23,6 +23,11 @@ export class FrigateSource extends Source<CoreConfig> {
     const logger = this.logger.sub('source', this.code)
     const verdicts = new ReviewVerdicts()
 
+    // Any traffic from the NVR counts, not only events: Frigate publishes
+    // stats on a timer whatever happens in front of the cameras, so this ticks
+    // through the quietest night and stops dead when the link does.
+    let lastContactAt: number | undefined
+
     // Connecting to the broker proves nothing about the NVR: with MQTT off in
     // its own config it publishes no events, and every other sign of health
     // stays green. Say so at startup rather than leaving a silent adapter.
@@ -39,7 +44,13 @@ export class FrigateSource extends Source<CoreConfig> {
     }
 
     await regulator
+      // Subscribed for its arrival, not its contents: the fact that stats keep
+      // coming is the whole signal.
+      .on('frigate/stats', async () => {
+        lastContactAt = Date.now()
+      })
       .on('frigate/events', async ({ topic, contents }) => {
+        lastContactAt = Date.now()
         const value = bufferToJson(contents)
 
         if (!value) {
@@ -60,6 +71,7 @@ export class FrigateSource extends Source<CoreConfig> {
         }
       })
       .on('frigate/reviews', async ({ contents }) => {
+        lastContactAt = Date.now()
         const value = bufferToJson(contents)
         if (!value) return
 
@@ -71,6 +83,7 @@ export class FrigateSource extends Source<CoreConfig> {
       .run({ mqtt })
 
     return {
+      lastContactAt: () => lastContactAt,
       stop: async () => {
         await mqtt.endAsync()
       },
