@@ -1,0 +1,70 @@
+# Frigate for the NVR rig: a real NVR whose eyes are spotter-probe.
+#
+# Everything here is the real thing except detection — Frigate does the
+# tracking, the recording, the severity and the MQTT publishing itself. That
+# hop is what production went two days without, and what our seeded test
+# events skip entirely.
+
+mqtt:
+  enabled: true
+  host: mosquitto
+  port: 1883
+  client_id: frigate
+
+detectors:
+  probe:
+    type: zmq
+    endpoint: tcp://probe:5555
+    # The plugin's 200ms default resets the socket and re-runs the handshake on
+    # every slow reply, which a loaded CI machine hits constantly.
+    request_timeout_ms: 5000
+
+model:
+  # No weights are downloaded: the probe answers "model ready" and Frigate
+  # hashes a missing path as "unknown" rather than reading it. The path must
+  # still be set — the plugin takes its basename before it asks anything.
+  path: /config/probe.model
+  width: 320
+  height: 320
+  labelmap:
+    0: person
+    1: car
+
+go2rtc:
+  streams:
+    front:
+      - 'ffmpeg:/media/frigate/source.mp4#video=h264#loop'
+
+cameras:
+  front:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front
+          input_args: preset-rtsp-restream
+          roles: [detect, record]
+    detect:
+      width: 640
+      height: 480
+      fps: 5
+    objects:
+      track: [person]
+    record:
+      enabled: true
+      retain:
+        days: 1
+        mode: all
+    snapshots:
+      enabled: true
+
+# The rig is short-lived, so keep the write volume small.
+record:
+  enabled: true
+  retain:
+    days: 1
+    mode: all
+
+logger:
+  default: info
+  logs:
+    frigate.detectors.plugins.zmq_ipc: debug
+    frigate.comms.mqtt: debug

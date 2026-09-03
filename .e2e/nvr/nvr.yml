@@ -1,0 +1,68 @@
+# NVR rig: a real Frigate, a real broker, and our adapter behind them.
+#
+# Separate from the smoke rig on purpose. Smoke asks "does the deployment come
+# up" against a fake NVR and stays light; this asks "does an event the NVR
+# itself produced reach us", and pays ~500MB of Frigate image for the answer.
+#
+# The hop it covers — NVR to broker to adapter — is covered by nothing else,
+# and it is the one that went silent in production for two days.
+name: spotter-nvr
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    networks: [nvr]
+    ports: ['1883:1883']
+    command: ['mosquitto', '-c', '/mosquitto-no-auth.conf']
+    healthcheck:
+      test: ['CMD-SHELL', 'mosquitto_sub -t healthcheck -E -W 1 || exit 1']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    networks: [nvr]
+    ports: ['6379:6379']
+    command: ['redis-server', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  probe:
+    build: ../../apps/probe
+    networks: [nvr]
+    ports: ['8081:8080']
+    # Healthcheck ships with the image, so every compose that gates on the probe
+    # gets the same one.
+
+  # Pinned: the detector plugin is an interface, not an endpoint, but it is not
+  # forever. Bumping this tag is a deliberate act with a test run behind it.
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:0.17.2
+    networks: [nvr]
+    shm_size: '128mb'
+    ports:
+      - '5000:5000'
+      - '8554:8554'
+    volumes:
+      - ./frigate.yml:/config/config.yml:ro
+      - ./media:/media/frigate
+      - type: tmpfs
+        target: /tmp/cache
+        tmpfs: { size: 200000000 }
+    depends_on:
+      mosquitto: { condition: service_healthy }
+      probe: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://localhost:5000/api/version || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+networks:
+  nvr:
+    driver: bridge
