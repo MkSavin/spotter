@@ -1,5 +1,79 @@
 # @spotter/sink
 
+## 1.6.0
+
+### Minor Changes
+
+- 44487a6: feat: report the NVR's own camera health
+  
+  Silence from a source cannot tell a quiet driveway from a camera whose stream dropped — but the NVR knows within seconds. The Frigate adapter now polls `/api/stats` in the background and reports, per camera, whether video is arriving and whether the detector sees it. Both appear in `/status`: a dead camera leads the message, and every adapter shows when it last saw an event.
+  
+  Two distinct faults are separated, because they need different fixes: a camera with no frames at all (the stream is gone) and a camera with frames the detector never sees (video is fine, no event can be produced). A camera with detection deliberately switched off is neither, and is never reported.
+  
+  State transitions are logged rather than the state itself, so a stream that drops at 02:00 leaves a line saying so instead of one repeated line a minute. A failed probe keeps the last good reading — not being able to ask is not evidence of health.
+  
+  fix: stop asking Frigate to end a manual event that has a duration
+  
+  `/event_test real` created the event with a duration, so Frigate closes it itself and refuses the manual end, leaving `has a set duration and can not be ended manually` in the NVR's log on every test run.
+- 8359b18: feat: warn when an NVR stops sending events
+  
+  An adapter whose source goes quiet was indistinguishable from a healthy one: it stays connected, passes its healthcheck and reports a green heartbeat while the NVR behind it has stopped publishing. A break went unnoticed for a day that way, with the bot saying nothing. Adapters now report when they last saw an event, and `/status` leads with a warning after six hours of silence instead of showing a green tick.
+  
+  fix: subscribe to MQTT topics one at a time
+  
+  A broker refusing a single topic (an ACL, a topic its version does not know) failed the whole batch, so an optional subscription could take the essential one down with it. Refusals are now logged and skipped; only a node where every topic fails still errors out.
+  
+  Container logs are capped and rotated (3 × 10 MB per service). The default json-file driver keeps one unbounded file and discards it when a container is recreated — which is when its history is most wanted.
+- 757f521: feat: alert when the NVR stops talking, instead of waiting to be told
+  
+  The adapter now tracks when its NVR last said *anything* on the transport, not only when it last produced an event, and the bot checks that on a timer and messages admins the moment it goes stale.
+  
+  This is the signal that was missing in September 2026. Frigate lost its route to the broker and published nothing for 60 hours while every other indicator stayed green: the adapter was connected, subscribed and beating, the NVR answered HTTP and served video. Nothing was watching the one thing that had actually stopped, and a break went unnoticed.
+  
+  Two thresholds, deliberately far apart, because they answer different questions. Event silence (6 hours) can be a quiet night and cannot be shortened without crying wolf every winter morning. No housekeeping traffic at all (15 minutes) is never normal — Frigate publishes `frigate/stats` once a minute regardless of what happens in front of the cameras, which is measured on the rig rather than taken from the docs. Where a source reports contact, event silence stops raising anything on its own: an NVR that is demonstrably alive and simply has nothing to report is not a fault.
+  
+  The check runs on a timer rather than on heartbeat arrival, which is the whole point: a broken NVR does not send a message saying it is broken. Alerts fire on transitions only — one at the outage, one at recovery with how long it lasted — because a warning that repeats every minute gets muted, and then the next outage goes unseen too. The outage alert makes a sound; the recovery does not.
+  
+  `/status` shows the same state as its own line, above the source figures — otherwise "last event an hour ago" reads as good news.
+
+### Patch Changes
+
+- 79f802b: feat: stamp every log line with `dd.mm.yyyy hh:mm:ss`
+  
+  A log said what happened but not when, so correlating our lines against an NVR's or a broker's meant guessing. The time is local, since container logs are read next to a wall clock and `TZ` is already set per node.
+  
+  fix: stop the catalog from burying the log
+  
+  `Catalog for "..." unchanged` is gone: it was the expected outcome of every quiet refresh and said nothing. A forced republish of an identical catalog drops to debug — only a catalog that actually differs stays at info, because that means cameras appeared or went away. Twelve quiet refreshes now print one line instead of thirteen; a real deployment log showed 98 catalog lines where 1 was informative.
+  
+  `publishCatalog` takes an explicit `force` rather than having the caller drop the memo, so a forced round can still tell a genuine change from a routine repeat.
+- 914eb43: feat: ship the probe behind a profile, and shout about it in `/status`
+  
+  `./spotter up --probe` starts the stub detector on a live node, so a real deployment can be tested the way CI tests it. Everything about it is built to be hard to leave on by accident:
+  
+  - the profile is off by default, and the choice is **not** persisted to `SPOTTER_PROFILES` the way the frontends are — forgetting a frontend is an annoyance, forgetting the probe leaves the property unwatched;
+  - the CLI prints a warning on every such start;
+  - `PROBE_ENDPOINT` is passed for that command only, so the adapter forgets the probe the moment the profile is dropped;
+  - while it is set, the adapter reports `probeActive` on every heartbeat and `/status` prints **🚨 ДЕТЕКТОР ПОДМЕНЁН** above the source figures.
+  
+  That last one carries the weight: without it, an admin reads "last event a minute ago" as good news, when the event is one we asked for ourselves. A test that reports on a staged detection while claiming the property is watched is worse than no test.
+  
+  The probe image also joins the release matrix. It is Rust, so changesets never sees it — the version comes from `Cargo.toml`, and it builds from its own directory rather than the repo root.
+- Updated dependencies [79f802b]
+- Updated dependencies [44487a6]
+- Updated dependencies [c797bc6]
+- Updated dependencies [56de302]
+- Updated dependencies [a07b6a9]
+- Updated dependencies [914eb43]
+- Updated dependencies [addddbc]
+- Updated dependencies [ae90386]
+- Updated dependencies [8359b18]
+- Updated dependencies [757f521]
+- Updated dependencies [b173e32]
+- Updated dependencies [523eb3f]
+  - stenograph@1.3.0
+  - @spotter/transport@1.9.0
+
 ## 1.5.0
 
 ### Minor Changes

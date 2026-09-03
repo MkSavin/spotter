@@ -1,5 +1,40 @@
 # @spotter/forwarder
 
+## 1.4.8
+
+### Patch Changes
+
+- addddbc: fix: answer `/test`, including when it refuses
+  
+  The adapter now publishes the outcome of every probe request to `spotter.probe.result`, and the bot delivers it to the chat that asked — a refusal with its reason, or a confirmation naming the camera and frame count.
+  
+  Without this the command was quietly broken in exactly the way it exists to catch. A refusal reached only the adapter's log on the ingest node, so an admin running `/test` on a deployment with no probe saw a cheerful "staging a detection" and then nothing at all — indistinguishable from the outage the command is meant to detect. The reply itself crosses the forwarder, or the same silence would return on any split deployment.
+  
+  `/test` also stops claiming success before the adapter has spoken, and the refusal reasons now say what to do (`./spotter up --probe`) rather than describing the internals.
+  
+  Adds `docs/testing.md`: the three levels of checking, what `/test` covers, and the two steps a live node needs before it works — the probe profile, and pointing Frigate's own detector config at it.
+- 523eb3f: feat: replace `/test_delivery` and `/test_media` with a single `/test`
+  
+  `/test [камера] [объект]` publishes to `spotter.probe.request.<source>`; the adapter arms the probe, and the NVR does the rest — it sees the object, tracks it, records the clip and publishes the event itself. What arrives in Telegram came the whole way round.
+  
+  The two old commands seeded `spotter.event.test_seed`, which skipped MQTT entirely: they proved our idea of an event, never the NVR's. The stretch they skipped is the one that went silent for two days in production while both commands kept passing. `test_seed`, `eventTestController` and `eventTestAction` are gone, and the forwarder now carries the probe request in their place — without that, `/test` on a cloud node could never reach an adapter on ingest.
+  
+  `PROBE_ENDPOINT` is empty by default and stays empty in production: the probe replaces the NVR's detector, so a request with no probe configured is refused with a reason rather than silently doing nothing.
+- Updated dependencies [79f802b]
+- Updated dependencies [44487a6]
+- Updated dependencies [c797bc6]
+- Updated dependencies [56de302]
+- Updated dependencies [a07b6a9]
+- Updated dependencies [914eb43]
+- Updated dependencies [addddbc]
+- Updated dependencies [ae90386]
+- Updated dependencies [8359b18]
+- Updated dependencies [757f521]
+- Updated dependencies [b173e32]
+- Updated dependencies [523eb3f]
+  - stenograph@1.3.0
+  - @spotter/transport@1.9.0
+
 ## 1.4.7
 
 ### Patch Changes

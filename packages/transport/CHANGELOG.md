@@ -1,5 +1,112 @@
 # @spotter/transport
 
+## 1.9.0
+
+### Minor Changes
+
+- 44487a6: feat: report the NVR's own camera health
+  
+  Silence from a source cannot tell a quiet driveway from a camera whose stream dropped — but the NVR knows within seconds. The Frigate adapter now polls `/api/stats` in the background and reports, per camera, whether video is arriving and whether the detector sees it. Both appear in `/status`: a dead camera leads the message, and every adapter shows when it last saw an event.
+  
+  Two distinct faults are separated, because they need different fixes: a camera with no frames at all (the stream is gone) and a camera with frames the detector never sees (video is fine, no event can be produced). A camera with detection deliberately switched off is neither, and is never reported.
+  
+  State transitions are logged rather than the state itself, so a stream that drops at 02:00 leaves a line saying so instead of one repeated line a minute. A failed probe keeps the last good reading — not being able to ask is not evidence of health.
+  
+  fix: stop asking Frigate to end a manual event that has a duration
+  
+  `/event_test real` created the event with a duration, so Frigate closes it itself and refuses the manual end, leaving `has a set duration and can not be ended manually` in the NVR's log on every test run.
+- 914eb43: feat: ship the probe behind a profile, and shout about it in `/status`
+  
+  `./spotter up --probe` starts the stub detector on a live node, so a real deployment can be tested the way CI tests it. Everything about it is built to be hard to leave on by accident:
+  
+  - the profile is off by default, and the choice is **not** persisted to `SPOTTER_PROFILES` the way the frontends are — forgetting a frontend is an annoyance, forgetting the probe leaves the property unwatched;
+  - the CLI prints a warning on every such start;
+  - `PROBE_ENDPOINT` is passed for that command only, so the adapter forgets the probe the moment the profile is dropped;
+  - while it is set, the adapter reports `probeActive` on every heartbeat and `/status` prints **🚨 ДЕТЕКТОР ПОДМЕНЁН** above the source figures.
+  
+  That last one carries the weight: without it, an admin reads "last event a minute ago" as good news, when the event is one we asked for ourselves. A test that reports on a staged detection while claiming the property is watched is worse than no test.
+  
+  The probe image also joins the release matrix. It is Rust, so changesets never sees it — the version comes from `Cargo.toml`, and it builds from its own directory rather than the repo root.
+- addddbc: fix: answer `/test`, including when it refuses
+  
+  The adapter now publishes the outcome of every probe request to `spotter.probe.result`, and the bot delivers it to the chat that asked — a refusal with its reason, or a confirmation naming the camera and frame count.
+  
+  Without this the command was quietly broken in exactly the way it exists to catch. A refusal reached only the adapter's log on the ingest node, so an admin running `/test` on a deployment with no probe saw a cheerful "staging a detection" and then nothing at all — indistinguishable from the outage the command is meant to detect. The reply itself crosses the forwarder, or the same silence would return on any split deployment.
+  
+  `/test` also stops claiming success before the adapter has spoken, and the refusal reasons now say what to do (`./spotter up --probe`) rather than describing the internals.
+  
+  Adds `docs/testing.md`: the three levels of checking, what `/test` covers, and the two steps a live node needs before it works — the probe profile, and pointing Frigate's own detector config at it.
+- 8359b18: feat: warn when an NVR stops sending events
+  
+  An adapter whose source goes quiet was indistinguishable from a healthy one: it stays connected, passes its healthcheck and reports a green heartbeat while the NVR behind it has stopped publishing. A break went unnoticed for a day that way, with the bot saying nothing. Adapters now report when they last saw an event, and `/status` leads with a warning after six hours of silence instead of showing a green tick.
+  
+  fix: subscribe to MQTT topics one at a time
+  
+  A broker refusing a single topic (an ACL, a topic its version does not know) failed the whole batch, so an optional subscription could take the essential one down with it. Refusals are now logged and skipped; only a node where every topic fails still errors out.
+  
+  Container logs are capped and rotated (3 × 10 MB per service). The default json-file driver keeps one unbounded file and discards it when a container is recreated — which is when its history is most wanted.
+- 757f521: feat: alert when the NVR stops talking, instead of waiting to be told
+  
+  The adapter now tracks when its NVR last said *anything* on the transport, not only when it last produced an event, and the bot checks that on a timer and messages admins the moment it goes stale.
+  
+  This is the signal that was missing in September 2026. Frigate lost its route to the broker and published nothing for 60 hours while every other indicator stayed green: the adapter was connected, subscribed and beating, the NVR answered HTTP and served video. Nothing was watching the one thing that had actually stopped, and a break went unnoticed.
+  
+  Two thresholds, deliberately far apart, because they answer different questions. Event silence (6 hours) can be a quiet night and cannot be shortened without crying wolf every winter morning. No housekeeping traffic at all (15 minutes) is never normal — Frigate publishes `frigate/stats` once a minute regardless of what happens in front of the cameras, which is measured on the rig rather than taken from the docs. Where a source reports contact, event silence stops raising anything on its own: an NVR that is demonstrably alive and simply has nothing to report is not a fault.
+  
+  The check runs on a timer rather than on heartbeat arrival, which is the whole point: a broken NVR does not send a message saying it is broken. Alerts fire on transitions only — one at the outage, one at recovery with how long it lasted — because a warning that repeats every minute gets muted, and then the next outage goes unseen too. The outage alert makes a sound; the recovery does not.
+  
+  `/status` shows the same state as its own line, above the source figures — otherwise "last event an hour ago" reads as good news.
+- 523eb3f: feat: replace `/test_delivery` and `/test_media` with a single `/test`
+  
+  `/test [камера] [объект]` publishes to `spotter.probe.request.<source>`; the adapter arms the probe, and the NVR does the rest — it sees the object, tracks it, records the clip and publishes the event itself. What arrives in Telegram came the whole way round.
+  
+  The two old commands seeded `spotter.event.test_seed`, which skipped MQTT entirely: they proved our idea of an event, never the NVR's. The stretch they skipped is the one that went silent for two days in production while both commands kept passing. `test_seed`, `eventTestController` and `eventTestAction` are gone, and the forwarder now carries the probe request in their place — without that, `/test` on a cloud node could never reach an adapter on ingest.
+  
+  `PROBE_ENDPOINT` is empty by default and stays empty in production: the probe replaces the NVR's detector, so a request with no probe configured is refused with a reason rather than silently doing nothing.
+
+### Patch Changes
+
+- c797bc6: test: close the NVR rig's chain through the adapter into Redis
+  
+  The rig now runs our own adapter image beside Frigate, so a `/detect` call is followed all the way: probe → Frigate's detector → its tracker → MQTT → the adapter → `spotter.event`. The score handed to the probe comes back out of Redis unchanged, which is the one thing seeding `spotter.event.test_seed` can never show.
+  
+  Adds minio (the adapter refuses to start without S3) and `bun run nvr:build` for the adapter image. Five tests, ~107s from a cold start.
+- 56de302: test: make the NVR rig actually produce events, verified against Frigate 0.17.2
+  
+  The rig now runs end to end: Frigate connects to the broker, polls the probe for every analysed frame, and on `/detect` opens, tracks and closes events of its own — `frigate/events` carries the real `before`/`after` payload with the score we asked for, and the NVR's own database records them.
+  
+  Four fixes, each found by running it and each invisible without a real NVR:
+  
+  - `detect.enabled` is explicit. It defaults to `false` in 0.17, so the camera captured fine while never calling the detector.
+  - `record.retain` becomes `record.continuous.days`. The old key is rejected outright in 0.17, and Frigate answers an invalid config by starting in safe mode with a CPU detector — a healthy-looking NVR that simply never calls the probe.
+  - No comments inside `go2rtc.streams`. Frigate copies that block into go2rtc's config verbatim, and a comment between the key and its list leaves the stream registered with no producer running, so Frigate 404s against its own restream.
+  - The source clip is 20 minutes rather than 30 seconds. go2rtc's `#loop` ends at EOF and `#input=` flags land after the output URL where ffmpeg rejects them, so a file longer than any run is the honest fix.
+  
+  The config mount is writable (Frigate migrates its own config across versions) and the rig's ports move off 5000/8554, which collide with AirPlay and with a developer's own Frigate.
+- a07b6a9: test: drive a real Frigate from the probe in its own rig
+  
+  Adds `.e2e/nvr/`: a pinned Frigate `0.17.2`, a real broker, and the probe as its detector, with `bun run test:nvr` asserting the NVR connects to MQTT, polls the detector, and publishes an event of its own making. That hop — NVR to broker to adapter — was covered by nothing, and it is the one that went silent in production for two days while every seeded test stayed green.
+  
+  Separate from smoke on purpose: smoke stays light against a fake NVR, this pays a ~500MB image for an answer smoke cannot give. It skips itself when docker or the image is absent.
+  
+  The probe's healthcheck moves into its image, and it now asks `127.0.0.1` rather than `localhost` — alpine resolves the name to `::1` first, where nothing listens, so the check could never pass and would have held Frigate at the starting line with no hint why. The image also builds from the committed `Cargo.lock` instead of resolving fresh versions.
+- ae90386: test: follow an event all the way to a recipient's chat
+  
+  The rig now covers the last stretch, the one a seeded event could never reach: the domain mints a code, the fake Bot API hands the bot a real `/login` message as though a person typed it, the code is redeemed, and a detection staged on the NVR arrives as a message in that chat.
+  
+  Without the ability to put words in a user's mouth this was untestable — no recipient exists until someone redeems a code from a genuine chat, and with no recipient an event has nowhere to go. The stand-in gained a `/__send` endpoint for exactly that.
+  
+  The rig also brings up the PWA, so `/user_sign`'s one-tap login link is exercised against a real instance announcing its own address.
+  
+  `compose up` now passes `--build`. A four-hour-old image of the Bot API stand-in is what made the first delivery run fail: compose happily reused it, and the test ran against code that was not the code in the tree.
+- b173e32: feat: add `spotter-probe`, a stub detector that drives a real Frigate
+  
+  Frigate has no hook for creating an event, but its supported `zmq_ipc` detector plugin asks an external process what is in each frame. The probe answers that on demand, so the NVR itself does the tracking, the recording, the severity and the MQTT publishing — the whole path `test_delivery` and `test_media` skip by writing straight to `spotter.event.test_seed`.
+  
+  Written in Rust, the only service in the repo that is not Bun: the ZeroMQ binding panics under Bun (`unsupported uv function: uv_async_init`), and a second JS runtime beside Bun invites someone to write a service on it. A pure-Rust ZMQ implementation keeps the image at 9.65 MB with no runtime at all, and everything builds inside Docker so no toolchain reaches a developer machine or a node.
+- Updated dependencies [79f802b]
+  - stenograph@1.3.0
+
 ## 1.8.1
 
 ### Patch Changes
