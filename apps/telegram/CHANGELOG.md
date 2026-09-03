@@ -1,5 +1,102 @@
 # @spotter/telegram
 
+## 1.8.0
+
+### Minor Changes
+
+- 44487a6: feat: report the NVR's own camera health
+  
+  Silence from a source cannot tell a quiet driveway from a camera whose stream dropped — but the NVR knows within seconds. The Frigate adapter now polls `/api/stats` in the background and reports, per camera, whether video is arriving and whether the detector sees it. Both appear in `/status`: a dead camera leads the message, and every adapter shows when it last saw an event.
+  
+  Two distinct faults are separated, because they need different fixes: a camera with no frames at all (the stream is gone) and a camera with frames the detector never sees (video is fine, no event can be produced). A camera with detection deliberately switched off is neither, and is never reported.
+  
+  State transitions are logged rather than the state itself, so a stream that drops at 02:00 leaves a line saying so instead of one repeated line a minute. A failed probe keeps the last good reading — not being able to ask is not evidence of health.
+  
+  fix: stop asking Frigate to end a manual event that has a duration
+  
+  `/event_test real` created the event with a duration, so Frigate closes it itself and refuses the manual end, leaving `has a set duration and can not be ended manually` in the NVR's log on every test run.
+- 914eb43: feat: ship the probe behind a profile, and shout about it in `/status`
+  
+  `./spotter up --probe` starts the stub detector on a live node, so a real deployment can be tested the way CI tests it. Everything about it is built to be hard to leave on by accident:
+  
+  - the profile is off by default, and the choice is **not** persisted to `SPOTTER_PROFILES` the way the frontends are — forgetting a frontend is an annoyance, forgetting the probe leaves the property unwatched;
+  - the CLI prints a warning on every such start;
+  - `PROBE_ENDPOINT` is passed for that command only, so the adapter forgets the probe the moment the profile is dropped;
+  - while it is set, the adapter reports `probeActive` on every heartbeat and `/status` prints **🚨 ДЕТЕКТОР ПОДМЕНЁН** above the source figures.
+  
+  That last one carries the weight: without it, an admin reads "last event a minute ago" as good news, when the event is one we asked for ourselves. A test that reports on a staged detection while claiming the property is watched is worse than no test.
+  
+  The probe image also joins the release matrix. It is Rust, so changesets never sees it — the version comes from `Cargo.toml`, and it builds from its own directory rather than the repo root.
+- addddbc: fix: answer `/test`, including when it refuses
+  
+  The adapter now publishes the outcome of every probe request to `spotter.probe.result`, and the bot delivers it to the chat that asked — a refusal with its reason, or a confirmation naming the camera and frame count.
+  
+  Without this the command was quietly broken in exactly the way it exists to catch. A refusal reached only the adapter's log on the ingest node, so an admin running `/test` on a deployment with no probe saw a cheerful "staging a detection" and then nothing at all — indistinguishable from the outage the command is meant to detect. The reply itself crosses the forwarder, or the same silence would return on any split deployment.
+  
+  `/test` also stops claiming success before the adapter has spoken, and the refusal reasons now say what to do (`./spotter up --probe`) rather than describing the internals.
+  
+  Adds `docs/testing.md`: the three levels of checking, what `/test` covers, and the two steps a live node needs before it works — the probe profile, and pointing Frigate's own detector config at it.
+- da69e7a: feat: hand the access code to the web app in one tap
+  
+  `/user_sign` now prints the code on its own line, with nothing else inside the tag: a tap copies exactly what the web app's field expects. It used to be wrapped as `/login <code>`, so copying brought the command along and it had to be edited out by hand — in the app where the code is least convenient to retype.
+  
+  Where a PWA is running, the message also carries `…/authorize?code=…`. Opening it fills the code in and submits it, then strips it from the address bar with `replaceState`: the code is single use and has nothing to gain from sitting in history, a bookmark, or a screenshot. An install that is already signed in drops the code the same way rather than leaving it in the URL, since the login page never renders there.
+  
+  The bot learns the address from the PWA's own heartbeat (`details.url`, from `PUBLIC_URL`) rather than a second copy in its own config, which would drift the first time one of them moved. No PWA, a silent one, or a code bound to a `@username` — which a device can never redeem — means no link offered.
+- 8359b18: feat: warn when an NVR stops sending events
+  
+  An adapter whose source goes quiet was indistinguishable from a healthy one: it stays connected, passes its healthcheck and reports a green heartbeat while the NVR behind it has stopped publishing. A break went unnoticed for a day that way, with the bot saying nothing. Adapters now report when they last saw an event, and `/status` leads with a warning after six hours of silence instead of showing a green tick.
+  
+  fix: subscribe to MQTT topics one at a time
+  
+  A broker refusing a single topic (an ACL, a topic its version does not know) failed the whole batch, so an optional subscription could take the essential one down with it. Refusals are now logged and skipped; only a node where every topic fails still errors out.
+  
+  Container logs are capped and rotated (3 × 10 MB per service). The default json-file driver keeps one unbounded file and discards it when a container is recreated — which is when its history is most wanted.
+- 757f521: feat: alert when the NVR stops talking, instead of waiting to be told
+  
+  The adapter now tracks when its NVR last said *anything* on the transport, not only when it last produced an event, and the bot checks that on a timer and messages admins the moment it goes stale.
+  
+  This is the signal that was missing in September 2026. Frigate lost its route to the broker and published nothing for 60 hours while every other indicator stayed green: the adapter was connected, subscribed and beating, the NVR answered HTTP and served video. Nothing was watching the one thing that had actually stopped, and a break went unnoticed.
+  
+  Two thresholds, deliberately far apart, because they answer different questions. Event silence (6 hours) can be a quiet night and cannot be shortened without crying wolf every winter morning. No housekeeping traffic at all (15 minutes) is never normal — Frigate publishes `frigate/stats` once a minute regardless of what happens in front of the cameras, which is measured on the rig rather than taken from the docs. Where a source reports contact, event silence stops raising anything on its own: an NVR that is demonstrably alive and simply has nothing to report is not a fault.
+  
+  The check runs on a timer rather than on heartbeat arrival, which is the whole point: a broken NVR does not send a message saying it is broken. Alerts fire on transitions only — one at the outage, one at recovery with how long it lasted — because a warning that repeats every minute gets muted, and then the next outage goes unseen too. The outage alert makes a sound; the recovery does not.
+  
+  `/status` shows the same state as its own line, above the source figures — otherwise "last event an hour ago" reads as good news.
+- 1bd6a85: feat: let the Bot API be pointed elsewhere, and run the bot in the rig
+  
+  `TELEGRAM_API_ROOT` sends every grammY call to a given host, and `TELEGRAM_TEST_ENVIRONMENT` switches to Telegram's own test infrastructure. Both are empty by default, so production is unchanged, and the bot warns loudly on startup whenever either is set — a redirected bot that looks normal in the logs is worse than no rig at all.
+  
+  This is not a knob invented for a test: it is what a self-hosted Bot API server needs, and what Telegram's separate test infrastructure needs. Declining to add it was the wrong call.
+  
+  The NVR rig now runs `spotter-server` and `spotter-telegram` against a recording Bot API stand-in, so a run exercises the whole deployment and still cannot message a real chat. `/__calls` serves what the bot tried to send.
+  
+  Delivery to an actual recipient stays uncovered: registration goes through a signed token and a live chat, which is its own piece of work.
+- 523eb3f: feat: replace `/test_delivery` and `/test_media` with a single `/test`
+  
+  `/test [камера] [объект]` publishes to `spotter.probe.request.<source>`; the adapter arms the probe, and the NVR does the rest — it sees the object, tracks it, records the clip and publishes the event itself. What arrives in Telegram came the whole way round.
+  
+  The two old commands seeded `spotter.event.test_seed`, which skipped MQTT entirely: they proved our idea of an event, never the NVR's. The stretch they skipped is the one that went silent for two days in production while both commands kept passing. `test_seed`, `eventTestController` and `eventTestAction` are gone, and the forwarder now carries the probe request in their place — without that, `/test` on a cloud node could never reach an adapter on ingest.
+  
+  `PROBE_ENDPOINT` is empty by default and stays empty in production: the probe replaces the NVR's detector, so a request with no probe configured is refused with a reason rather than silently doing nothing.
+
+### Patch Changes
+
+- Updated dependencies [79f802b]
+- Updated dependencies [44487a6]
+- Updated dependencies [c797bc6]
+- Updated dependencies [56de302]
+- Updated dependencies [a07b6a9]
+- Updated dependencies [914eb43]
+- Updated dependencies [addddbc]
+- Updated dependencies [ae90386]
+- Updated dependencies [8359b18]
+- Updated dependencies [757f521]
+- Updated dependencies [b173e32]
+- Updated dependencies [523eb3f]
+  - stenograph@1.3.0
+  - @spotter/transport@1.9.0
+
 ## 1.7.1
 
 ### Patch Changes

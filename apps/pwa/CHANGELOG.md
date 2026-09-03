@@ -1,5 +1,41 @@
 # @spotter/pwa
 
+## 0.4.0
+
+### Minor Changes
+
+- da69e7a: feat: hand the access code to the web app in one tap
+  
+  `/user_sign` now prints the code on its own line, with nothing else inside the tag: a tap copies exactly what the web app's field expects. It used to be wrapped as `/login <code>`, so copying brought the command along and it had to be edited out by hand — in the app where the code is least convenient to retype.
+  
+  Where a PWA is running, the message also carries `…/authorize?code=…`. Opening it fills the code in and submits it, then strips it from the address bar with `replaceState`: the code is single use and has nothing to gain from sitting in history, a bookmark, or a screenshot. An install that is already signed in drops the code the same way rather than leaving it in the URL, since the login page never renders there.
+  
+  The bot learns the address from the PWA's own heartbeat (`details.url`, from `PUBLIC_URL`) rather than a second copy in its own config, which would drift the first time one of them moved. No PWA, a silent one, or a code bound to a `@username` — which a device can never redeem — means no link offered.
+
+### Patch Changes
+
+- 9eb7bde: fix: show snapshots and play clips in the PWA
+  
+  Media was handed to the browser as a presigned S3 URL. That is a cross-origin request, and the bucket answers a preflight with no `Access-Control-*` headers at all, so `<img>` stayed blank and `<video>` — which needs Range requests to play and seek — failed outright. The Telegram frontend never hit this: it passes the same URL to Telegram, whose servers fetch it, so no browser and no CORS are involved.
+  
+  The PWA now streams media through its own API (`/api/events/:id/snapshot`, `/api/events/:id/clip`) with Range support, so seeking works and Safari plays. Storage credentials and the bucket layout no longer reach the browser, and media is subject to the app's own authorization — via `?token=`, since `<img>` and `<video>` cannot send a header.
+  
+  A key that outlives its object now falls back to the snapshot and then to a placeholder, instead of a broken player, and says which event lost its media when `PWA_DEBUG` is on.
+- Updated dependencies [79f802b]
+- Updated dependencies [44487a6]
+- Updated dependencies [c797bc6]
+- Updated dependencies [56de302]
+- Updated dependencies [a07b6a9]
+- Updated dependencies [914eb43]
+- Updated dependencies [addddbc]
+- Updated dependencies [ae90386]
+- Updated dependencies [8359b18]
+- Updated dependencies [757f521]
+- Updated dependencies [b173e32]
+- Updated dependencies [523eb3f]
+  - stenograph@1.3.0
+  - @spotter/transport@1.9.0
+
 ## 0.3.3
 
 ### Patch Changes
