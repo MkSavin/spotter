@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { getPackages } from '@manypkg/get-packages'
@@ -66,7 +66,16 @@ const released: PublishedPackage[] = fromWorkspace
     }))
   : versions
 
-const entries = released.flatMap((version) => {
+type MatrixEntry = {
+  name: string
+  version: string
+  relativePath: string
+  code: string
+  /** Builds from its own directory, without the Bun build args. */
+  standalone?: boolean
+}
+
+const entries: MatrixEntry[] = released.flatMap((version) => {
   const pkg = byName.get(version.name)
   if (!pkg) return []
 
@@ -84,6 +93,38 @@ const entries = released.flatMap((version) => {
     },
   ]
 })
+
+/**
+ * `spotter-probe` is Rust, so it is not a workspace package and has no version
+ * in `package.json` — changesets never sees it. It still ships as an image, so
+ * it is added by hand, with its version read from `Cargo.toml`.
+ *
+ * Its Dockerfile also builds from its own directory rather than the repo root,
+ * which is why it carries `standalone`.
+ */
+const probeEntry = (): MatrixEntry[] => {
+  const dir = path.join(rootDir, 'apps', 'probe')
+  const manifest = path.join(dir, 'Cargo.toml')
+  if (!existsSync(manifest)) return []
+
+  const version = readFileSync(manifest, 'utf8')
+    .match(/^version\s*=\s*"([^"]+)"/m)
+    ?.at(1)
+
+  if (!version) return []
+
+  return [
+    {
+      name: 'spotter-probe',
+      version,
+      relativePath: path.join('apps', 'probe'),
+      code: 'spotter-probe',
+      standalone: true,
+    },
+  ]
+}
+
+entries.push(...probeEntry())
 
 // CI asks for the matrix first, then runs one job per entry.
 if (asMatrix) {
@@ -114,6 +155,13 @@ for (const entry of selected) {
 
   // A local tag holds one arch only, so the manifest goes straight to ghcr.
   const outputArgs = noPublish ? ['--output=type=cacheonly'] : ['--push']
+
+  if (entry.standalone) {
+    // Its own directory is the context, and it takes none of the Bun args.
+    const context = path.join(rootDir, entry.relativePath)
+    await $`docker buildx build --platform ${platform} ${context} ${tagArgs} ${outputArgs}`
+    continue
+  }
 
   await $`docker buildx build --platform ${platform} -f ${entry.relativePath}/Dockerfile ${rootDir} --build-arg APP_RELATIVE_PATH=${entry.relativePath} --build-arg APP_PACKAGE_NAME=${entry.name} ${tagArgs} ${outputArgs}`
 }

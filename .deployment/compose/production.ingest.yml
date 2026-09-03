@@ -67,6 +67,9 @@ services:
     environment:
       REDIS_URL: redis://local-redis:6379
       SOURCE_TYPE: frigate
+      # Set only by `--probe`, so a normal deployment reports no probe and
+      # refuses staged detections outright.
+      PROBE_ENDPOINT: ${PROBE_ENDPOINT:-}
     # Node-wide config (incl. FRIGATE_* NVR creds, held ONLY on this node) from
     # the combined .env. MQTT_BROKER lives there too — own broker or someone
     # else's, the adapter does not care. Raw media is staged to S3, keys travel on.

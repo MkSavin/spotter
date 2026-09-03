@@ -82,6 +82,14 @@ export const heartbeatSchema = z.object({
   queues: z.array(queueDepthSchema).optional(),
   /** Set only by adapters that own an NVR source; absent everywhere else. */
   source: sourceActivitySchema.optional(),
+  /**
+   * The adapter's detector is a stub, so real detection is off.
+   *
+   * A field rather than a free-form detail because it changes what every other
+   * line on the status page means: a source reporting healthy while this is set
+   * is reporting on events we asked for, not on anything that happened.
+   */
+  probeActive: z.boolean().optional(),
 })
 export type Heartbeat = z.infer<typeof heartbeatSchema>
 

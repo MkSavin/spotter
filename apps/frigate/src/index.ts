@@ -50,6 +50,10 @@ runSink({
       controller: probeController,
     },
   ],
+  // Configured, not confirmed: asking the probe on every beat would put a
+  // network call on the heartbeat path. A configured probe is the thing worth
+  // shouting about — it means someone deployed the profile.
+  probeActive: () => Boolean(config.probeEndpoint),
   heartbeatDetails: () => probeDetails(config),
   cameraHealth: cameraHealth.current,
 }).catch((error) => {

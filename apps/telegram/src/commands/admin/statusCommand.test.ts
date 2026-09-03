@@ -6,7 +6,10 @@ import { statusCommand } from './statusCommand'
 const HOUR = 3600_000
 
 /** Captures what /status would send, for one adapter service. */
-const render = async (source?: ServiceStatus['source']): Promise<string> => {
+const render = async (
+  source?: ServiceStatus['source'],
+  extra: Partial<ServiceStatus> = {},
+): Promise<string> => {
   let out = ''
   const context = {
     heartbeats: {
@@ -19,6 +22,7 @@ const render = async (source?: ServiceStatus['source']): Promise<string> => {
           at: Date.now(),
           online: true,
           source,
+          ...extra,
         },
       ],
     },
@@ -114,5 +118,35 @@ describe('/status: тишина источника', () => {
 
     expect(text).toContain('событий не было')
     expect(text).not.toContain('Нет событий от NVR')
+  })
+})
+
+describe('/status: подменённый детектор', () => {
+  const healthy = {
+    source: 'frigate',
+    lastEventAt: Date.now() - 60_000,
+    eventCount: 7,
+    since: 90_000,
+  } as const
+
+  test('молчит, пока детектор настоящий', async () => {
+    expect(await render(healthy)).not.toContain('ДЕТЕКТОР ПОДМЕНЁН')
+  })
+
+  test('кричит, когда probe активен', async () => {
+    const text = await render(healthy, { probeActive: true })
+
+    expect(text).toContain('ДЕТЕКТОР ПОДМЕНЁН')
+    expect(text).toContain('реальная детекция не работает')
+  })
+
+  test('предупреждение стоит выше бодрых цифр источника', async () => {
+    // Иначе админ прочитает «последнее событие минуту назад» как хорошую
+    // новость, хотя это событие мы сами и заказали.
+    const text = await render(healthy, { probeActive: true })
+
+    expect(text.indexOf('ДЕТЕКТОР ПОДМЕНЁН')).toBeLessThan(
+      text.indexOf('последнее событие'),
+    )
   })
 })

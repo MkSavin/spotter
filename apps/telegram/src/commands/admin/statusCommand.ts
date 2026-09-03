@@ -76,6 +76,18 @@ const renderSource = (service: ServiceStatus): string => {
   return `\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}${cameraLine}`
 }
 
+/**
+ * The loudest line on the page, and deliberately so.
+ *
+ * A probe replaces the NVR's detector, so while it runs, every reassuring
+ * number above it describes events we asked for rather than anything that
+ * happened. An admin reading a healthy status page has to know that.
+ */
+const renderProbe = (service: ServiceStatus): string =>
+  service.probeActive
+    ? '\n    🚨 <b>ДЕТЕКТОР ПОДМЕНЁН</b> — реальная детекция не работает'
+    : ''
+
 const renderService = (service: ServiceStatus): string => {
   const mark = service.online ? '✅' : '⚠️'
   const state = service.online
@@ -87,7 +99,7 @@ const renderService = (service: ServiceStatus): string => {
 
   return `${mark} <code>${service.service}</code> <b>${service.version}</b> — ${state}${
     extras ? `\n    <i>${extras}</i>` : ''
-  }${renderSource(service)}${renderQueues(service)}`
+  }${renderProbe(service)}${renderSource(service)}${renderQueues(service)}`
 }
 
 class StatusCommand extends SpotterCommand {

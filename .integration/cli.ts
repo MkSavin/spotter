@@ -57,6 +57,7 @@ const OWN_FLAGS = [
   '--external-mqtt',
   '--pwa',
   '--email',
+  '--probe',
 ]
 
 const flags = new Map<string, string>()
@@ -97,6 +98,15 @@ const frontendProfiles = (): string[] => {
   return asked
 }
 
+/**
+ * Whether to run the stub detector, for this command only.
+ *
+ * Deliberately not persisted, unlike the frontends: forgetting a frontend is
+ * an annoyance, while a probe that quietly survives into the next `update`
+ * leaves the property unwatched. Asking for it every time is the point.
+ */
+const probeProfile = (): string[] => (has('--probe') ? ['probe'] : [])
+
 // GPU is on by default: transcoding is several times faster.
 const composeArgs = (mode: Mode): string[] => {
   const files = [path.join('.deployment', 'compose', `production.${mode}.yml`)]
@@ -105,7 +115,10 @@ const composeArgs = (mode: Mode): string[] => {
   // Both delivery nodes can host the frontends; ingest has no Redis of its own.
   if (mode !== 'ingest')
     files.push(path.join('.deployment', 'compose', 'production.frontends.yml'))
-  const profiles = frontendProfiles()
+  // Beside the adapter and the NVR, which is both of these nodes.
+  if (mode !== 'cloud')
+    files.push(path.join('.deployment', 'compose', 'production.probe.yml'))
+  const profiles = [...frontendProfiles(), ...probeProfile()]
   // From .env, not a flag: chosen once at install, not repeated every `up`.
   if (ownsBroker()) profiles.push('mqtt')
   return [
@@ -131,8 +144,25 @@ const persistEnv = (key: string, value: string): void => {
 
 const compose = async (args: string[]): Promise<never> => {
   const mode = requireMode()
+
+  if (has('--probe')) {
+    console.warn(
+      '\n⚠️  ФИКТИВНЫЙ ДЕТЕКТОР ВКЛЮЧЁН.\n' +
+        '   Реальная детекция не работает — за участком никто не следит.\n' +
+        '   Сними профиль сразу после проверки: ./spotter up\n',
+    )
+  }
+
   const { exitCode } = await $`docker ${composeArgs(mode)} ${args}`
     .cwd(root)
+    // Passed here rather than written to .env: the adapter must forget the
+    // probe the moment the profile is dropped.
+    .env({
+      ...process.env,
+      ...(has('--probe')
+        ? { PROBE_ENDPOINT: 'http://spotter-probe:8080' }
+        : {}),
+    })
     .nothrow()
   process.exit(exitCode)
 }
@@ -391,6 +421,9 @@ ${NAMES.map((name) => `  ${left(name).padEnd(width)}  ${COMMANDS[name]?.about}`)
   Флаги:
     --pwa                    Поднять PWA-фронтенд (нужны VAPID_* в .env)
     --email                  Поднять email-фронтенд (нужны SMTP_* в .env)
+    --probe                  ⚠️  Поднять фиктивный детектор: РЕАЛЬНАЯ ДЕТЕКЦИЯ
+                             ВЫКЛЮЧАЕТСЯ, за участком никто не следит. Только
+                             на время проверки; не запоминается между запусками
     --no-gpu                 Без NVIDIA (ingest; по умолчанию GPU включён)
     --no-watchtower          Без авто-обновления
     --own-mqtt               install: поставить свой MQTT-брокер, не спрашивая

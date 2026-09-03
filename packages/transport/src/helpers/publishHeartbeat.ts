@@ -27,6 +27,14 @@ export type HeartbeatOptions = {
    * healthy one without it.
    */
   source?: () => SourceActivity
+  /**
+   * Whether the service's NVR is running a stub detector.
+   *
+   * Read on every beat, like `source`: a probe that was armed an hour ago and
+   * a probe running right now are different facts, and only the second one
+   * invalidates everything else on the page.
+   */
+  probeActive?: () => boolean
 }
 
 /**
@@ -35,7 +43,7 @@ export type HeartbeatOptions = {
  */
 export const startHeartbeat = (
   producer: Producer,
-  { service, version, details, queues, source }: HeartbeatOptions,
+  { service, version, details, queues, source, probeActive }: HeartbeatOptions,
 ): (() => void) => {
   const startedAt = Date.now()
   const node = process.env.SPOTTER_MODE ?? 'single'
@@ -61,6 +69,14 @@ export const startHeartbeat = (
       activity = undefined
     }
 
+    // Same reasoning as `source`: a throwing probe must not cost the beat.
+    let probing = false
+    try {
+      probing = probeActive?.() ?? false
+    } catch {
+      probing = false
+    }
+
     const payload: Heartbeat = {
       service,
       version,
@@ -70,6 +86,9 @@ export const startHeartbeat = (
       ...(collected ? { details: collected } : {}),
       ...(depths.length > 0 ? { queues: depths } : {}),
       ...(activity ? { source: activity } : {}),
+      // Only when true: false would say "we checked", which is noise on
+      // every service that has no detector at all.
+      ...(probing ? { probeActive: true } : {}),
     }
     // A failed heartbeat must never take the service down with it.
     await producer.publish(heartbeatStream, payload).catch(() => undefined)

@@ -64,6 +64,13 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
   timelapseDeadlineMs?: number
   /** Extra stream subscriptions (e.g. a test-seed controller). */
   controllers?: SinkController<TConfig>[]
+  /**
+   * Whether this adapter's NVR is running a stub detector right now.
+   *
+   * Not an extra detail: while it is true, nothing the NVR reports is evidence
+   * about the real world, and `/status` has to say so loudly.
+   */
+  probeActive?: () => boolean
   /** Extras for `/status`, e.g. the NVR build behind this adapter. */
   heartbeatDetails?: () =>
     | Promise<Record<string, string>>
@@ -182,6 +189,7 @@ export const runSink = async <TConfig extends SinkConfig>(
     service: information.name.replace(/^@spotter\//, ''),
     version: information.version,
     details: options.heartbeatDetails,
+    probeActive: options.probeActive,
     // Re-read every beat: a source that stopped publishing looks identical to a
     // healthy one from the outside, and this is the only signal that separates
     // them.

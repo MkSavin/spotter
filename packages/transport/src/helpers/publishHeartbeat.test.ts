@@ -81,3 +81,39 @@ describe('startHeartbeat: активность источника', () => {
     expect(producer.beats[0].source?.eventCount).toBe(1)
   })
 })
+
+describe('startHeartbeat: подменённый детектор', () => {
+  const beat = async (probeActive?: () => boolean) => {
+    const producer = collector()
+    const stop = startHeartbeat(producer, {
+      service: 'frigate',
+      version: '1.0.0',
+      probeActive,
+    })
+    await Bun.sleep(10)
+    stop()
+    return producer.beats[0]
+  }
+
+  test('поле отсутствует, когда детектора-заглушки нет', async () => {
+    // Сервисы без детектора вообще не должны слать это поле — иначе `false`
+    // на каждом из них засорит и удар, и страницу статуса.
+    expect((await beat()).probeActive).toBeUndefined()
+    expect((await beat(() => false)).probeActive).toBeUndefined()
+  })
+
+  test('поле выставлено, пока probe настроен', async () => {
+    expect((await beat(() => true)).probeActive).toBe(true)
+  })
+
+  test('падение проверки не срывает удар', async () => {
+    // Тот же принцип, что и у source: молчащий сервис выглядит мёртвым, и это
+    // худшая ложь, чем пропавшее предупреждение.
+    const payload = await beat(() => {
+      throw new Error('probe check exploded')
+    })
+
+    expect(payload.service).toBe('frigate')
+    expect(payload.probeActive).toBeUndefined()
+  })
+})

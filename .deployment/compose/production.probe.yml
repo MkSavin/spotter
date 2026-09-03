@@ -1,0 +1,38 @@
+# The stub detector, shared by the single and ingest nodes — both run the
+# adapter and sit beside an NVR, so both can host it. One place, so the two
+# node profiles cannot drift apart.
+#
+# ⚠️  DANGEROUS BY DESIGN. The probe replaces the NVR's object detector: while
+# it runs, the NVR sees only what we tell it to, and REAL DETECTION IS OFF.
+# Nothing is watching the property. `/status` shows a red line for exactly as
+# long as it is configured.
+#
+# It exists so a live node can be tested the same way CI tests it: `/test`
+# stages a detection, the NVR itself opens the event, and the whole path is
+# exercised end to end — the path that went silent for two days in September
+# 2026 while every seeded test kept passing.
+#
+# Off unless asked for: `./spotter up --probe`, and take it down the moment the
+# check is over. Pointing the NVR's detector back at the probe also requires a
+# change in the NVR's own config, so this cannot switch on by accident.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
+services:
+  spotter-probe:
+    <<: *logging
+    profiles: [probe]
+    image: ghcr.io/mksavin/spotter-probe:latest
+    container_name: spotter-probe
+    restart: unless-stopped
+    networks:
+      - spotter
+      # The NVR connects its detector here by name, from its own compose
+      # project — the same way it reaches the broker.
+      - mqtt
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
