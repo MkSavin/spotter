@@ -4,6 +4,7 @@ import {
   deliveryStreams,
   heartbeatStream,
   mediaStreams,
+  probeStreams,
   RedisRegulator,
   type RegulatorHandle,
   timelapseStreams,
@@ -20,6 +21,7 @@ import { deliveryEventController } from './controllers/deliveryEventController'
 import { deliveryRecipientController } from './controllers/deliveryRecipientController'
 import { heartbeatController } from './controllers/heartbeatController'
 import { mediaProgressController } from './controllers/mediaProgressController'
+import { probeResultController } from './controllers/probeResultController'
 import {
   timelapseFailedController,
   timelapseProgressController,
@@ -39,6 +41,7 @@ export const telegramTransport = async (
     .message(catalogUpdatedStream, catalogController)
     .message(heartbeatStream, heartbeatController)
     .message(mediaStreams.mediaProgress, mediaProgressController)
+    .message(probeStreams.result, probeResultController)
     .message(timelapseStreams.progress, timelapseProgressController)
     .message(timelapseStreams.ready, timelapseReadyController)
     .message(timelapseStreams.failed, timelapseFailedController)

@@ -44,6 +44,9 @@ export const UP_STREAMS = [
   // the cloud side.
   timelapseStreams.progress,
   timelapseStreams.failed,
+  // Outcome of a staged detection. Without it a refused `/test` on a split
+  // deployment is silent, which is precisely the failure it exists to catch.
+  probeStreams.result,
 ] as const
 
 /**

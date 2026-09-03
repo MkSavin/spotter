@@ -213,6 +213,71 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
     expect(entry).toContain('"source":"frigate"')
   }, 120_000)
 
+  test('a refused probe request answers instead of going quiet', async () => {
+    // The whole point of the reply channel: an unanswered `/test` looks exactly
+    // like the outage it exists to detect, and the admin waits for nothing.
+    await compose(
+      'exec',
+      '-T',
+      'redis',
+      'redis-cli',
+      'XADD',
+      'spotter.probe.request.frigate',
+      '*',
+      'value',
+      JSON.stringify({
+        source: 'frigate',
+        camera: 'front',
+        // A label the probe has no class id for, so the adapter refuses.
+        label: 'dragon',
+        frames: 10,
+        score: 0.9,
+        chatId: 4242,
+      }),
+    )
+      .quiet()
+      .nothrow()
+
+    await until(
+      async () => {
+        const result = await compose(
+          'exec',
+          '-T',
+          'redis',
+          'redis-cli',
+          'XLEN',
+          'spotter.probe.result',
+        )
+          .quiet()
+          .nothrow()
+        return Number(result.stdout.toString().trim()) > 0
+      },
+      'the adapter to answer the refused request',
+      60_000,
+    )
+
+    const entry = await compose(
+      'exec',
+      '-T',
+      'redis',
+      'redis-cli',
+      'XRANGE',
+      'spotter.probe.result',
+      '-',
+      '+',
+      'COUNT',
+      '1',
+    )
+      .quiet()
+      .nothrow()
+
+    const text = entry.stdout.toString()
+    expect(text).toContain('"staged":false')
+    // Carries a reason a person can act on, not just a flag.
+    expect(text).toContain('"reason"')
+    expect(text).toContain('4242')
+  }, 90_000)
+
   test('a probe request on the bus stages a detection', async () => {
     // The path `/test` takes in production: the bot publishes to the stream,
     // the adapter reaches the probe. Nothing here talks to the probe directly.

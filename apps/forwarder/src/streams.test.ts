@@ -25,6 +25,7 @@ describe('forwarder stream map', () => {
       timelapseStreams.ready,
       timelapseStreams.progress,
       timelapseStreams.failed,
+      probeStreams.result,
     ])
   })
 
@@ -34,6 +35,12 @@ describe('forwarder stream map', () => {
 
   test('carries heartbeats, so /status sees the ingest node', () => {
     expect(UP_STREAMS).toContain(heartbeatStream)
+  })
+
+  test('carries the probe outcome back to the bot', () => {
+    // The bot is on cloud, the adapter on ingest: without this a refused
+    // `/test` looks exactly like the outage it is meant to detect.
+    expect(UP_STREAMS).toContain(probeStreams.result)
   })
 
   test('bridges one request pair per source', () => {

@@ -61,12 +61,11 @@ class TestCommand extends SpotterCommand {
 
     const label = args.label?.trim() || 'person'
 
+    // No promise of an event here: the adapter answers separately, and it may
+    // well answer "refused". Claiming success before the adapter has spoken is
+    // how a broken test looks identical to a broken NVR.
     await context.replyWithHTML(
-      `🎬 <b>Показываем NVR «${label}»</b> на камере <b>${camera.label}</b>.
-
-Событие породит сам NVR: он увидит объект, отследит его, запишет клип и опубликует событие. Сообщение придёт само, обычно через полминуты.
-
-<i>Если ничего не пришло — сломано что-то настоящее, а не тест.</i>`,
+      `🎬 <b>Просим NVR увидеть «${label}»</b> на камере <b>${camera.label}</b>…`,
     )
 
     await producer.publish(probeStreams.request(config.source), {
@@ -75,6 +74,7 @@ class TestCommand extends SpotterCommand {
       label,
       frames: FRAMES,
       score: 0.9,
+      chatId: context.chat?.id,
     })
   }
 }

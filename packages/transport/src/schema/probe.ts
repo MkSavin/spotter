@@ -34,10 +34,41 @@ export const probeRequestSchema = z.object({
 
 export type ProbeRequest = z.infer<typeof probeRequestSchema>
 
-/** Stream carrying probe requests to the `<source>` adapter. */
+/**
+ * What the adapter made of a probe request.
+ *
+ * A staged detection that quietly fails is the worst possible outcome for this
+ * command: the caller waits for an event that is never coming, and reads the
+ * silence as the very fault they were testing for. So the adapter always
+ * answers, and a refusal carries the reason.
+ */
+export const probeResultSchema = z.object({
+  source: z.string().min(1),
+  staged: z.boolean(),
+  /** Camera the detection was staged on; absent on a refusal. */
+  camera: z.string().min(1).optional(),
+  /** Frames it will run for; absent on a refusal. */
+  frames: z.number().int().positive().optional(),
+  /** Why it was refused, in a form worth showing a person. */
+  reason: z.string().min(1).optional(),
+  /** Echoed back so the bot can answer in the chat that asked. */
+  chatId: z.number().optional(),
+})
+
+export type ProbeResult = z.infer<typeof probeResultSchema>
+
+/** Streams carrying probe requests and their outcome. */
 export const probeStreams = {
   request: (source: string): string => `spotter.probe.request.${source}`,
+  /** Not per source: one consumer on the delivery side handles them all. */
+  result: 'spotter.probe.result',
 } as const
+
+/** Returns `null` on invalid input. Use when consuming from the wire. */
+export const safeParseProbeResult = (value: unknown): ProbeResult | null => {
+  const result = probeResultSchema.safeParse(value)
+  return result.success ? result.data : null
+}
 
 /** Throws `ZodError` on invalid input. Use when producing. */
 export const parseProbeRequest = (value: unknown): ProbeRequest =>

@@ -33,7 +33,8 @@ describe('probeAction', () => {
 
     expect(outcome.staged).toBe(false)
     expect(outcome).toMatchObject({
-      reason: expect.stringContaining('profile'),
+      // Показываем человеку, что делать, а не только что не так.
+      reason: expect.stringContaining('--probe'),
     })
   })
 

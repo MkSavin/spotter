@@ -44,6 +44,8 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 
 Деплой-профили (dev / single / ingest / cloud) — в [docs/deployment.md](docs/deployment.md).
 
+Как проверить, что всё работает — unit, стенд с настоящим NVR, команда `/test` на живом узле — в [docs/testing.md](docs/testing.md).
+
 ## Стримы
 
 Каждый стрим читается своей consumer-группой — по одной на сервис (`spotter-server`,

@@ -23,7 +23,7 @@ export const probeAction = async (
     return {
       staged: false,
       reason:
-        'Probe is not configured — it replaces the detector, so it runs only behind its profile.',
+        'Фиктивный детектор не запущен. Он подменяет детектор NVR, поэтому живёт за профилем: <code>./spotter up --probe</code>.',
     }
   }
 
@@ -39,7 +39,11 @@ export const probeAction = async (
   )
 
   if (!armed?.ok) {
-    return { staged: false, reason: 'The probe did not accept the detection.' }
+    return {
+      staged: false,
+      reason:
+        'Детектор поднят, но не принял запрос. Проверь, что он жив и что объект ему знаком.',
+    }
   }
 
   return { staged: true, camera, frames: armed.frames }

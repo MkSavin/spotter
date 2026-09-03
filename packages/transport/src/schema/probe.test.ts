@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { parseProbeRequest, probeStreams, safeParseProbeRequest } from './probe'
+import {
+  parseProbeRequest,
+  probeStreams,
+  safeParseProbeRequest,
+  safeParseProbeResult,
+} from './probe'
 
 describe('probeRequest', () => {
   test('fills in the defaults a caller can omit', () => {
@@ -42,5 +47,45 @@ describe('probeRequest', () => {
     expect(probeStreams.request('frigate')).toBe(
       'spotter.probe.request.frigate',
     )
+  })
+})
+
+describe('probeResult', () => {
+  test('успешный ответ несёт камеру и кадры', () => {
+    const result = safeParseProbeResult({
+      source: 'frigate',
+      staged: true,
+      camera: 'front',
+      frames: 30,
+    })
+
+    expect(result).toMatchObject({ staged: true, camera: 'front', frames: 30 })
+  })
+
+  test('отказ несёт причину, а не только флаг', () => {
+    // Без причины пользователю нечего делать: он видит «не сработало» и всё.
+    const result = safeParseProbeResult({
+      source: 'frigate',
+      staged: false,
+      reason: 'Детектор не запущен',
+    })
+
+    expect(result?.reason).toBe('Детектор не запущен')
+  })
+
+  test('chatId переживает дорогу, чтобы ответ дошёл в тот же чат', () => {
+    expect(
+      safeParseProbeResult({ source: 'frigate', staged: true, chatId: 42 })
+        ?.chatId,
+    ).toBe(42)
+  })
+
+  test('ответ без источника отбрасывается', () => {
+    expect(safeParseProbeResult({ staged: true })).toBeNull()
+  })
+
+  test('результат едет одним стримом на все источники', () => {
+    // Потребитель один — доставляющая сторона; делить по источникам незачем.
+    expect(probeStreams.result).toBe('spotter.probe.result')
   })
 })
