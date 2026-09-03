@@ -30,10 +30,18 @@ model:
     0: person
     1: car
 
+# The source loops because `source.sh` builds a long file, not because of a
+# flag here: go2rtc's `#loop` ends at EOF, and `#input=` arguments land after
+# the output URL where ffmpeg rejects them. A stream that dies mid-run would
+# make every later test flaky.
+#
+# Keep comments out of `streams` — Frigate copies this block into go2rtc's own
+# config verbatim, and a comment between the key and its list is enough to
+# leave the stream registered with no producer running.
 go2rtc:
   streams:
     front:
-      - 'ffmpeg:/media/frigate/source.mp4#video=h264#loop'
+      - 'ffmpeg:/media/frigate/source.mp4#video=h264'
 
 cameras:
   front:
@@ -43,6 +51,10 @@ cameras:
           input_args: preset-rtsp-restream
           roles: [detect, record]
     detect:
+      # Explicit: 0.17 defaults this to false, and a camera that captures fine
+      # while never running detection looks like a broken probe rather than a
+      # missing line of config.
+      enabled: true
       width: 640
       height: 480
       fps: 5
@@ -50,21 +62,21 @@ cameras:
       track: [person]
     record:
       enabled: true
-      retain:
-        days: 1
-        mode: all
     snapshots:
       enabled: true
 
-# The rig is short-lived, so keep the write volume small.
+# The rig is short-lived, so keep the write volume small. `continuous.days`,
+# not the `retain` of older configs: 0.17 split retention per recording kind and
+# rejects the old key outright, dropping Frigate into safe mode with a CPU
+# detector — which looks like a working NVR that simply never calls the probe.
 record:
   enabled: true
-  retain:
+  continuous:
     days: 1
-    mode: all
 
 logger:
   default: info
   logs:
     frigate.detectors.plugins.zmq_ipc: debug
     frigate.comms.mqtt: debug
+version: 0.17-0

@@ -12,8 +12,12 @@ if [ -f "$out" ]; then
   exit 0
 fi
 
+# 20 minutes, not 30 seconds: go2rtc's own looping ends the stream at EOF, and
+# `#input=` flags land after the output URL where ffmpeg rejects them. A file
+# longer than any run sidesteps the whole question, and testsrc compresses to
+# almost nothing.
 docker run --rm -v "$(cd "$(dirname "$out")" && pwd)":/out linuxserver/ffmpeg \
-  -f lavfi -i testsrc=size=640x480:rate=5 -t 30 \
-  -c:v libx264 -pix_fmt yuv420p -g 10 /out/source.mp4
+  -f lavfi -i testsrc=size=640x480:rate=5 -t 1200 \
+  -c:v libx264 -pix_fmt yuv420p -g 10 -preset veryfast /out/source.mp4
 
 echo "wrote $out"

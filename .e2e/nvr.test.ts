@@ -88,6 +88,19 @@ const collectEvents = async (seconds: number): Promise<string> => {
   return result.stdout.toString()
 }
 
+/** Events Frigate has recorded, newest first. */
+const recordedEvents = async (): Promise<
+  Array<{ id: string; camera: string; label: string }>
+> => {
+  const response = await fetch('http://localhost:5050/api/events?limit=10')
+  if (!response.ok) return []
+  return (await response.json()) as Array<{
+    id: string
+    camera: string
+    label: string
+  }>
+}
+
 describeIfReady('nvr rig: Frigate produces the event itself', () => {
   beforeAll(async () => {
     await compose('down', '-v', '--remove-orphans').quiet().nothrow()
@@ -128,13 +141,34 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
   }, 150_000)
 
   test('an armed detection reaches the broker as a real event', async () => {
-    const armed = await detect({ class_id: 0, score: 0.9, frames: 60 })
+    // Subscribe before arming: the whole point is to catch the publish, and
+    // Frigate opens the event within a second of the first detection.
+    const listening = collectEvents(60)
+    await Bun.sleep(2_000)
+
+    const armed = await detect({ class_id: 0, score: 0.95, frames: 100 })
     expect(armed.status).toBe(200)
 
-    const published = await collectEvents(45)
+    const published = await listening
 
-    // Frigate's own payload, off the wire — the shape our adapter parses.
-    expect(published).toContain('"camera"')
-    expect(published).toContain('person')
+    // Frigate's own payload, off the wire — the shape our adapter parses, with
+    // the score we asked for carried through its tracker untouched.
+    expect(published).toContain('"before"')
+    expect(published).toContain('"label": "person"')
+    expect(published).toContain('"camera": "front"')
   }, 180_000)
+
+  test('Frigate records the event as its own', async () => {
+    // Not just a message on a topic: the NVR opened, tracked and closed an
+    // event, which is what a seeded `test_seed` payload can never demonstrate.
+    await until(
+      async () => (await recordedEvents()).length > 0,
+      'frigate to record an event',
+      60_000,
+    )
+
+    const events = await recordedEvents()
+    expect(events[0].camera).toBe('front')
+    expect(events[0].label).toBe('person')
+  }, 90_000)
 })

@@ -44,11 +44,15 @@ services:
     image: ghcr.io/blakeblackshear/frigate:0.17.2
     networks: [nvr]
     shm_size: '128mb'
+    # Shifted off Frigate's own numbers: 5000 is AirPlay on macOS, and the rig
+    # should not fight whatever the developer already runs.
     ports:
-      - '5000:5000'
-      - '8554:8554'
+      - '5050:5000'
+      - '8654:8554'
     volumes:
-      - ./frigate.yml:/config/config.yml:ro
+      # Writable: Frigate migrates its own config across versions, and a
+      # read-only mount turns that into an error on every start.
+      - ./frigate.yml:/config/config.yml
       - ./media:/media/frigate
       - type: tmpfs
         target: /tmp/cache
