@@ -56,7 +56,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 | Стрим | Кто пишет | Кто читает | Назначение |
 | --- | --- | --- | --- |
 | `spotter.event` | frigate | server | Событие камеры (start/update/end) |
-| `spotter.event.test_seed` | telegram | frigate | Посев тестовых событий |
+| `spotter.probe.request.<source>` | telegram | frigate | Показать NVR объект, чтобы он сам породил событие |
 | `spotter.catalog.updated` | frigate | server, telegram, pwa | Снимок каталога камер/объектов |
 | `spotter.catalog.request` | консьюмеры | frigate | Просьба переопубликовать каталог |
 | `spotter.media.request.<source>` | server | frigate | Стейджинг медиа события |

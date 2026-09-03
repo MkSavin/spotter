@@ -6,6 +6,7 @@ import {
   heartbeatStream,
   mediaStreams,
   notificationStreams,
+  probeStreams,
   timelapseStreams,
 } from '@spotter/transport'
 import { downStreams, UP_STREAMS } from './streams'
@@ -41,7 +42,7 @@ describe('forwarder stream map', () => {
       mediaStreams.cameraRequest('frigate'),
       timelapseStreams.request('frigate'),
       notificationStreams.suspend('frigate'),
-      eventStreams.testSeed,
+      probeStreams.request('frigate'),
       catalogRequestStream,
     ])
   })

@@ -108,6 +108,7 @@ services:
       S3_ACCESS: spotter
       S3_SECRET: spotter-nvr-rig
       S3_BUCKET: spotter
+      PROBE_ENDPOINT: http://probe:8080
       LOG_LEVEL: verbose
       TZ: Europe/Moscow
     healthcheck:
@@ -120,6 +121,7 @@ services:
       redis: { condition: service_healthy }
       mosquitto: { condition: service_healthy }
       frigate: { condition: service_healthy }
+      probe: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
 
 networks:

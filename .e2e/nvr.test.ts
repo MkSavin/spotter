@@ -207,6 +207,42 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
     expect(entry).toContain('"source":"frigate"')
   }, 120_000)
 
+  test('a probe request on the bus stages a detection', async () => {
+    // The path `/test` takes in production: the bot publishes to the stream,
+    // the adapter reaches the probe. Nothing here talks to the probe directly.
+    const before = (await probeHealth()).framesServed
+
+    await compose(
+      'exec',
+      '-T',
+      'redis',
+      'redis-cli',
+      'XADD',
+      'spotter.probe.request.frigate',
+      '*',
+      'value',
+      JSON.stringify({
+        source: 'frigate',
+        camera: 'front',
+        label: 'person',
+        frames: 40,
+        score: 0.88,
+      }),
+    )
+      .quiet()
+      .nothrow()
+
+    await until(
+      async () =>
+        (await logsOf('spotter-frigate')).includes('Staged a person on front'),
+      'the adapter to stage the detection',
+      60_000,
+    )
+
+    expect(await logsOf('spotter-frigate')).toContain('Staged a person on front')
+    expect((await probeHealth()).framesServed).toBeGreaterThan(before)
+  }, 90_000)
+
   test('Frigate records the event as its own', async () => {
     // Not just a message on a topic: the NVR opened, tracked and closed an
     // event, which is what a seeded `test_seed` payload can never demonstrate.

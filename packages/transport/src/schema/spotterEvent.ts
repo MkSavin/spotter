@@ -41,8 +41,6 @@ export type SpotterEvent = z.infer<typeof spotterEventSchema>
 export const eventStreams = {
   /** `spotter.event` — every adapter publishes SpotterEvents here. */
   event: 'spotter.event',
-  /** `spotter.event.test_seed` — synthetic events for offline/dev flows. */
-  testSeed: 'spotter.event.test_seed',
 } as const
 
 /**

@@ -1,5 +1,5 @@
 import { runSink } from '@spotter/sink'
-import { eventStreams } from '@spotter/transport'
+import { probeStreams } from '@spotter/transport'
 import information from '../package.json'
 import { FrigateCatalog } from './catalog/FrigateCatalog'
 import { resolveConfig } from './config'
@@ -9,7 +9,7 @@ import { FrigateMediaProvider } from './media/FrigateMediaProvider'
 import { FrigateNotificationSuspender } from './notifications/FrigateNotificationSuspender'
 import { probeDetails } from './probeDetails'
 import { constructSource } from './source/constructSource'
-import { eventTestController } from './stream/controllers/eventTestController'
+import { probeController } from './stream/controllers/probeController'
 import { FrigateTimelapseProvider } from './timelapse/FrigateTimelapseProvider'
 
 const config = resolveConfig()
@@ -45,7 +45,10 @@ runSink({
   timelapseStatePath: config.timelapseStatePath,
   timelapseDeadlineMs: config.timelapseDeadlineMs,
   controllers: [
-    { stream: eventStreams.testSeed, controller: eventTestController },
+    {
+      stream: probeStreams.request(config.sourceId),
+      controller: probeController,
+    },
   ],
   heartbeatDetails: () => probeDetails(config),
   cameraHealth: cameraHealth.current,

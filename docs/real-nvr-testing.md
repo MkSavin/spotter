@@ -124,7 +124,7 @@ grammY принимает [`apiRoot`](https://grammy.dev/ref/core/apiclientoptio
 1. ~~`spotter-probe` + ZMQ, без Frigate~~ — **сделано** ([`apps/probe`](../apps/probe/AGENTS.md)): Rust, образ 9.65 МБ, 22 теста, протокол проверен клиентом Frigate.
 2. ~~Frigate + go2rtc в compose стенда, зафиксировать версию образа~~ — **сделано** ([`.e2e/nvr/`](../.e2e/nvr/nvr.yml)): образ закреплён на `0.17.2`, источник видео синтетический, тест в [`.e2e/nvr.test.ts`](../.e2e/nvr.test.ts).
 3. Первый тест: `/detect` → `frigate/events` в брокере — **сделано и проверено вживую**. Frigate 0.17.2 подключился к probe, опросил его сотни раз и по команде сам породил события `person`: в `frigate/events` ушёл payload со структурой `before`/`after`, `score` и `max_severity`, а в базе NVR остались записи с настоящими id. Хвост до Redis тоже замкнут: адаптер в стенде подобрал событие из `frigate/events` и положил в `spotter.event` со `score`, дошедшим от `/detect` без изменений.
-4. Заменить `test_delivery`/`test_media` на `/test`, выпилить `test_seed`.
+4. ~~Заменить `test_delivery`/`test_media` на `/test`, выпилить `test_seed`~~ — **сделано**. `/test [камера] [объект]` публикует в `spotter.probe.request.<source>`; адаптер вызывает probe, дальше событие рождает NVR. `spotter.event.test_seed`, `eventTestController` и `eventTestAction` удалены, стрим в forwarder заменён на `probeStreams.request`.
 5. Telegram: `apiRoot` в конфиг, фейк Bot API в smoke.
 6. Профиль `probe` в production compose плюс красная строка в `/status`.
 

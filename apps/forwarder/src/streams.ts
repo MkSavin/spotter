@@ -17,6 +17,7 @@ import {
   heartbeatStream,
   mediaStreams,
   notificationStreams,
+  probeStreams,
   timelapseStreams,
 } from '@spotter/transport'
 
@@ -58,8 +59,10 @@ export const downStreams = (sources: string[]): string[] => [
     timelapseStreams.request(source),
     // Admin asking the NVR itself to go quiet; only the adapter can do it.
     notificationStreams.suspend(source),
+    // Staging a detection on the NVR: the bot runs on cloud, the probe and the
+    // NVR sit on ingest, so the request has to cross.
+    probeStreams.request(source),
   ]),
-  eventStreams.testSeed,
   // A restarted cloud consumer asking the adapter to republish its catalog.
   catalogRequestStream,
 ]

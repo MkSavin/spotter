@@ -1,13 +1,13 @@
-import { eventStreams } from '@spotter/transport'
+import { probeStreams } from '@spotter/transport'
 import type { BotContext } from '../../context'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
-/** Seconds of footage Frigate records for the manual event. */
-const DURATION = 10
+/** Frames of detection, at ~5fps roughly six seconds of a visible object. */
+const FRAMES = 30
 
-class TestMediaCommand extends SpotterCommand {
-  readonly name = 'test_media'
-  readonly description = 'Сквозной тест: настоящее событие в NVR'
+class TestCommand extends SpotterCommand {
+  readonly name = 'test'
+  readonly description = 'Сквозной тест: NVR сам порождает событие'
   readonly access = 'ADMIN' as const
 
   readonly args = [
@@ -18,6 +18,15 @@ class TestMediaCommand extends SpotterCommand {
       prompt: '📷 <b>Выберите камеру</b>',
       choices: (context: BotContext) =>
         context.catalog.cameras(context.config.source),
+      allowManual: true,
+    },
+    {
+      name: 'label',
+      hint: 'объект',
+      optional: true,
+      prompt: '🧍 <b>Что показать NVR?</b>',
+      choices: (context: BotContext) =>
+        context.catalog.objectTypes(context.config.source),
       allowManual: true,
     },
   ]
@@ -50,19 +59,24 @@ class TestMediaCommand extends SpotterCommand {
       return
     }
 
-    await context.replyWithHTML(
-      `🎬 <b>Прошу NVR записать ${DURATION} секунд</b> с камеры <b>${camera.label}</b>.
+    const label = args.label?.trim() || 'person'
 
-Событие настоящее, поэтому клип действительно появится — это проверяет всю цепочку целиком. Сообщение придёт само, примерно через полминуты.`,
+    await context.replyWithHTML(
+      `🎬 <b>Показываем NVR «${label}»</b> на камере <b>${camera.label}</b>.
+
+Событие породит сам NVR: он увидит объект, отследит его, запишет клип и опубликует событие. Сообщение придёт само, обычно через полминуты.
+
+<i>Если ничего не пришло — сломано что-то настоящее, а не тест.</i>`,
     )
 
-    await producer.publish(eventStreams.testSeed, {
-      mode: 'real',
+    await producer.publish(probeStreams.request(config.source), {
+      source: config.source,
       camera: camera.code,
-      label: 'person',
-      duration: DURATION,
+      label,
+      frames: FRAMES,
+      score: 0.9,
     })
   }
 }
 
-export const testMediaCommand = new TestMediaCommand()
+export const testCommand = new TestCommand()

@@ -38,6 +38,15 @@ export type CoreConfig = SinkConfig & {
   frigate: FrigateMediaConfig
 
   /**
+   * Where `spotter-probe` listens, when it is running at all.
+   *
+   * Empty by default and empty in production: the probe replaces the NVR's
+   * detector, so real detection stops while it is up. It exists for the rig
+   * and for a deliberate check on a live node, never as a standing service.
+   */
+  probeEndpoint: string
+
+  /**
    * Where in-flight timelapse exports are recorded. An export outlives the
    * request that started it, so this has to sit on a volume to be of any use.
    */
@@ -94,6 +103,7 @@ export const resolveConfig = (): CoreConfig => {
       authSecret: env.string('FRIGATE_AUTH_SECRET', ''),
       authUser: env.string('FRIGATE_AUTH_USER', ''),
     },
+    probeEndpoint: env.string('PROBE_ENDPOINT', ''),
     timelapseStatePath: env.string(
       'TIMELAPSE_STATE_PATH',
       '/data/timelapse-exports.json',
