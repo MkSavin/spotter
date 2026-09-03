@@ -30,9 +30,15 @@ const imagePresent = async (): Promise<boolean> =>
 const sourcePresent = async (): Promise<boolean> =>
   await Bun.file(`${import.meta.dir}/nvr/media/source.mp4`).exists()
 
-const adapterBuilt = async (): Promise<boolean> =>
-  (await $`docker image inspect spotter-nvr/frigate:test`.quiet().nothrow())
-    .exitCode === 0
+const adapterBuilt = async (): Promise<boolean> => {
+  for (const app of ['frigate', 'server', 'telegram']) {
+    const probe = await $`docker image inspect spotter-nvr/${app}:test`
+      .quiet()
+      .nothrow()
+    if (probe.exitCode !== 0) return false
+  }
+  return true
+}
 
 const usable =
   (await dockerUp()) &&
@@ -242,6 +248,30 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
     expect(await logsOf('spotter-frigate')).toContain('Staged a person on front')
     expect((await probeHealth()).framesServed).toBeGreaterThan(before)
   }, 90_000)
+
+  test('the bot runs against the recorder, never a real chat', async () => {
+    // grammY dials `apiRoot` for every call, so a rig run cannot message
+    // anyone. The bot proves it is talking to the recorder by having booted at
+    // all: `getMe` has to succeed before grammY will start.
+    const logs = await logsOf('spotter-telegram')
+
+    expect(logs).toContain('Bot API redirected to http://botapi:8090')
+    expect(logs).toContain('Bot is successfully started up!')
+    expect(logs).not.toContain('api.telegram.org')
+  }, 60_000)
+
+  test('the domain reaches the bot', async () => {
+    // The catalog crosses server → bot, which is the hop that tells us the two
+    // halves of the deployment actually see each other.
+    await until(
+      async () =>
+        (await logsOf('spotter-telegram')).includes('Catalog cached'),
+      'the catalog to reach the bot',
+      90_000,
+    )
+
+    expect(await logsOf('spotter-telegram')).toContain('Catalog cached')
+  }, 120_000)
 
   test('Frigate records the event as its own', async () => {
     // Not just a message on a topic: the NVR opened, tracked and closed an

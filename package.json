@@ -24,7 +24,7 @@
     "smoke:build": "bun .e2e/smoke/build.ts",
     "test:smoke": "bun test ./.e2e/smoke.test.ts",
     "nvr:source": "./.e2e/nvr/source.sh",
-    "nvr:build": "docker build --file apps/frigate/Dockerfile --build-arg APP_RELATIVE_PATH=apps/frigate --build-arg APP_PACKAGE_NAME=@spotter/frigate --tag spotter-nvr/frigate:test --load .",
+    "nvr:build": "bun .e2e/nvr/build.ts",
     "test:nvr": "bun test ./.e2e/nvr.test.ts"
   },
   "private": "true",

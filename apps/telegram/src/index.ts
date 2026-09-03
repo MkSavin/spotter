@@ -59,7 +59,18 @@ let db: TelegramDatabase | undefined
 const initialize = async (
   coreContext: CoreContext,
 ): Promise<Bot<BotContext, BotApi>> => {
-  const bot = new Bot<BotContext, BotApi>(coreContext.config.telegram.token)
+  const { token, apiRoot, testEnvironment } = coreContext.config.telegram
+
+  const bot = new Bot<BotContext, BotApi>(token, {
+    client: {
+      ...(apiRoot ? { apiRoot } : {}),
+      ...(testEnvironment ? { environment: 'test' as const } : {}),
+    },
+  })
+
+  if (apiRoot) applicationLogger.warn(`Bot API redirected to ${apiRoot}`)
+  if (testEnvironment)
+    applicationLogger.warn('Using the Telegram test environment')
 
   attachInnoxious(bot.api)
 

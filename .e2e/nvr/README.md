@@ -22,7 +22,21 @@ curl -X POST localhost:8081/detect -d '{"class_id":0,"score":0.9,"frames":60}'
 docker compose -f .e2e/nvr/nvr.yml exec mosquitto mosquitto_sub -t 'frigate/#' -v
 ```
 
-Веб-интерфейс Frigate — `localhost:5000`, `/health` probe — `localhost:8081`.
+Веб-интерфейс Frigate — `localhost:5050`, `/health` probe — `localhost:8081`, записанные вызовы бота — `localhost:8090/__calls`.
+
+## Telegram
+
+`spotter-telegram` поднимается с `TELEGRAM_API_ROOT=http://botapi:8090`, и grammY шлёт туда **каждый** вызов. Токен в стенде синтаксически валидный, но никуда не ведёт: дойти до реального чата прогон не может физически.
+
+`botapi` отвечает `ok` на всё и **запоминает**, что бот пытался отправить:
+
+```sh
+curl -s localhost:8090/__calls | python3 -m json.tool
+curl -s 'localhost:8090/__calls?method=sendPhoto'
+curl -s -X POST localhost:8090/__reset
+```
+
+`apiRoot` — не ручка ради теста: то же самое нужно для self-hosted Bot API server и для тестовой инфраструктуры Telegram (`TELEGRAM_TEST_ENVIRONMENT=true` — отдельные аккаунты, отдельный BotFather). В стенде включён только первый путь; второй требует настоящего токена.
 
 ## Из чего состоит
 
@@ -32,6 +46,9 @@ docker compose -f .e2e/nvr/nvr.yml exec mosquitto mosquitto_sub -t 'frigate/#' -
 | `probe` | наш фиктивный детектор, [`apps/probe`](../../apps/probe/AGENTS.md) |
 | `mosquitto` | брокер, тот же образ, что в проде |
 | `spotter-frigate` | наш адаптер, настоящий образ |
+| `spotter-server` | домен |
+| `spotter-telegram` | бот, направленный на `botapi` |
+| `botapi` | пишущая заглушка Bot API — что бот **пытался** отправить |
 | `redis` | шина, куда адаптер кладёт `spotter.event` |
 | `minio` | S3, без него адаптер не стартует |
 

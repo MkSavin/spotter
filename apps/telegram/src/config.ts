@@ -20,6 +20,20 @@ export type Config = {
   redis: RedisConfig
   telegram: {
     token: string
+    /**
+     * Where the Bot API lives. Empty means Telegram's own servers.
+     *
+     * Not a knob invented for a test: it is what a self-hosted Bot API server
+     * needs, what Telegram's separate test infrastructure needs, and what lets
+     * a smoke run assert on the calls the bot makes without messaging a real
+     * chat.
+     */
+    apiRoot: string
+    /**
+     * Telegram's own test infrastructure — separate accounts, separate
+     * BotFather, nothing shared with real chats. Off unless asked for.
+     */
+    testEnvironment: boolean
   }
   database: {
     path: string
@@ -42,6 +56,8 @@ export const resolveConfig = (): Config => {
     }),
     telegram: {
       token: env.string('TELEGRAM_TOKEN', ''),
+      apiRoot: env.string('TELEGRAM_API_ROOT', ''),
+      testEnvironment: env.boolean('TELEGRAM_TEST_ENVIRONMENT', false),
     },
     database: {
       path: env.string('DATABASE_PATH', './data/telegram.sqlite'),

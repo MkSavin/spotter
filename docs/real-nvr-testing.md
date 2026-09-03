@@ -125,7 +125,9 @@ grammY принимает [`apiRoot`](https://grammy.dev/ref/core/apiclientoptio
 2. ~~Frigate + go2rtc в compose стенда, зафиксировать версию образа~~ — **сделано** ([`.e2e/nvr/`](../.e2e/nvr/nvr.yml)): образ закреплён на `0.17.2`, источник видео синтетический, тест в [`.e2e/nvr.test.ts`](../.e2e/nvr.test.ts).
 3. Первый тест: `/detect` → `frigate/events` в брокере — **сделано и проверено вживую**. Frigate 0.17.2 подключился к probe, опросил его сотни раз и по команде сам породил события `person`: в `frigate/events` ушёл payload со структурой `before`/`after`, `score` и `max_severity`, а в базе NVR остались записи с настоящими id. Хвост до Redis тоже замкнут: адаптер в стенде подобрал событие из `frigate/events` и положил в `spotter.event` со `score`, дошедшим от `/detect` без изменений.
 4. ~~Заменить `test_delivery`/`test_media` на `/test`, выпилить `test_seed`~~ — **сделано**. `/test [камера] [объект]` публикует в `spotter.probe.request.<source>`; адаптер вызывает probe, дальше событие рождает NVR. `spotter.event.test_seed`, `eventTestController` и `eventTestAction` удалены, стрим в forwarder заменён на `probeStreams.request`.
-5. Telegram: `apiRoot` в конфиг, фейк Bot API в smoke.
+5. ~~Telegram: `apiRoot` в конфиг, фейк Bot API~~ — **сделано наполовину, сознательно**. `TELEGRAM_API_ROOT` и `TELEGRAM_TEST_ENVIRONMENT` в конфиге, пишущая заглушка Bot API в стенде: бот поднимается, шлёт туда каждый вызов и до реального чата дойти не может. Путь 2 (тестовая инфраструктура Telegram) готов к включению одним флагом, но не проверен — нужен настоящий токен.
+
+   Что ещё не покрыто: доставка **до получателя**. Регистрация получателя идёт через подписанный токен и живой чат, поэтому «событие → сообщение в чат» стенд пока не утверждает. Это следующий заход, и он про регистрацию, а не про Telegram.
 6. Профиль `probe` в production compose плюс красная строка в `/status`.
 
 Шаги 1–3 самостоятельны и уже закрывают главную дыру.
