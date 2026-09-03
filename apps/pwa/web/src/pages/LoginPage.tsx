@@ -1,10 +1,11 @@
 import { KeyRound, LoaderCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api, ApiError } from '@/lib/api'
+import { codeFromLocation, forgetCodeInUrl } from '@/lib/authorizeLink'
 import { log } from '@/lib/log'
 import { deviceId, remember } from '@/lib/session'
 
@@ -47,12 +48,13 @@ const loginError = (caught: unknown): string => {
 }
 
 export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(() => codeFromLocation() ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const submitted = useRef(false)
 
-  const submit = async () => {
-    const value = code.trim()
+  const submit = async (override?: string) => {
+    const value = (override ?? code).trim()
     if (!value || busy) return
 
     setBusy(true)
@@ -77,6 +79,19 @@ export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
     }
   }
 
+  // A code arriving in the URL is redeemed on sight: the whole point of the
+  // link is not having to copy anything. The code leaves the address bar
+  // immediately either way — it is single use, and it has no business sitting
+  // in history or in a screenshot.
+  useEffect(() => {
+    const linked = codeFromLocation()
+    if (!linked || submitted.current) return
+
+    submitted.current = true
+    forgetCodeInUrl()
+    void submit(linked)
+  }, [])
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-md items-center px-4">
       <Card className="w-full">
@@ -95,7 +110,7 @@ export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
           <Input
             value={code}
             onChange={(event) => setCode(event.target.value)}
-            onKeyDown={(event) => event.key === 'Enter' && submit()}
+            onKeyDown={(event) => event.key === 'Enter' && void submit()}
             placeholder="например, xK3p-Rd9Qm2A"
             autoCapitalize="off"
             autoCorrect="off"
@@ -112,7 +127,7 @@ export function LoginPage({ onAuthorized }: { onAuthorized: () => void }) {
           <Button
             className="w-full"
             disabled={busy || !code.trim()}
-            onClick={submit}
+            onClick={() => void submit()}
           >
             {busy && <LoaderCircle className="size-4 animate-spin" />}
             Войти

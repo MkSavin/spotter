@@ -3,6 +3,7 @@ import { Header } from '@/components/Header'
 import type { Status } from '@/components/StatusDot'
 import { Toaster } from '@/components/ui/sonner'
 import { PushProvider, usePush } from '@/hooks/pushContext'
+import { codeFromLocation, forgetCodeInUrl } from '@/lib/authorizeLink'
 import { navigate, usePathname } from '@/lib/router'
 import { hasRole, isAuthorized } from '@/lib/session'
 import { CamerasPage } from '@/pages/CamerasPage'
@@ -23,6 +24,9 @@ const toStatus = (push: ReturnType<typeof usePush>): Status => {
 function Routes({ status }: { status: Status }) {
   const pathname = usePathname()
 
+  // `/authorize` is consumed by the login page and then replaced away; it is
+  // never a page of its own, so it falls through to the feed like any unknown
+  // path rather than needing a route.
   const eventMatch = pathname.match(/^\/event\/(.+)$/)
   if (eventMatch) return <EventPage id={decodeURIComponent(eventMatch[1])} />
   if (pathname === '/setup') return <SetupPage />
@@ -54,6 +58,14 @@ function Shell() {
   }, [])
 
   const onAuthorized = useCallback(() => setAuthorized(true), [])
+
+  // An authorize link opened on an install that is already signed in would
+  // otherwise land on the feed with the code still in the address bar: the
+  // login page never renders, so nothing consumes it. Drop it — the install
+  // already has a grant, and the code is single use.
+  useEffect(() => {
+    if (authorized && codeFromLocation()) forgetCodeInUrl()
+  }, [authorized])
 
   // Follow deep-link navigation requested by the service worker on click.
   useEffect(() => {

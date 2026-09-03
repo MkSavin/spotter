@@ -1,5 +1,6 @@
 import { normalizeUsername, type Role } from '@spotter/transport'
 import { InputFile } from 'grammy'
+import { authorizeLink, pwaUrl } from '../../auth/pwaLink'
 import { renderQr } from '../../auth/qr'
 import { deepLink } from '../../auth/token'
 import type { BotContext } from '../../context'
@@ -66,22 +67,41 @@ class UserSignCommand extends SpotterCommand {
     )
 
     // A bound code cannot be redeemed by a PWA install — there is no username
-    // on a device to match it against — so say so where it is decided.
+    // on a device to match it against — so say so where it is decided, and do
+    // not offer a web link that is guaranteed to be refused.
     const binding = username
       ? `🔒 Активировать сможет только <b>@${username}</b> в Telegram`
       : '🔓 Подойдёт любому — и в Telegram, и в веб-приложении'
 
+    const web = username ? null : pwaUrl(context.heartbeats.all())
+
+    // The code on its own line, with nothing else inside the tag: a tap copies
+    // exactly what the web app's field expects. Wrapping it in `/login …` made
+    // the command come along, and it had to be edited out by hand.
+    const parts = [
+      `🔑 <b>Код доступа создан!</b>`,
+      ``,
+      `Роль: <b>${roleTitle(grantedRole)}</b>`,
+      binding,
+      ``,
+      `Код (нажмите, чтобы скопировать):`,
+      `<code>${code}</code>`,
+      ``,
+      `В Telegram — отсканируйте QR или откройте ссылку:`,
+      `🔗 ${link}`,
+    ]
+
+    if (web) {
+      parts.push(
+        ``,
+        `В веб-приложении — вход одним нажатием:`,
+        `🌐 ${authorizeLink(web, code)}`,
+      )
+    }
+
     await context.replyWithPhoto(new InputFile(qr, 'access-code.png'), {
       parse_mode: 'HTML',
-      caption: `🔑 <b>Код доступа создан!</b>
-
-Роль: <b>${roleTitle(grantedRole)}</b>
-${binding}
-
-Отсканируйте QR-код или активируйте вручную:
-<code>/login ${code}</code>
-
-🔗 ${link}`,
+      caption: parts.join('\n'),
     })
   }
 }

@@ -77,6 +77,10 @@ const main = async (): Promise<void> => {
 
   const stopHeartbeat = startHeartbeat(producer, {
     service: 'pwa',
+    // Announced rather than configured twice: the bot builds authorize links
+    // from this, and a URL copied into the bot's own env would drift the first
+    // time one of them moves.
+    ...(config.publicUrl ? { details: () => ({ url: config.publicUrl }) } : {}),
     // Read at beat time: the regulator is created after this call.
     queues: async () =>
       transport
