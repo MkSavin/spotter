@@ -14,7 +14,9 @@ import type { Catalog } from './Catalog'
  * it — replacing the bot's hard-coded `cameraLabels`/`objectLabels`.
  *
  * `previous` short-circuits an unchanged snapshot so the refresh loop does not
- * wake every consumer on a timer.
+ * wake every consumer on a timer. `force` publishes regardless, for a consumer
+ * that restarted and missed the last one — it keeps the memo, so the log can
+ * still tell a real change from a routine repeat.
  */
 export const publishCatalog = async (
   catalog: Catalog,
@@ -22,6 +24,7 @@ export const publishCatalog = async (
   producer: StreamProducer,
   logger: Stenograph,
   previous?: { value: string | undefined },
+  force = false,
 ): Promise<boolean> => {
   const [cameras, objectTypes] = await Promise.all([
     catalog.listCameras(),
@@ -43,10 +46,8 @@ export const publishCatalog = async (
 
   const serialized = JSON.stringify(snapshot)
 
-  if (previous && previous.value === serialized) {
-    logger.debug(`Catalog for "${sourceId}" unchanged`)
-    return true
-  }
+  const unchanged = previous?.value === serialized
+  if (unchanged && !force) return true
 
   // SET via the producer's non-blocking connection (the subscriber connection
   // is reserved for the blocking XREADGROUP loop). The key serves same-node
@@ -55,10 +56,17 @@ export const publishCatalog = async (
   await producer.send('SET', [catalogKey(sourceId), serialized])
   await producer.publish(catalogUpdatedStream, snapshot)
 
+  const isFirst = previous?.value === undefined
+
   if (previous) previous.value = serialized
 
-  logger.info(
-    `Published catalog for "${sourceId}": ${cameras.length} cameras, ${objectTypes.length} object types`,
-  )
+  // Only a catalog that actually differs is news — cameras appeared or went
+  // away. A forced republish of an identical list is bookkeeping, and at one
+  // an hour per source it buries the lines worth reading.
+  const message = `Published catalog for "${sourceId}": ${cameras.length} cameras, ${objectTypes.length} object types`
+  if (unchanged) logger.debug(message)
+  else if (isFirst || previous) logger.info(message)
+  else logger.debug(message)
+
   return true
 }

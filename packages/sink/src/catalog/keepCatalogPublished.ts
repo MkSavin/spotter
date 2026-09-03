@@ -40,16 +40,12 @@ export const keepCatalogPublished = (
   const previous: { value: string | undefined } = { value: undefined }
 
   const publish = (force: boolean): Promise<boolean> =>
-    publishCatalog(
-      catalog,
-      sourceId,
-      producer,
-      logger,
-      force ? undefined : previous,
-    ).catch((error) => {
-      logger.warn(`Catalog publish failed: ${error}`)
-      return false
-    })
+    publishCatalog(catalog, sourceId, producer, logger, previous, force).catch(
+      (error) => {
+        logger.warn(`Catalog publish failed: ${error}`)
+        return false
+      },
+    )
 
   const attempt = async (): Promise<void> => {
     if (stopped) return
@@ -58,7 +54,6 @@ export const keepCatalogPublished = (
     // against what was actually sent.
     const force = forceEvery > 0 && quiet >= forceEvery
     if (force) {
-      previous.value = undefined
       quiet = 0
     } else {
       quiet += 1
@@ -80,7 +75,6 @@ export const keepCatalogPublished = (
       clearTimeout(timer)
     },
     republish: async () => {
-      previous.value = undefined
       quiet = 0
       await publish(true)
     },

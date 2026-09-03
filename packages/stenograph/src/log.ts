@@ -1,6 +1,7 @@
 import { combineFormat } from './format/combineFormat'
 import { pathJoinFormat } from './format/pathJoinFormat'
 import { prefixFormat } from './format/prefixFormat'
+import { timestampFormat } from './format/timestampFormat'
 import { Stenograph } from './Stenograph'
 import {
   consoleRenderer,
@@ -47,6 +48,7 @@ export const defaultLogger = new Stenograph({
   ],
   format: combineFormat([
     pathJoinFormat(' » '),
+    timestampFormat(),
     prefixFormat(
       (message, oldPrefix) =>
         `${message.level.icon ?? message.level.name} ${oldPrefix ? `${oldPrefix} ` : ''}[${message.path || '~'}]`,
