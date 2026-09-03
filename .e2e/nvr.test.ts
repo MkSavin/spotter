@@ -30,12 +30,19 @@ const imagePresent = async (): Promise<boolean> =>
 const sourcePresent = async (): Promise<boolean> =>
   await Bun.file(`${import.meta.dir}/nvr/media/source.mp4`).exists()
 
+const adapterBuilt = async (): Promise<boolean> =>
+  (await $`docker image inspect spotter-nvr/frigate:test`.quiet().nothrow())
+    .exitCode === 0
+
 const usable =
-  (await dockerUp()) && (await imagePresent()) && (await sourcePresent())
+  (await dockerUp()) &&
+  (await imagePresent()) &&
+  (await sourcePresent()) &&
+  (await adapterBuilt())
 
 if (!usable) {
   console.warn(
-    'nvr: skipped — needs docker, the pinned frigate image and .e2e/nvr/source.sh',
+    'nvr: skipped — needs docker, the pinned frigate image, `bun run nvr:build` and `bun run nvr:source`',
   )
 }
 
@@ -101,6 +108,32 @@ const recordedEvents = async (): Promise<
   }>
 }
 
+/** Reads a Redis stream from the rig's own container. */
+const streamLength = async (stream: string): Promise<number> => {
+  const result = await compose('exec', '-T', 'redis', 'redis-cli', 'XLEN', stream)
+    .quiet()
+    .nothrow()
+  return Number(result.stdout.toString().trim()) || 0
+}
+
+const firstEntry = async (stream: string): Promise<string> => {
+  const result = await compose(
+    'exec',
+    '-T',
+    'redis',
+    'redis-cli',
+    'XRANGE',
+    stream,
+    '-',
+    '+',
+    'COUNT',
+    '1',
+  )
+    .quiet()
+    .nothrow()
+  return result.stdout.toString()
+}
+
 describeIfReady('nvr rig: Frigate produces the event itself', () => {
   beforeAll(async () => {
     await compose('down', '-v', '--remove-orphans').quiet().nothrow()
@@ -157,6 +190,22 @@ describeIfReady('nvr rig: Frigate produces the event itself', () => {
     expect(published).toContain('"label": "person"')
     expect(published).toContain('"camera": "front"')
   }, 180_000)
+
+  test('the adapter turns it into a spotter event in Redis', async () => {
+    // The whole chain in one assertion: the score we handed the probe comes
+    // back out of Redis unchanged, having passed through Frigate's detector,
+    // its tracker, MQTT and our adapter. Seeding `test_seed` proves none of it.
+    await until(
+      async () => (await streamLength('spotter.event')) > 0,
+      'the adapter to publish a spotter event',
+      90_000,
+    )
+
+    const entry = await firstEntry('spotter.event')
+    expect(entry).toContain('"camera":"front"')
+    expect(entry).toContain('"label":"person"')
+    expect(entry).toContain('"source":"frigate"')
+  }, 120_000)
 
   test('Frigate records the event as its own', async () => {
     // Not just a message on a topic: the NVR opened, tracked and closed an

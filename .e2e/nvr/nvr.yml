@@ -67,6 +67,61 @@ services:
       retries: 30
       start_period: 30s
 
+  minio:
+    image: minio/minio
+    networks: [nvr]
+    environment:
+      MINIO_ROOT_USER: spotter
+      MINIO_ROOT_PASSWORD: spotter-nvr-rig
+    command: ['server', '/data']
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  minio-init:
+    image: minio/mc
+    networks: [nvr]
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 spotter spotter-nvr-rig; do sleep 1; done;
+      mc mb --ignore-existing local/spotter;
+      "
+
+  # The real adapter image, so the rig covers what it makes of Frigate's
+  # payload — not only that the payload was published.
+  spotter-frigate:
+    image: spotter-nvr/frigate:test
+    restart: 'no'
+    networks: [nvr]
+    environment:
+      REDIS_URL: redis://redis:6379
+      SOURCE_TYPE: frigate
+      MQTT_BROKER: mqtt://mosquitto:1883
+      FRIGATE_REMOTE_URL: http://frigate:5000
+      FRIGATE_AUTH_USER: admin
+      FRIGATE_AUTH_SECRET: rig
+      S3_HOST: http://minio:9000
+      S3_ACCESS: spotter
+      S3_SECRET: spotter-nvr-rig
+      S3_BUCKET: spotter
+      LOG_LEVEL: verbose
+      TZ: Europe/Moscow
+    healthcheck:
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      redis: { condition: service_healthy }
+      mosquitto: { condition: service_healthy }
+      frigate: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+
 networks:
   nvr:
     driver: bridge

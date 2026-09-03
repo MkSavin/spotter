@@ -8,6 +8,7 @@
 
 ```sh
 bun run nvr:source     # синтетическое видео, один раз; ffmpeg берётся из контейнера
+bun run nvr:build      # образ адаптера, после правок в apps/frigate
 bun run test:nvr
 ```
 
@@ -30,7 +31,9 @@ docker compose -f .e2e/nvr/nvr.yml exec mosquitto mosquitto_sub -t 'frigate/#' -
 | `frigate` | настоящий NVR, **версия закреплена** на `0.17.2` |
 | `probe` | наш фиктивный детектор, [`apps/probe`](../../apps/probe/AGENTS.md) |
 | `mosquitto` | брокер, тот же образ, что в проде |
-| `redis` | для шага, где в стенд добавится адаптер |
+| `spotter-frigate` | наш адаптер, настоящий образ |
+| `redis` | шина, куда адаптер кладёт `spotter.event` |
+| `minio` | S3, без него адаптер не стартует |
 
 Версия Frigate закреплена не из осторожности: протокол детектора — интерфейс плагина, а не эндпоинт, но и он не вечен. Поднимать тег — отдельное решение с прогоном стенда за ним.
 
@@ -62,4 +65,13 @@ docker run --rm -v "$PWD/.e2e/nvr/frigate.yml":/config/config.yml:ro \
 
 ## Что проверено вживую
 
-Frigate 0.17.2 подключился к probe (`Model probe.model is ready` — файл модели не нужен), опросил его 670 раз, и по команде `/detect` **сам породил события**: пять записей `person` на камере `front` с настоящими id и, в `frigate/events`, payload со структурой `before`/`after`, `score: 0.95` и `max_severity: "alert"` — ровно то, что разбирает наш адаптер.
+Frigate 0.17.2 подключился к probe (`Model probe.model is ready` — файл модели не нужен), опросил его больше тысячи раз, и по команде `/detect` **сам породил события**: записи `person` на камере `front` с настоящими id и payload со структурой `before`/`after`, `score` и `max_severity: "alert"`.
+
+Дальше их подобрал наш адаптер и положил в `spotter.event`:
+
+```json
+{"id":"1788454070.21682-sk0354","camera":"front","label":"person",
+ "score":0.93,"type":"start","source":"frigate"}
+```
+
+`score: 0.93` — ровно то, что передали в `/detect`. Значение прошло probe → детектор → трекер Frigate → MQTT → адаптер → Redis, не изменившись. Именно этот путь подменяет вброс в `test_seed`.
