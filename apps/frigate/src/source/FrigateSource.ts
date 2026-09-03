@@ -2,6 +2,7 @@ import { type EventSink, Source, type SourceHandle } from '@spotter/sink'
 import { bufferToJson } from '@spotter/transport'
 import { connectAsync as mqttConnectAsync } from 'mqtt'
 import type { CoreConfig } from '../config'
+import { reportMqttConfig } from '../frigate/checkMqttConfig'
 import { parseFrigateEvent } from '../parsing/parseFrigateEvent'
 import { parseFrigateReview } from '../parsing/parseFrigateReview'
 import { MqttRegulator } from '../regulators/MqttRegulator'
@@ -21,6 +22,11 @@ export class FrigateSource extends Source<CoreConfig> {
   async run(emit: EventSink): Promise<SourceHandle> {
     const logger = this.logger.sub('source', this.code)
     const verdicts = new ReviewVerdicts()
+
+    // Connecting to the broker proves nothing about the NVR: with MQTT off in
+    // its own config it publishes no events, and every other sign of health
+    // stays green. Say so at startup rather than leaving a silent adapter.
+    void reportMqttConfig(this.config, logger)
 
     const mqtt = await mqttConnectAsync(this.config.source.frigate.broker, {
       connectTimeout: 15 * 1000,
