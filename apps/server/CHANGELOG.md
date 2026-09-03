@@ -4,15 +4,15 @@
 
 ### Minor Changes
 
-- 3ed7822: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
-- 93d636e: feat: filter delivery by the NVR's own verdict. The adapter reads `frigate/reviews` and stamps `severity` on the event, and `DELIVERY_POLICY=alerts` keeps pushes for alerts only
-- 049f333: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
+- 98a2893: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
+- 86b3270: feat: filter delivery by the NVR's own verdict. The adapter reads `frigate/reviews` and stamps `severity` on the event, and `DELIVERY_POLICY=alerts` keeps pushes for alerts only
+- 6a348ed: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
 
 ### Patch Changes
 
-- 211f3c3: chore: drop the `PRAGMA foreign_keys` that enforced nothing — no schema declares a foreign key, and SQLite cannot check relations that span services
-- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
-- b389438: refactor: reduce the role vocabulary and username normalisation to a single definition in `@spotter/transport`, so access checks in server and telegram no longer rely on local copies of `ROLE_RANK`
+- bae64c6: chore: drop the `PRAGMA foreign_keys` that enforced nothing — no schema declares a foreign key, and SQLite cannot check relations that span services
+- 152a587: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- 4f28b4b: refactor: reduce the role vocabulary and username normalisation to a single definition in `@spotter/transport`, so access checks in server and telegram no longer rely on local copies of `ROLE_RANK`
 - Updated dependencies [2b590c2]
 - Updated dependencies [0ecd990]
 - Updated dependencies [3ed7822]
@@ -48,7 +48,7 @@
 
 ### Patch Changes
 
-- 32d9796: chore: upgrade the runtime to Bun 1.4
+- 2a4d678: chore: upgrade the runtime to Bun 1.4
 - Updated dependencies [6fb558c]
 - Updated dependencies [714cf4e]
 - Updated dependencies [044e6ae]

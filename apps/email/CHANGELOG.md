@@ -12,11 +12,11 @@
 
 ### Minor Changes
 
-- 3ed7822: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
+- 98a2893: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
 
 ### Patch Changes
 
-- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- 152a587: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
 - Updated dependencies [2b590c2]
 - Updated dependencies [0ecd990]
 - Updated dependencies [3ed7822]
@@ -29,7 +29,7 @@
 
 ### Patch Changes
 
-- 32d9796: chore: upgrade the runtime to Bun 1.4
+- 2a4d678: chore: upgrade the runtime to Bun 1.4
 - Updated dependencies [6fb558c]
 - Updated dependencies [714cf4e]
 - Updated dependencies [044e6ae]

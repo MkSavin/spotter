@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- 152a587: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
 - Updated dependencies [2b590c2]
 - Updated dependencies [0ecd990]
 - Updated dependencies [3ed7822]
@@ -17,11 +17,11 @@
 
 ### Minor Changes
 
-- 7611adb: feat: replace sharp with the built-in `Bun.Image`, dropping the native libvips binaries from the image
+- f9a1387: feat: replace sharp with the built-in `Bun.Image`, dropping the native libvips binaries from the image
 
 ### Patch Changes
 
-- 32d9796: chore: upgrade the runtime to Bun 1.4
+- 2a4d678: chore: upgrade the runtime to Bun 1.4
 - Updated dependencies [6fb558c]
 - Updated dependencies [714cf4e]
 - Updated dependencies [044e6ae]

@@ -4,24 +4,24 @@
 
 ### Patch Changes
 
-- ce37f5e: fix: make the `sent_at` migration work on a populated table — SQLite rejects a non-constant DEFAULT in `ALTER TABLE ADD COLUMN` once the table has rows
+- a7cb74d: fix: make the `sent_at` migration work on a populated table — SQLite rejects a non-constant DEFAULT in `ALTER TABLE ADD COLUMN` once the table has rows
 
 ## 1.7.0
 
 ### Minor Changes
 
-- 3563382: feat: rate-limit commands that reach the NVR. A repeat in the same chat is dropped (3 s by default, 60 s for `/timelapse`); commands that only read local state stay unthrottled
-- 2b590c2: feat: add silence controls. `/mute` and `/unmute` silence a single chat, and `/nvr_suspend` (ADMIN) suspends the NVR's own notifications through the new `NotificationSuspender` port
-- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
-- 3ed7822: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
-- 049f333: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
-- 152ccba: feat: stop failing long timelapses on the clock. A 12 h deadline (`TIMELAPSE_DEADLINE_HOURS`) and a check against the NVR before giving up, plus live status and a `/timelapse_status` command
+- 1df6899: feat: rate-limit commands that reach the NVR. A repeat in the same chat is dropped (3 s by default, 60 s for `/timelapse`); commands that only read local state stay unthrottled
+- 49868ba: feat: add silence controls. `/mute` and `/unmute` silence a single chat, and `/nvr_suspend` (ADMIN) suspends the NVR's own notifications through the new `NotificationSuspender` port
+- 152a587: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- 98a2893: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
+- 6a348ed: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
+- b8b95ff: feat: stop failing long timelapses on the clock. A 12 h deadline (`TIMELAPSE_DEADLINE_HOURS`) and a check against the NVR before giving up, plus live status and a `/timelapse_status` command
 
 ### Patch Changes
 
-- 211f3c3: chore: drop the `PRAGMA foreign_keys` that enforced nothing — no schema declares a foreign key, and SQLite cannot check relations that span services
-- 8d537a3: fix: correct the duration of events longer than a day — a copy of `renderEventTiming` took hours modulo 60 and rendered "1 дней 25 ч"
-- b389438: refactor: reduce the role vocabulary and username normalisation to a single definition in `@spotter/transport`, so access checks in server and telegram no longer rely on local copies of `ROLE_RANK`
+- bae64c6: chore: drop the `PRAGMA foreign_keys` that enforced nothing — no schema declares a foreign key, and SQLite cannot check relations that span services
+- af04358: fix: correct the duration of events longer than a day — a copy of `renderEventTiming` took hours modulo 60 and rendered "1 дней 25 ч"
+- 4f28b4b: refactor: reduce the role vocabulary and username normalisation to a single definition in `@spotter/transport`, so access checks in server and telegram no longer rely on local copies of `ROLE_RANK`
 - Updated dependencies [2b590c2]
 - Updated dependencies [0ecd990]
 - Updated dependencies [3ed7822]
@@ -34,7 +34,7 @@
 
 ### Patch Changes
 
-- 32d9796: chore: upgrade the runtime to Bun 1.4
+- 2a4d678: chore: upgrade the runtime to Bun 1.4
 - 6fb558c: feat: make the PWA a real client, not a read-only feed
   
   The PWA could show events and nothing else. It published nothing to the bus, so every action the bot offers — a camera snapshot, a clip, the camera list, service status — simply did not exist there. What blocked all of them was the same missing piece: a way to send a command and hear back.

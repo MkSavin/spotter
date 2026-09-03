@@ -4,9 +4,9 @@
 
 ### Minor Changes
 
-- 2b590c2: feat: add silence controls. `/mute` and `/unmute` silence a single chat, and `/nvr_suspend` (ADMIN) suspends the NVR's own notifications through the new `NotificationSuspender` port
-- 93d636e: feat: filter delivery by the NVR's own verdict. The adapter reads `frigate/reviews` and stamps `severity` on the event, and `DELIVERY_POLICY=alerts` keeps pushes for alerts only
-- 152ccba: feat: stop failing long timelapses on the clock. A 12 h deadline (`TIMELAPSE_DEADLINE_HOURS`) and a check against the NVR before giving up, plus live status and a `/timelapse_status` command
+- 49868ba: feat: add silence controls. `/mute` and `/unmute` silence a single chat, and `/nvr_suspend` (ADMIN) suspends the NVR's own notifications through the new `NotificationSuspender` port
+- 86b3270: feat: filter delivery by the NVR's own verdict. The adapter reads `frigate/reviews` and stamps `severity` on the event, and `DELIVERY_POLICY=alerts` keeps pushes for alerts only
+- b8b95ff: feat: stop failing long timelapses on the clock. A 12 h deadline (`TIMELAPSE_DEADLINE_HOURS`) and a check against the NVR before giving up, plus live status and a `/timelapse_status` command
 
 ### Patch Changes
 
@@ -23,7 +23,7 @@
 
 ### Patch Changes
 
-- 32d9796: chore: upgrade the runtime to Bun 1.4
+- 2a4d678: chore: upgrade the runtime to Bun 1.4
 - a7de7d7: fix: drop disabled cameras from the catalog
   
   A camera turned off in Frigate stayed in `camera_list`, and a snapshot or timelapse requested against it would never be answered. Disabling a camera does not remove it from `/api/config` — Frigate marks it with `enabled: false` and keeps the section — and the catalog read every key it found there.

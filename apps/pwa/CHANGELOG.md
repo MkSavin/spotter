@@ -24,7 +24,7 @@
 
 ### Patch Changes
 
-- 762b599: fix: stop 500-ing the PWA login. A request without a usable `Host` header broke static serving with `Invalid URL`, and the server answered 500. `CommandBus` no longer spins a hot loop while Redis loads its AOF
+- c639989: fix: stop 500-ing the PWA login. A request without a usable `Host` header broke static serving with `Invalid URL`, and the server answered 500. `CommandBus` no longer spins a hot loop while Redis loads its AOF
 - Updated dependencies [762b599]
   - @spotter/transport@1.8.1
 
@@ -32,12 +32,12 @@
 
 ### Minor Changes
 
-- 3ed7822: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
+- 98a2893: feat: bound table growth. Events, dedup ledgers and message links are trimmed by age, and access codes now expire (`ACCESS_CODE_TTL_HOURS`, a day by default)
 
 ### Patch Changes
 
-- 0ecd990: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
-- 049f333: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
+- 152a587: feat: report queue depth in the heartbeat and show it in `/status`: how many entries are waiting, how many are in flight, and the age of the oldest unacked one
+- 6a348ed: feat: let `/user_sign` pick a role (VIEWER by default), and have the PWA say why a code was refused instead of the blanket "invalid or already used"
 - Updated dependencies [2b590c2]
 - Updated dependencies [0ecd990]
 - Updated dependencies [3ed7822]
@@ -73,7 +73,7 @@
 
 ### Patch Changes
 
-- 32d9796: chore: upgrade the runtime to Bun 1.4
+- 2a4d678: chore: upgrade the runtime to Bun 1.4
 - df906a6: fix: keep the snapshot on a card whose event also has a clip
   
   Every event with a video showed a placeholder instead of its image. The snapshot and the clip arrive as separate `media` deliveries — the clip last, since transcoding a video takes longer — and each carries only its own key. The feed cache replaced the stored row wholesale, so the clip's delivery wrote `snapshotKey: undefined` over the image that had already arrived. Keys are now merged into what is already cached.
