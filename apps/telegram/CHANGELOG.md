@@ -1,5 +1,38 @@
 # @spotter/telegram
 
+## 1.8.1
+
+### Patch Changes
+
+- 8039180: fix: say when an event has no video, instead of silently dropping the button
+  
+  The "🎬 Видео" button appears only when the NVR closes an event with `has_clip` set. When it does not, the button was simply absent, which is indistinguishable from a broken bot — and the reader has no way to tell that the NVR itself decided there was nothing to offer.
+  
+  An ended event without a clip now carries `🎞️ Без видео` on its label line. The film reel is deliberately not the button's clapperboard and not the snapshot's `📸`/`🙈`: the clip and the snapshot are independent axes, and an event can lack both, so the marks have to read apart at a glance.
+  
+  The mark tracks the truth rather than the flag: a clip that arrives anyway clears it, while a delivered snapshot leaves it standing, since a photo says nothing about the video.
+  
+  `shouldOfferClip` gated the button and had no tests at all. It now has them, alongside its new counterpart `shouldSayClipless`, including a case asserting the two can never both hold — a message must never offer a button while claiming there is nothing to offer.
+- 9108030: refactor: read the S3 block in one place
+  
+  Six services declared the same `S3Config` type and read the same four `S3_*` variables, each with its own copy of the defaults. Adding a variable meant editing six files and hoping none was missed. `resolveS3Config` in transport now owns the block, the way `resolveRedisConfig` already owned the Redis one; `SinkS3Config` extends it with the staging prefix only adapters need.
+  
+  Also removed: a dead `innoxiousHelpers` export nothing imported, three redundant named JWT exports beside the default object every caller actually uses, and the `typecheck:full` script, which had become a second name for `tsc --noEmit` — the docs pointing at it as a wider check were saying something untrue.
+  
+  `zod` in pwa, `abort-controller` in telegram and the changesets read/write packages at the root were imported but only resolved transitively; they are declared now.
+- d0e5fd5: refactor: share the guards every controller and domain call repeated
+  
+  Nine stream controllers opened with the same four lines — decode the buffer, bail on empty, run the schema, bail on null — and eight call sites wrapped `commandBus.send` in the same try/catch. Both are now single helpers: `parsedController` in the regulator, `trySendCommand` alongside `CommandBus`, plus `askDomain` in the telegram command framework for the two answers every command shares.
+  
+  The point is less the lines saved than the guards no longer being a matter of discipline: a controller cannot forget to validate, and a command cannot forget that `send` throws when the domain is unreachable.
+  
+  Writing tests for the wrapper surfaced a bug the hand-written version had everywhere: `bufferToJson` throws on malformed JSON rather than returning null, so the `if (!value) return` guard never covered it. Such a message burned all five delivery attempts before reaching the dead-letter stream. `parsedController` drops it on the first pass — a body that is not JSON will not become JSON on a retry.
+  
+  `CommandReply` turned out to be exported already, so the `Awaited<ReturnType<typeof context.commandBus.send>>` in eight files was never necessary.
+- Updated dependencies [9108030]
+- Updated dependencies [d0e5fd5]
+  - @spotter/transport@1.10.0
+
 ## 1.8.0
 
 ### Minor Changes
