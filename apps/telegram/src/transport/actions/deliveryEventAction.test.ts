@@ -147,3 +147,101 @@ describe('deliveryEventAction media with nothing attached', () => {
     cleanup()
   })
 })
+
+describe('deliveryEventAction clip marker', () => {
+  test('an ended event with no clip says so instead of just dropping the button', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      { eventId: 'cam-htriyg-1', event: event('end'), action: 'update' },
+      context,
+    )
+
+    const [, , text, options] = context.editMessageText.mock.calls[0]
+    expect(text as string).toContain('🎞️ Без видео')
+    // No button, and now the text explains why rather than looking broken.
+    expect((options as { reply_markup?: unknown }).reply_markup).toBeUndefined()
+    cleanup()
+  })
+
+  test('an ended event advertising a clip gets the button and no marker', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      { eventId: 'cam-htriyg-1', event: event('end', true), action: 'update' },
+      context,
+    )
+
+    const [, , text, options] = context.editMessageText.mock.calls[0]
+    expect(text as string).not.toContain('Без видео')
+    expect((options as { reply_markup?: unknown }).reply_markup).toBeDefined()
+    cleanup()
+  })
+
+  test('a running event stays silent about the clip', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      { eventId: 'cam-htriyg-1', event: event('start'), action: 'create' },
+      context,
+    )
+
+    const text = context.editMessageText.mock.calls[0][2] as string
+    expect(text).not.toContain('Без видео')
+    cleanup()
+  })
+
+  test('an arriving clip clears the marker it was delivered against', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      {
+        eventId: 'cam-htriyg-1',
+        event: event('end'),
+        action: 'media',
+        clipKey: 'event-media/clip.mp4',
+      },
+      context,
+    )
+
+    const media = context.editMessageMedia.mock.calls[0][2] as {
+      caption: string
+    }
+    expect(media.caption).not.toContain('Без видео')
+    cleanup()
+  })
+
+  test('a snapshot keeps the marker: it says nothing about the clip', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      {
+        eventId: 'cam-htriyg-1',
+        event: event('end'),
+        action: 'media',
+        snapshotKey: 'event-media/snap.jpg',
+      },
+      context,
+    )
+
+    const media = context.editMessageMedia.mock.calls[0][2] as {
+      caption: string
+    }
+    expect(media.caption).toContain('🎞️ Без видео')
+    cleanup()
+  })
+
+  test('an empty delivery says both: no snapshot and no clip', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      { eventId: 'cam-htriyg-1', event: event('end'), action: 'media' },
+      context,
+    )
+
+    const text = context.editMessageText.mock.calls[0][2] as string
+    expect(text).toContain('🙈 Без снимка')
+    expect(text).toContain('🎞️ Без видео')
+    cleanup()
+  })
+})

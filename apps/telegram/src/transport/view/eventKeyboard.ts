@@ -14,6 +14,15 @@ export const CLIP_WAIT = 'wait'
 export const shouldOfferClip = (event: SpotterEvent): boolean =>
   event.type === 'end' && event.hasClip
 
+/**
+ * The other side of the same coin: an ended event the NVR gave no clip for.
+ *
+ * Kept next to `shouldOfferClip` so the button and the text explaining its
+ * absence can never disagree — a running event says nothing either way.
+ */
+export const shouldSayClipless = (event: SpotterEvent): boolean =>
+  event.type === 'end' && !event.hasClip
+
 /** Inline keyboard with the active "Видео" button for an event message. */
 export const videoButtonKeyboard = (eventId: string): InlineKeyboard =>
   new InlineKeyboard().text('🎬 Видео', `${CLIP_PREFIX}${eventId}`)

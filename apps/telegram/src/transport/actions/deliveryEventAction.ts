@@ -4,7 +4,11 @@ import type { TransportContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
 import { actualizeEventMedia } from '../mixins/actualizeEventMedia'
 import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
-import { shouldOfferClip, videoButtonKeyboard } from '../view/eventKeyboard'
+import {
+  shouldOfferClip,
+  shouldSayClipless,
+  videoButtonKeyboard,
+} from '../view/eventKeyboard'
 import { renderEvent } from '../view/renderEvent'
 
 export const deliveryEventAction = async (
@@ -25,6 +29,7 @@ export const deliveryEventAction = async (
     // rather than leaving a bare text message that looks final.
     const caption = renderEvent(event, context, {
       media: event.type === 'end' ? 'pending' : undefined,
+      clipless: shouldSayClipless(event),
     })
 
     await actualizeSentMessages(eventId, messages, caption, context, keyboard)
@@ -36,8 +41,12 @@ export const deliveryEventAction = async (
   // action === 'media' — attach transcoded media to the existing messages.
   const messages = eventMessagesRepo.find(db, eventId)
 
-  // The photo is on the message now, so the indicator has done its job.
-  const caption = renderEvent(event, context, { media: 'ready' })
+  // The photo is on the message now, so the indicator has done its job. The
+  // clip mark stays: a delivered snapshot says nothing about a missing clip.
+  const caption = renderEvent(event, context, {
+    media: 'ready',
+    clipless: shouldSayClipless(event),
+  })
 
   // Nothing came back — the NVR has no media for this event. Mark the text so
   // an empty notification is not mistaken for one still waiting on its photo.
@@ -54,7 +63,10 @@ export const deliveryEventAction = async (
     await actualizeSentMessages(
       eventId,
       messages,
-      renderEvent(event, context, { media: 'absent' }),
+      renderEvent(event, context, {
+        media: 'absent',
+        clipless: shouldSayClipless(event),
+      }),
       context,
       keyboard,
     )
@@ -71,7 +83,8 @@ export const deliveryEventAction = async (
     const video: InputMediaVideo = {
       type: 'video',
       media: s3.presign(clipKey, { expiresIn: config.presignExpiry }),
-      caption,
+      // A clip arrived, so whatever the event advertised, it is not clipless.
+      caption: renderEvent(event, context, { media: 'ready' }),
       parse_mode: 'HTML',
     }
     await actualizeEventMedia(eventId, messages, video, undefined, context)

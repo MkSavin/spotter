@@ -18,8 +18,19 @@ const MEDIA_MARKS: Partial<Record<MediaState, string>> = {
   absent: '🙈 Без снимка',
 }
 
+/**
+ * Said when the NVR closed the event without attaching a clip, so the missing
+ * "Видео" button reads as the NVR's verdict rather than as a broken bot.
+ *
+ * Film reel, not the button's clapperboard: the same medium, visibly not the
+ * control — and distinct from the snapshot marks, which are a separate axis.
+ */
+const NO_CLIP_MARK = '🎞️ Без видео'
+
 export type RenderEventOptions = {
   media?: MediaState
+  /** Whether to say the event has no clip. Only meaningful once it has ended. */
+  clipless?: boolean
 }
 
 export const renderEvent = (
@@ -45,9 +56,13 @@ export const renderEvent = (
   const code = eventCode(event.id)
   const timing = renderEventTiming(event, context.config.timezone)
 
-  const mark = options.media ? MEDIA_MARKS[options.media] : undefined
+  // Two independent axes: an event can lack both a snapshot and a clip.
+  const marks = [
+    options.media ? MEDIA_MARKS[options.media] : undefined,
+    options.clipless ? NO_CLIP_MARK : undefined,
+  ].filter(Boolean)
 
   return `<b>${title}</b> <code>${code}</code>
-<b>${label}</b> ${score} | <b>${camera}</b>${mark ? ` | ${mark}` : ''}
+<b>${label}</b> ${score} | <b>${camera}</b>${marks.map((mark) => ` | ${mark}`).join('')}
 📅 ${timing}`
 }
