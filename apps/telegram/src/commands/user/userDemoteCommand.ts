@@ -1,9 +1,9 @@
 import type { BotContext } from '../../context'
 import { tgBindingsRepo } from '../../db/repository'
-import { escapeHtml } from '../../helpers/html'
 import { roleTitle } from '../../helpers/role'
+import { askDomain } from '../framework/askDomain'
 import { SpotterCommand } from '../framework/SpotterCommand'
-import { userRefArg } from './userArgs'
+import { userNotFound, userRefArg } from './userArgs'
 
 class UserDemoteCommand extends SpotterCommand {
   readonly name = 'user_demote'
@@ -18,28 +18,13 @@ class UserDemoteCommand extends SpotterCommand {
   ): Promise<void> {
     const ref = args.ref
 
-    let reply: Awaited<ReturnType<typeof context.commandBus.send>>
-    try {
-      reply = await context.commandBus.send(
-        'user.setRole',
-        { ref, role: 'VIEWER' },
-        context.session.user.recipientUuid,
-      )
-    } catch {
-      await context.reply('Сервис временно недоступен.')
-      return
-    }
-
-    if (!reply.ok) {
-      if (reply.error === 'not-found') {
-        await context.replyWithHTML(
-          `🔍 <b>Пользователь <code>${escapeHtml(ref)}</code> не найден</b>`,
-        )
-      } else {
-        await context.reply(`Ошибка: ${reply.error}`)
-      }
-      return
-    }
+    const reply = await askDomain(
+      context,
+      'user.setRole',
+      { ref, role: 'VIEWER' },
+      userNotFound(context, ref),
+    )
+    if (!reply) return
 
     const data = reply.data as { tgUserId?: string }
     const binding = data.tgUserId

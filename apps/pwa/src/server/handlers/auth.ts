@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { trySendCommand } from '@spotter/transport'
 import type { CoreContext } from '../../context'
 import { devicesRepo } from '../../db/repository'
 import { json, parseBody } from '../http'
@@ -30,14 +31,17 @@ export const authHandler = async (
   if (context.config.debug)
     trace.info(`Redeem attempt from ${deviceId} (${label ?? 'no label'})`)
 
-  let reply: Awaited<ReturnType<typeof context.commandBus.send>>
+  const outcome = await trySendCommand(context.commandBus, 'device.redeem', {
+    code,
+    deviceId,
+  })
 
-  try {
-    reply = await context.commandBus.send('device.redeem', { code, deviceId })
-  } catch (error) {
-    trace.warn('device.redeem did not answer', error)
+  if (!outcome.reached) {
+    trace.warn('device.redeem did not answer', outcome.error)
     return json({ ok: false, error: 'unavailable' }, { status: 503 })
   }
+
+  const { reply } = outcome
 
   if (!reply.ok) {
     trace.warn(`Redeem refused for ${deviceId}: ${reply.error ?? 'not-found'}`)

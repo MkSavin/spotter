@@ -1,4 +1,5 @@
 import type { BotContext } from '../../context'
+import { askDomain } from '../framework/askDomain'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 class EventClearCommand extends SpotterCommand {
@@ -7,22 +8,8 @@ class EventClearCommand extends SpotterCommand {
   readonly access = 'ADMIN' as const
 
   async handle(context: BotContext): Promise<void> {
-    let reply: Awaited<ReturnType<typeof context.commandBus.send>>
-    try {
-      reply = await context.commandBus.send(
-        'event.clear',
-        {},
-        context.session.user.recipientUuid,
-      )
-    } catch {
-      await context.reply('Сервис временно недоступен.')
-      return
-    }
-
-    if (!reply.ok) {
-      await context.reply(`Ошибка: ${reply.error}`)
-      return
-    }
+    const reply = await askDomain(context, 'event.clear')
+    if (!reply) return
 
     const { count } = reply.data as { count: number }
 

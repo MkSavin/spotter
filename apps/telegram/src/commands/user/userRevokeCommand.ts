@@ -1,8 +1,9 @@
 import type { BotContext } from '../../context'
 import { tgBindingsRepo } from '../../db/repository'
 import { escapeHtml } from '../../helpers/html'
+import { askDomain } from '../framework/askDomain'
 import { SpotterCommand } from '../framework/SpotterCommand'
-import { userRefArg } from './userArgs'
+import { userNotFound, userRefArg } from './userArgs'
 
 class UserRevokeCommand extends SpotterCommand {
   readonly name = 'user_revoke'
@@ -25,28 +26,15 @@ class UserRevokeCommand extends SpotterCommand {
       return
     }
 
-    let reply: Awaited<ReturnType<typeof context.commandBus.send>>
-    try {
-      reply = await context.commandBus.send(
+    if (
+      !(await askDomain(
+        context,
         'user.revoke',
         { ref },
-        context.session.user.recipientUuid,
-      )
-    } catch {
-      await context.reply('Сервис временно недоступен.')
+        userNotFound(context, ref),
+      ))
+    )
       return
-    }
-
-    if (!reply.ok) {
-      if (reply.error === 'not-found') {
-        await context.replyWithHTML(
-          `🔍 <b>Пользователь <code>${escapeHtml(ref)}</code> не найден</b>`,
-        )
-      } else {
-        await context.reply(`Ошибка: ${reply.error}`)
-      }
-      return
-    }
 
     context.logger
       .sub('auth')

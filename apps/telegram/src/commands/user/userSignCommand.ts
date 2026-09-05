@@ -5,6 +5,7 @@ import { renderQr } from '../../auth/qr'
 import { deepLink } from '../../auth/token'
 import type { BotContext } from '../../context'
 import { roleTitle } from '../../helpers/role'
+import { askDomain } from '../framework/askDomain'
 import { SpotterCommand } from '../framework/SpotterCommand'
 import { roleArg } from './userArgs'
 
@@ -38,22 +39,8 @@ class UserSignCommand extends SpotterCommand {
       : undefined
     const role = args.role as Role | undefined
 
-    let reply: Awaited<ReturnType<typeof context.commandBus.send>>
-    try {
-      reply = await context.commandBus.send(
-        'user.sign',
-        { username, role },
-        context.session.user.recipientUuid,
-      )
-    } catch {
-      await context.reply('Сервис временно недоступен.')
-      return
-    }
-
-    if (!reply.ok) {
-      await context.reply(`Ошибка: ${reply.error}`)
-      return
-    }
+    const reply = await askDomain(context, 'user.sign', { username, role })
+    if (!reply) return
 
     const { code, role: grantedRole } = reply.data as {
       code: string

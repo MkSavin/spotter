@@ -1,5 +1,5 @@
 import {
-  bufferToJson,
+  parsedController,
   type StreamMessageController,
   safeParseCatalogRequest,
 } from '@spotter/transport'
@@ -16,21 +16,17 @@ import type { SinkContext } from '../runtime/context'
  */
 export const createCatalogRequestController = <TConfig extends SinkConfig>(
   republish: () => Promise<void>,
-): StreamMessageController<SinkContext<TConfig>> => {
-  return async (payload, context): Promise<void> => {
-    const value = bufferToJson(payload.message.value)
-    if (!value) return
+): StreamMessageController<SinkContext<TConfig>> =>
+  parsedController(
+    safeParseCatalogRequest,
+    async (request, context: SinkContext<TConfig>) => {
+      // An unaddressed request is a broadcast: every adapter answers.
+      if (request.source && request.source !== context.sourceId) return
 
-    const request = safeParseCatalogRequest(value)
-    if (!request) return
+      context.logger
+        .sub('catalog')
+        .debug(`Republishing catalog for "${context.sourceId}" on request`)
 
-    // An unaddressed request is a broadcast: every adapter answers.
-    if (request.source && request.source !== context.sourceId) return
-
-    context.logger
-      .sub('catalog')
-      .debug(`Republishing catalog for "${context.sourceId}" on request`)
-
-    await republish()
-  }
-}
+      await republish()
+    },
+  )

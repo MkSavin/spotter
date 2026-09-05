@@ -1,6 +1,5 @@
 import {
-  bufferToJson,
-  type StreamMessageController,
+  parsedController,
   safeParseDeliveryRecipient,
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
@@ -14,20 +13,15 @@ import { devicesRepo } from '../../db/repository'
  * that always fail is its own kind of broken. A revoked recipient loses its
  * devices outright.
  */
-export const recipientController: StreamMessageController<
-  TransportContext
-> = async (payload, context): Promise<void> => {
-  const value = bufferToJson(payload.message.value)
-  if (!value) return
+export const recipientController = parsedController(
+  safeParseDeliveryRecipient,
+  async (update, context: TransportContext) => {
+    if (update.action === 'revoke' || !update.role) {
+      devicesRepo.revoke(context.db, update.recipientUuid)
+      context.logger.debug(`revoked devices of ${update.recipientUuid}`)
+      return
+    }
 
-  const update = safeParseDeliveryRecipient(value)
-  if (!update) return
-
-  if (update.action === 'revoke' || !update.role) {
-    devicesRepo.revoke(context.db, update.recipientUuid)
-    context.logger.debug(`revoked devices of ${update.recipientUuid}`)
-    return
-  }
-
-  devicesRepo.setRole(context.db, update.recipientUuid, update.role)
-}
+    devicesRepo.setRole(context.db, update.recipientUuid, update.role)
+  },
+)

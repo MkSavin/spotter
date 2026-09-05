@@ -1,28 +1,20 @@
 import {
-  bufferToJson,
   eventCode,
-  type StreamMessageController,
+  parsedController,
   safeParseDeliveryEvent,
 } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { pushEventAction } from '../actions/pushEventAction'
 
-export const deliveryEventController: StreamMessageController<
-  TransportContext
-> = async (payload, context): Promise<void> => {
-  const { topic, message } = payload
+export const deliveryEventController = parsedController(
+  safeParseDeliveryEvent,
+  async (delivery, context: TransportContext, { topic }) => {
+    const logger = context.logger.sub(
+      topic,
+      eventCode(delivery.eventId),
+      delivery.action,
+    )
 
-  const value = bufferToJson(message.value)
-  if (!value) return
-
-  const delivery = safeParseDeliveryEvent(value)
-  if (!delivery) return
-
-  const logger = context.logger.sub(
-    topic,
-    eventCode(delivery.eventId),
-    delivery.action,
-  )
-
-  await pushEventAction(delivery, { ...context, logger })
-}
+    await pushEventAction(delivery, { ...context, logger })
+  },
+)

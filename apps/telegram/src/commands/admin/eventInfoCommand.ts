@@ -3,6 +3,7 @@ import type { BotContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
 import { escapeHtml } from '../../helpers/html'
 import { renderEvent } from '../../transport/view/renderEvent'
+import { askDomain } from '../framework/askDomain'
 import { SpotterCommand } from '../framework/SpotterCommand'
 
 class EventInfoCommand extends SpotterCommand {
@@ -24,24 +25,14 @@ class EventInfoCommand extends SpotterCommand {
   ): Promise<void> {
     const code = args.code
 
-    let reply: Awaited<ReturnType<typeof context.commandBus.send>>
-    try {
-      reply = await context.commandBus.send(
-        'event.info',
-        { code },
-        context.session.user.recipientUuid,
-      )
-    } catch {
-      await context.reply('Сервис временно недоступен.')
-      return
-    }
-
-    if (!reply.ok) {
+    // Any refusal means the same thing to the reader: no such event.
+    const reply = await askDomain(context, 'event.info', { code }, async () => {
       await context.replyWithHTML(
         `🔍 <b>Событие с кодом <code>${escapeHtml(code)}</code> не найдено</b>`,
       )
-      return
-    }
+      return true
+    })
+    if (!reply) return
 
     const { event } = reply.data as { event: SpotterEvent }
     const messagesCount = eventMessagesRepo.count(context.db, event.id)

@@ -1,3 +1,4 @@
+import { trySendCommand } from '@spotter/transport'
 import type { BotContext } from '../context'
 import { tgBindingsRepo, tgChatsRepo } from '../db/repository'
 import type { Role } from '../db/schema'
@@ -19,19 +20,20 @@ export const loginWithCode = async (
   const tgUserId = from.id.toString()
   const tgChatId = context.chatId.toString()
 
-  let reply: Awaited<ReturnType<typeof context.commandBus.send>>
+  // No principal yet: redeeming the code is what creates one.
+  const outcome = await trySendCommand(context.commandBus, 'login.redeem', {
+    code: code.trim(),
+    tgUserId,
+    tgChatId,
+    username: from.username,
+  })
 
-  try {
-    reply = await context.commandBus.send('login.redeem', {
-      code: code.trim(),
-      tgUserId,
-      tgChatId,
-      username: from.username,
-    })
-  } catch {
+  if (!outcome.reached) {
     await context.reply('Сервис временно недоступен. Попробуйте позже.')
     return
   }
+
+  const { reply } = outcome
 
   if (!reply.ok) {
     const reason = reply.error

@@ -1,8 +1,4 @@
-import {
-  bufferToJson,
-  type StreamMessageController,
-  safeParseProbeResult,
-} from '@spotter/transport'
+import { parsedController, safeParseProbeResult } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 
 const refusal = (reason: string): string =>
@@ -15,31 +11,26 @@ const staged = (camera: string, frames: number): string =>
 
 <i>Если ничего не пришло за пару минут — сломано что-то настоящее, и это ровно то, что тест ищет.</i>`
 
-export const probeResultController: StreamMessageController<
-  TransportContext
-> = async (payload, context): Promise<void> => {
-  const value = bufferToJson(payload.message.value)
-  if (!value) return
+export const probeResultController = parsedController(
+  safeParseProbeResult,
+  async (result, context: TransportContext) => {
+    // Without a chat to answer, the outcome is still worth a log line: an
+    // unanswered refusal is what makes `/test` look like the outage it detects.
+    if (result.chatId === undefined) {
+      context.logger.warn(
+        result.staged
+          ? `Probe staged on ${result.camera}, but nobody asked`
+          : `Probe refused: ${result.reason}`,
+      )
+      return
+    }
 
-  const result = safeParseProbeResult(value)
-  if (!result) return
+    const text = result.staged
+      ? staged(result.camera ?? '—', result.frames ?? 0)
+      : refusal(result.reason ?? 'Причина неизвестна.')
 
-  // Without a chat to answer, the outcome is still worth a log line: an
-  // unanswered refusal is what makes `/test` look like the outage it detects.
-  if (result.chatId === undefined) {
-    context.logger.warn(
-      result.staged
-        ? `Probe staged on ${result.camera}, but nobody asked`
-        : `Probe refused: ${result.reason}`,
-    )
-    return
-  }
-
-  const text = result.staged
-    ? staged(result.camera ?? '—', result.frames ?? 0)
-    : refusal(result.reason ?? 'Причина неизвестна.')
-
-  await context.bot.api.sendMessage(result.chatId, text, {
-    parse_mode: 'HTML',
-  })
-}
+    await context.bot.api.sendMessage(result.chatId, text, {
+      parse_mode: 'HTML',
+    })
+  },
+)
