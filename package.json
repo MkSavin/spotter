@@ -13,7 +13,6 @@
     "test:coverage": "bun run pretest && bun test apps packages --coverage",
     "build": "bun --filter '*' build",
     "typecheck": "tsc --noEmit",
-    "typecheck:full": "tsc --noEmit",
     "green": "tsc --noEmit && bun run test && biome check",
     "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && lefthook install || true",
     "sign:token": "bun apps/server/src/cli.ts sign",
@@ -35,6 +34,8 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.8",
     "@changesets/cli": "3.0.0",
+    "@changesets/read": "^1.0.0",
+    "@changesets/write": "^1.0.0",
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "@manypkg/get-packages": "^3.1.0",

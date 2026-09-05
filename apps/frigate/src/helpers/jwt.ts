@@ -63,7 +63,7 @@ const base64UrlDecode = (input: string): Buffer => {
   return Buffer.from(str, 'base64')
 }
 
-export const jwtSign = (
+const jwtSign = (
   payload: JwtPayload,
   secret: string | Buffer,
   options?: JwtSignOptions,
@@ -107,7 +107,7 @@ export const jwtSign = (
   return `${message}.${signatureEncoded}`
 }
 
-export const jwtDecode = (token: string) => {
+const jwtDecode = (token: string) => {
   const parts = token.split('.')
   if (parts.length !== 3) throw new Error('Invalid token')
 
@@ -127,7 +127,7 @@ export const jwtDecode = (token: string) => {
   }
 }
 
-export const jwtVerify = (
+const jwtVerify = (
   token: string,
   secret: string | Buffer,
   opts?: {

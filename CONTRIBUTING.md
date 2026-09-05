@@ -60,9 +60,8 @@ if (seen.has(event.id)) return
   Импорты сортируются автоматически.
 - `noExplicitAny` и `noForEach` выключены — `any` допустим там, где иначе никак.
 - `process.env` читаем **только** в `config.ts` сервиса, через `env`-хелпер.
-- Перед завершением задачи — `bun run green` (typecheck + тесты затронутых
-  пакетов + biome). Полный прогон нужен редко: `bun run test`,
-  `bun run typecheck:full`.
+- Перед завершением задачи — `bun run green` (typecheck + тесты + biome по
+  всему репо).
 
 Подробнее об архитектурных конвенциях (Regulator, Controller → Action,
 логирование, единый `.env`) — в [AGENTS.md](AGENTS.md).

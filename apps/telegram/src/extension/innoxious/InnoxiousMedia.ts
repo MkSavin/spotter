@@ -91,12 +91,6 @@ const resolveAccurateInput = async <Input extends MediaInput>(
 ): Promise<Input> =>
   ({ ...handler.input, media: await resolveAccurateSource(handler) }) as Input
 
-export const innoxiousHelpers = {
-  toMediaHandler,
-  resolveNaiveSource,
-  resolveAccurateSource,
-}
-
 export class InnoxiousMedia<Input extends MediaInput> {
   protected readonly handler: MediaHandler<Input>
   private naivePromise: Promise<Input> | undefined

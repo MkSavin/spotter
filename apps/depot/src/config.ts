@@ -4,6 +4,8 @@ import {
   redactConfig,
   requireConfig,
   resolveRedisConfig,
+  resolveS3Config,
+  type S3Config,
 } from '@spotter/transport'
 import information from '../package.json'
 import { applicationLogger } from './log'
@@ -48,12 +50,7 @@ export type CoreConfig = {
   /** Staged streams this replica subscribes to. */
   lane: Lane
 
-  s3: {
-    host: string
-    accessKey: string
-    secretKey: string
-    bucket: string
-  }
+  s3: S3Config
 
   directory: {
     cleanupStrategy: (typeof cleanupStrategies)[number]
@@ -70,12 +67,7 @@ export const resolveConfig = (): CoreConfig => {
       clientId: information.name,
     }),
     lane: env.enum('DEPOT_LANE', lanes, 'all'),
-    s3: {
-      host: env.string('S3_HOST', ''),
-      accessKey: env.string('S3_ACCESS', ''),
-      secretKey: env.string('S3_SECRET', ''),
-      bucket: env.string('S3_BUCKET', 'spotter'),
-    },
+    s3: resolveS3Config(),
     directory: {
       cleanupStrategy: env.enum(
         'DIRECTORY_CLEANUP',

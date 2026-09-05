@@ -8,6 +8,8 @@ import type {
   RedisConnection,
   StreamProducer,
 } from '@spotter/transport'
+// grammY types its API signals with this package's AbortSignal, and the
+// built-in one is not assignable to it.
 import type { AbortSignal } from 'abort-controller'
 import type { S3Client } from 'bun'
 import type {

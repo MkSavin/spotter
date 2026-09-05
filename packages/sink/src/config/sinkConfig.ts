@@ -1,14 +1,10 @@
-import type { RedisConfig } from '@spotter/transport'
+import type { RedisConfig, S3Config } from '@spotter/transport'
 
 /**
  * S3 connection used to stage raw NVR media for depot to transcode. Optional in
  * the base config: ingest-only adapters (no MediaProvider) don't need it.
  */
-export type SinkS3Config = {
-  host: string
-  accessKey: string
-  secretKey: string
-  bucket: string
+export type SinkS3Config = S3Config & {
   /** Key prefix under which raw (untranscoded) media is staged. */
   stagingPrefix: string
 }
