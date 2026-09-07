@@ -75,6 +75,33 @@ mqtt:
 
 ---
 
+## Если в Frigate включена авторизация
+
+Секция `auth` в `config.yml` закрывает и API. Spotter не логинится, а подписывает токен сам — значит секрет должен быть **один и тот же** с обеих сторон.
+
+Свой Frigate ищет так: `FRIGATE_JWT_SECRET` в окружении → `/run/secrets/` → опции Home Assistant → `config/.jwt_secret`. Не нашёл — сгенерирует сам при первом старте.
+
+Проще всего задать общий явно:
+
+```bash
+openssl rand -hex 32
+```
+
+Значение — в оба места: `FRIGATE_JWT_SECRET` в compose Frigate и `FRIGATE_AUTH_SECRET` в нашем `.env`. `FRIGATE_AUTH_USER` — существующий пользователь NVR.
+
+Если Frigate уже сгенерировал секрет и менять его не хочется — просто скопируй:
+
+```bash
+docker exec frigate cat /config/.jwt_secret   # чужой контейнер, не наш compose
+./spotter exec frigate printenv FRIGATE_AUTH_SECRET
+```
+
+Задание `FRIGATE_JWT_SECRET` перебивает существующий `.jwt_secret` — сессии в веб-интерфейсе Frigate разлогинятся.
+
+**Как выглядит расхождение:** `401` в логах адаптера, событий нет, медиа и список камер недоступны. `./spotter doctor` и `/status` в боте скажут «NVR отклоняет авторизацию» — эта строка идёт выше остальных, потому что остальные её следствия.
+
+---
+
 ## Вариант 1. Одна машина (`single`)
 
 Самый простой: и камеры, и Telegram на одной машине.
@@ -192,6 +219,7 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 | «Список камер пока недоступен» | адаптер не достучался до Frigate — `./spotter doctor` на ingest |
 | `client version 1.25 is too old` | старый образ watchtower — `git pull` и `./spotter update` |
 | Нет видео в сообщениях | не заполнены `S3_*` или бакет недоступен |
+| `401` от Frigate, каталог и медиа пусты | `FRIGATE_AUTH_SECRET` разошёлся с JWT-секретом NVR (см. выше) |
 | `port is already allocated` (1883) | у тебя уже есть свой MQTT — выбери «готовый брокер» |
 | `getaddrinfo ESERVFAIL` | адаптер не видит брокер по имени — укажи `MQTT_NETWORK` (сеть брокера) |
 | События не приходят, всё зелёное | Frigate не публикует в тот брокер — проверь `mqtt` в его `config.yml` |

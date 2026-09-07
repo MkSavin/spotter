@@ -192,7 +192,7 @@ const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
         status: 'fail',
         detail: probe.out.slice(0, 160) || 'нет ответа',
         hint: probe.out.includes('401')
-          ? 'проверь FRIGATE_AUTH_SECRET в .env'
+          ? 'NVR отклоняет авторизацию: FRIGATE_AUTH_SECRET в .env должен совпадать с JWT-секретом Frigate (FRIGATE_JWT_SECRET или config/.jwt_secret), FRIGATE_AUTH_USER — существующий пользователь'
           : 'проверь FRIGATE_REMOTE_URL и FRIGATE_AUTH_SECRET в .env',
       },
     ]
