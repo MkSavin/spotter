@@ -1,7 +1,21 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { resolveConfig } from './config'
 
 const saved = { ...process.env }
+
+/**
+ * What `resolveConfig` demands before it will return anything. Set explicitly
+ * because Bun loads the repository's own `.env`, so a test that relied on the
+ * ambient environment passed here and failed in CI, where no `.env` exists.
+ */
+const required = {
+  REDIS_URL: 'redis://localhost:6379',
+  MQTT_BROKER: 'mqtt://localhost:1883',
+  S3_HOST: 'https://s3.example',
+  S3_ACCESS: 'access',
+  S3_SECRET: 'secret',
+  FRIGATE_URL: 'https://frigate.example',
+}
 
 /** Only the keys under test; the rest keeps whatever the environment had. */
 const withEnv = (vars: Record<string, string | undefined>) => {
@@ -11,14 +25,19 @@ const withEnv = (vars: Record<string, string | undefined>) => {
   }
 }
 
+beforeEach(() => {
+  // A stray FRIGATE_* from the developer's own `.env` would decide the result.
+  process.env = { ...saved, ...required }
+  delete process.env.FRIGATE_REMOTE_URL
+  delete process.env.FRIGATE_AUTH_ROLE
+})
+
 afterEach(() => {
   process.env = { ...saved }
 })
 
 describe('frigate credentials', () => {
   test('the role defaults to admin, which exports and manual events need', () => {
-    withEnv({ FRIGATE_AUTH_ROLE: undefined })
-
     expect(resolveConfig().frigate.authRole).toBe('admin')
   })
 })
