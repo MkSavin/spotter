@@ -213,6 +213,45 @@ const nvrSecret = async (): Promise<{
  * names the side that is wrong. Runs only on a 401, where the extra `docker
  * exec` into the NVR's own container is worth it.
  */
+/**
+ * Tries the same token against the NVR reached directly, bypassing whatever
+ * fronts it.
+ *
+ * A refusal that clears on the direct route is not a credentials problem: the
+ * token never reached Frigate, because something between consumed the
+ * `Authorization` header. Frigate answers both cases with an identical nginx
+ * 401, so only the second route tells them apart.
+ */
+const reachableDirectly = async (
+  composeArgs: string[],
+): Promise<string | null> => {
+  const script = [
+    'const {createHmac} = require("node:crypto");',
+    'const e = process.env;',
+    'const b = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");',
+    'const now = Math.floor(Date.now() / 1000);',
+    'const m = b({alg:"HS256",typ:"JWT"}) + "." + b({sub:e.FRIGATE_AUTH_USER,',
+    'role:e.FRIGATE_AUTH_ROLE||"admin",iat:now,exp:now+600});',
+    'const t = m + "." + createHmac("sha256",e.FRIGATE_AUTH_SECRET||"")',
+    '.update(m).digest("base64url");',
+    // The NVR's own container, on the network the adapter already shares.
+    'for (const base of ["http://frigate:5000","https://frigate:8971"]) {',
+    'try {',
+    'const r = await fetch(base + "/api/config",{headers:{Authorization:"Bearer " + t},',
+    'tls:{rejectUnauthorized:false},signal:AbortSignal.timeout(4000)});',
+    'if (r.ok) { console.log("DIRECT " + base); break }',
+    '} catch {}',
+    '}',
+  ].join('')
+
+  const probe = await inService(
+    composeArgs,
+    'spotter-frigate',
+    `bun -e '${script}' 2>&1 | tail -c 120`,
+  )
+  return probe.out.match(/DIRECT (\S+)/)?.[1] ?? null
+}
+
 const explainRefusal = async (composeArgs: string[]): Promise<string> => {
   const probe = await inService(
     composeArgs,
@@ -233,7 +272,12 @@ const explainRefusal = async (composeArgs: string[]): Promise<string> => {
     return `секреты РАЗНЫЕ. У нас sha=${ours}, у NVR sha=${theirs.digest} из ${theirs.source}. Приведи FRIGATE_AUTH_SECRET к значению оттуда${theirs.source.includes('env') ? ' — правка config/.jwt_secret ничего не даст, переменная её перекрывает' : ''}`
   }
 
-  return `секреты совпадают (sha=${ours}, источник NVR — ${theirs.source}), значит дело не в них. Скорее всего запрос идёт через проксю, которая срезает заголовок Authorization: проверь, что она его пробрасывает`
+  // Same secret on both sides and still refused: suspect the route, not the key.
+  const direct = await reachableDirectly(composeArgs)
+  if (direct) {
+    return `секреты совпадают (sha=${ours}), и тот же токен принимается по прямому адресу ${direct}. Значит до Frigate он не доходит — заголовок Authorization забирает себе то, что стоит перед ним (облачный KeenDNS проксирует через свой сервер). Поставь FRIGATE_URL=${direct}`
+  }
+  return `секреты совпадают (sha=${ours}, источник NVR — ${theirs.source}), и по прямому адресу NVR отсюда не виден. Причина либо в прокси перед Frigate (забирает Authorization себе), либо в самом Frigate — посмотри его логи с logger.default: debug`
 }
 
 const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
