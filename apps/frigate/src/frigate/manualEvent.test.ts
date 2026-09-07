@@ -6,6 +6,7 @@ const config = {
   remoteUrl: 'https://nvr.local',
   authSecret: 'secret',
   authUser: 'admin',
+  authRole: 'admin',
 }
 
 const originalFetch = globalThis.fetch

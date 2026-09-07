@@ -12,6 +12,7 @@ const config: FrigateMediaConfig = {
   remoteUrl: 'https://nvr.local',
   authSecret: 'secret',
   authUser: 'spotter',
+  authRole: 'admin',
 }
 
 const span = {

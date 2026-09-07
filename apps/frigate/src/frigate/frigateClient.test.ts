@@ -13,6 +13,7 @@ const config: FrigateMediaConfig = {
   remoteUrl: 'https://frigate.example.com/',
   authSecret: 'topsecret',
   authUser: 'spotter',
+  authRole: 'admin',
 }
 
 describe('frigateClient', () => {
@@ -22,6 +23,11 @@ describe('frigateClient', () => {
       ['https://frigate.example.com', 'https://frigate.example.com'],
       ['https://frigate.example.com/?token=x', 'https://frigate.example.com'],
       ['  https://host.tld/path/  ', 'https://host.tld/path'],
+      // A port used to defeat the trailing-slash strip, sending every
+      // request to `//api/...`.
+      ['http://frigate:5000/', 'http://frigate:5000'],
+      ['http://frigate:5000', 'http://frigate:5000'],
+      ['http://192.168.1.10:8971///', 'http://192.168.1.10:8971'],
     ]
     for (const [input, expected] of cases) {
       expect(normalizeHostUrl(input)).toBe(expected)
@@ -52,6 +58,23 @@ describe('frigateClient', () => {
     const payload = jwt.verify(token, 'topsecret') as JwtPayload
     expect(payload.sub).toBe('spotter')
     expect(payload.exp).toBeGreaterThan(Date.now() / 1000)
+  })
+
+  // Frigate rejects a token missing any of these, whatever the secret is:
+  // `if "role" not in token.claims: return fail_response`.
+  test('the token carries every claim Frigate demands', () => {
+    const payload = jwt.decode(mintFrigateJwt(config)).payload as JwtPayload
+
+    expect(payload.sub).toBe('spotter')
+    expect(payload.role).toBe('admin')
+    expect(payload.exp).toBeDefined()
+  })
+
+  test('timestamps are whole seconds, since Frigate compares integers', () => {
+    const payload = jwt.decode(mintFrigateJwt(config)).payload as JwtPayload
+
+    expect(Number.isInteger(payload.exp)).toBe(true)
+    expect(Number.isInteger(payload.iat)).toBe(true)
   })
 
   test('media request carries the bearer header', () => {

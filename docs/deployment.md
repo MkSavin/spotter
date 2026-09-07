@@ -87,7 +87,9 @@ mqtt:
 openssl rand -hex 32
 ```
 
-Значение — в оба места: `FRIGATE_JWT_SECRET` в compose Frigate и `FRIGATE_AUTH_SECRET` в нашем `.env`. `FRIGATE_AUTH_USER` — существующий пользователь NVR.
+Значение — в оба места: `FRIGATE_JWT_SECRET` в compose Frigate и `FRIGATE_AUTH_SECRET` в нашем `.env`. `FRIGATE_AUTH_USER` — существующий пользователь NVR, `FRIGATE_AUTH_ROLE` — его роль (по умолчанию `admin`; экспорт таймлапсов и manual-события доступны только админу).
+
+Адрес NVR (`FRIGATE_REMOTE_URL`) может быть любым, до которого достаёт контейнер адаптера: имя контейнера в общей сети, IP в локальной, домен снаружи. «Remote» в имени — про то, что NVR отдельный сервис, а не про интернет. Порт указывается как обычно: `http://frigate:5000`.
 
 Если Frigate уже сгенерировал секрет и менять его не хочется — просто скопируй:
 

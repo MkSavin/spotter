@@ -30,12 +30,16 @@ export const frigateUrls = {
   exportFile: '{host}/exports/{file}',
 } as const
 
-/** Strips trailing slash / query noise from the configured host URL. */
+/**
+ * Strips trailing slashes and query noise from the configured host URL.
+ *
+ * Hand-rolled rather than `new URL()`: the value may carry a path prefix behind
+ * a reverse proxy, which `origin` would discard. The port matters — the earlier
+ * character class excluded `:`, so `http://frigate:5000/` kept its slash and
+ * every request went to `//api/...`.
+ */
 export const normalizeHostUrl = (hostUrl: string): string =>
-  hostUrl.replaceAll(
-    /^\s*((?:http|ftp)s?:\/\/[\w./]*?)\/?(?:\?.*)?\s*$/gi,
-    '$1',
-  )
+  hostUrl.trim().replace(/\?.*$/, '').replace(/\/+$/, '')
 
 /** Substitutes `{host}` and named params into a Frigate URL template. */
 export const settleUrl = (
@@ -53,16 +57,25 @@ export const settleUrl = (
 /**
  * Mints a short-lived Frigate JWT. The secret never leaves this process — only
  * staged S3 keys travel downstream.
+ *
+ * Frigate requires `sub`, `role` and `exp`, and rejects the token outright when
+ * any is missing — a token without `role` fails no matter how right the secret
+ * is. Timestamps are whole seconds because it compares them as integers.
  */
-export const mintFrigateJwt = (config: FrigateMediaConfig): string =>
-  jwt.sign(
+export const mintFrigateJwt = (config: FrigateMediaConfig): string => {
+  const now = Math.floor(Date.now() / 1000)
+
+  return jwt.sign(
     {
       sub: config.authUser,
-      exp: Date.now() / 1000 + 60 * 60 * 3,
+      role: config.authRole,
+      iat: now,
+      exp: now + 60 * 60 * 3,
     },
     config.authSecret || '',
     { algorithm: 'HS256' },
   )
+}
 
 /** Authorization header carrying a fresh Frigate JWT. */
 export const frigateAuthHeaders = (
