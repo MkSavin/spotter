@@ -396,6 +396,21 @@ const COMMANDS: Record<string, Command> = {
     },
   },
 
+  dlq: {
+    usage: '[--replay]',
+    about: 'Записи, отброшенные после всех попыток',
+    run: async (rest) => {
+      const mode = requireMode()
+      const { inspect, replay } = await import('./dlq')
+      const args = composeArgs(mode)
+      process.exit(
+        (rest.includes('--replay') ? await replay(args) : await inspect(args))
+          ? 0
+          : 1,
+      )
+    },
+  },
+
   compose: {
     usage: '<аргументы>',
     about: 'Любая docker compose команда',
