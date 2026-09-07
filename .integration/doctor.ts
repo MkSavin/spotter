@@ -168,10 +168,21 @@ const checkMqtt = async (
 const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
   // Parsed inside the container: truncating the JSON here cut `cameras` off and
   // reported a healthy Frigate as broken.
+  // Signs a JWT the way the adapter does. Sending the raw secret as the bearer
+  // token — as this once did — is refused by any NVR with auth switched on,
+  // so the check reported a credentials problem that did not exist.
   const script = [
+    'const {createHmac} = require("node:crypto");',
     'const e = process.env;',
-    'const r = await fetch(e.FRIGATE_REMOTE_URL + "/api/config",',
-    '{headers:{Authorization:"Bearer " + e.FRIGATE_AUTH_SECRET}});',
+    'const url = (e.FRIGATE_URL || e.FRIGATE_REMOTE_URL || "").trim()',
+    '.replace(/\\?.*$/, "").replace(/\\/+$/, "");',
+    'const b = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");',
+    'const now = Math.floor(Date.now() / 1000);',
+    'const m = b({alg:"HS256",typ:"JWT"}) + "." + b({sub:(e.FRIGATE_AUTH_USER||"").trim(),',
+    'role:(e.FRIGATE_AUTH_ROLE||"admin").trim(),iat:now,exp:now+600});',
+    'const t = m + "." + createHmac("sha256",(e.FRIGATE_AUTH_SECRET||"").trim())',
+    '.update(m).digest("base64url");',
+    'const r = await fetch(url + "/api/config",{headers:{Authorization:"Bearer " + t}});',
     'if(!r.ok){console.log("HTTP " + r.status);process.exit(0)}',
     'const c = await r.json();',
     'console.log("OK " + Object.keys(c.cameras ?? {}).length + " " + (c.version ?? "?"))',
@@ -193,7 +204,7 @@ const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
         detail: probe.out.slice(0, 160) || 'нет ответа',
         hint: probe.out.includes('401')
           ? 'NVR отклоняет авторизацию: FRIGATE_AUTH_SECRET в .env должен совпадать с JWT-секретом Frigate (FRIGATE_JWT_SECRET или config/.jwt_secret), FRIGATE_AUTH_USER — существующий пользователь'
-          : 'проверь FRIGATE_REMOTE_URL и FRIGATE_AUTH_SECRET в .env',
+          : 'проверь FRIGATE_URL и FRIGATE_AUTH_SECRET в .env',
       },
     ]
   }

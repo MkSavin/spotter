@@ -99,11 +99,15 @@ export const resolveConfig = (): CoreConfig => {
       },
     },
     frigate: {
-      remoteUrl: env.string('FRIGATE_REMOTE_URL', ''),
-      authSecret: env.string('FRIGATE_AUTH_SECRET', ''),
-      authUser: env.string('FRIGATE_AUTH_USER', ''),
+      remoteUrl: env
+        .string('FRIGATE_URL', env.string('FRIGATE_REMOTE_URL', ''))
+        .trim(),
+      // Trimmed on purpose: Frigate `.strip()`s its own `.jwt_secret`, so a
+      // value copied from it with a trailing newline would sign differently.
+      authSecret: env.string('FRIGATE_AUTH_SECRET', '').trim(),
+      authUser: env.string('FRIGATE_AUTH_USER', '').trim(),
       // Exports and manual events are admin-only on the NVR side.
-      authRole: env.string('FRIGATE_AUTH_ROLE', 'admin'),
+      authRole: env.string('FRIGATE_AUTH_ROLE', 'admin').trim(),
     },
     probeEndpoint: env.string('PROBE_ENDPOINT', ''),
     timelapseStatePath: env.string(
@@ -120,7 +124,7 @@ export const resolveConfig = (): CoreConfig => {
     S3_HOST: result.s3?.host,
     S3_ACCESS: result.s3?.accessKey,
     S3_SECRET: result.s3?.secretKey,
-    FRIGATE_REMOTE_URL: result.frigate.remoteUrl,
+    FRIGATE_URL: result.frigate.remoteUrl,
   })
 
   if (result.source.type === 'frigate' && !result.source.frigate.broker) {

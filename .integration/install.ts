@@ -221,8 +221,8 @@ if (mode === 'ingest') {
   say('  Доступ к Frigate/NVR (живёт только на этом узле):')
   env = setEnv(
     env,
-    'FRIGATE_REMOTE_URL',
-    await ask('FRIGATE_REMOTE_URL', 'https://frigate.example.local'),
+    'FRIGATE_URL',
+    await ask('FRIGATE_URL', 'http://frigate:5000'),
   )
   env = setEnv(
     env,

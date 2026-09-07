@@ -14,7 +14,7 @@ bun test
 ```
 Окружение: единый `.env` узла (см. [.env.example](../../.env.example) для single,
 [.env.ingest.example](../../.env.ingest.example) для ingest). Сервис читает `REDIS_URL`,
-`S3_*` (стейджинг сырья), `TZ`, `S3_STAGING_PREFIX`, `FRIGATE_REMOTE_URL` /
+`S3_*` (стейджинг сырья), `TZ`, `S3_STAGING_PREFIX`, `FRIGATE_URL` /
 `FRIGATE_AUTH_USER` / `FRIGATE_AUTH_SECRET`, `MQTT_BROKER`; `SOURCE_TYPE` (по умолч.
 `frigate`) compose задаёт inline через `environment:`; consumer-группа и `SOURCE_ID` —
 с дефолтами в коде. `MQTT_BROKER` живёт в `.env`, а не в compose: брокер может быть
@@ -77,9 +77,10 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 
 - **claims.** Frigate требует `sub`, `role` и `exp` — `if "role" not in token.claims: return fail_response`. Роль берётся из `FRIGATE_AUTH_ROLE`.
 - **целые секунды.** `exp`/`iat` сравниваются как `int`, дробное значение из `Date.now() / 1000` не годится.
+- **пробелы.** Frigate `.strip()`-ает секрет из `.jwt_secret`, но не из `FRIGATE_JWT_SECRET`; скопированный перевод строки меняет подпись, поэтому `FRIGATE_AUTH_*` мы срезаем в конфиге.
 - **кодировка подписи.** base64url **сырого** дайджеста; закодированная hex-строка даёт токен вдвое длиннее, который не примет ни одна сторонняя реализация ([jwt.test.ts](src/helpers/jwt.test.ts) проверяет независимой реализацией, а не собственным `verify`).
 
-`FRIGATE_REMOTE_URL` — любой адрес, достижимый из контейнера адаптера; «remote» про отдельный сервис, не про интернет. URL нормализуется вручную, а не через `new URL()`: за реверс-прокси в нём может быть префикс пути, который `origin` бы отбросил.
+`FRIGATE_URL` (прежнее имя `FRIGATE_REMOTE_URL` ещё читается) — любой адрес, достижимый из контейнера адаптера. URL нормализуется вручную, а не через `new URL()`: за реверс-прокси в нём может быть префикс пути, который `origin` бы отбросил.
 
 `401`/`403` отличается от прочих сбоев: `readNvrHealth` возвращает `unauthorized`, [watchCameraHealth](src/frigate/watchCameraHealth.ts) логирует ошибку один раз на переход, а не раз в минуту, и поднимает флаг в heartbeat — `/status` печатает его выше остальных строк, потому что медиа, каталог и счётчики камер отваливаются вместе.
 

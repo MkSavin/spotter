@@ -101,7 +101,7 @@ services:
       REDIS_URL: redis://redis:6379
       SOURCE_TYPE: frigate
       MQTT_BROKER: mqtt://mosquitto:1883
-      FRIGATE_REMOTE_URL: http://frigate:5000
+      FRIGATE_URL: http://frigate:5000
       FRIGATE_AUTH_USER: admin
       FRIGATE_AUTH_SECRET: rig
       S3_HOST: http://minio:9000
