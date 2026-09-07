@@ -13,6 +13,7 @@ const config: FrigateMediaConfig = {
   authSecret: 'secret',
   authUser: 'spotter',
   authRole: 'admin',
+  tlsInsecure: false,
 }
 
 const span = {

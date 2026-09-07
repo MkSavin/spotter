@@ -14,6 +14,7 @@ const config: FrigateMediaConfig = {
   authSecret: 'topsecret',
   authUser: 'spotter',
   authRole: 'admin',
+  tlsInsecure: false,
 }
 
 describe('frigateClient', () => {
@@ -70,7 +71,7 @@ describe('frigateClient', () => {
     expect(payload.exp).toBeDefined()
   })
 
-  test('timestamps are whole seconds, since Frigate compares integers', () => {
+  test('timestamps are whole seconds, as JWT defines them', () => {
     const payload = jwt.decode(mintFrigateJwt(config)).payload as JwtPayload
 
     expect(Number.isInteger(payload.exp)).toBe(true)

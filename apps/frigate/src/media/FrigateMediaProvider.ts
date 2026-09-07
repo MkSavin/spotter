@@ -1,7 +1,7 @@
 import type { MediaFetch, MediaProvider } from '@spotter/sink'
 import type { FrigateMediaConfig } from '../config'
 import {
-  frigateAuthHeaders,
+  frigateFetch,
   frigateMediaRequest,
   frigateUrls,
   settleUrl,
@@ -58,9 +58,9 @@ export class FrigateMediaProvider implements MediaProvider {
 
   private async fetchEvent(eventId: string): Promise<FrigateEvent | null> {
     try {
-      const response = await fetch(
+      const response = await frigateFetch(
+        this.config,
         settleUrl(frigateUrls.event, this.config.remoteUrl, { id: eventId }),
-        { headers: frigateAuthHeaders(this.config) },
       )
       return response.ok ? ((await response.json()) as FrigateEvent) : null
     } catch {

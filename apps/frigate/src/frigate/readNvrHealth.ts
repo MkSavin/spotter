@@ -1,5 +1,5 @@
 import type { CoreConfig } from '../config'
-import { frigateAuthHeaders, frigateUrls, settleUrl } from './frigateClient'
+import { frigateFetch, frigateUrls, settleUrl } from './frigateClient'
 
 /** One camera as the NVR itself reports it. */
 export type CameraHealth = {
@@ -52,12 +52,10 @@ export const stalledCameras = (cameras: CameraHealth[]): CameraHealth[] =>
  */
 export const readNvrHealth = async (config: CoreConfig): Promise<NvrHealth> => {
   try {
-    const response = await fetch(
+    const response = await frigateFetch(
+      config.frigate,
       settleUrl(frigateUrls.stats, config.frigate.remoteUrl),
-      {
-        headers: frigateAuthHeaders(config.frigate),
-        signal: AbortSignal.timeout(10_000),
-      },
+      { signal: AbortSignal.timeout(10_000) },
     )
 
     if (response.status === 401 || response.status === 403) {

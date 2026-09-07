@@ -9,6 +9,7 @@ import type { TimelapseSpeed } from '@spotter/transport'
 import type { FrigateMediaConfig } from '../config'
 import {
   frigateAuthHeaders,
+  frigateFetch,
   frigateUrls,
   settleUrl,
 } from '../frigate/frigateClient'
@@ -45,12 +46,9 @@ export class FrigateTimelapseProvider implements TimelapseProvider {
       end: String(Math.ceil(span.end)),
     })
 
-    const response = await fetch(url, {
+    const response = await frigateFetch(this.config, url, {
       method: 'POST',
-      headers: {
-        ...frigateAuthHeaders(this.config),
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         playback: PLAYBACK[span.speed],
         source: 'recordings',
@@ -85,10 +83,7 @@ export class FrigateTimelapseProvider implements TimelapseProvider {
       id: jobId,
     })
 
-    await fetch(url, {
-      method: 'DELETE',
-      headers: frigateAuthHeaders(this.config),
-    })
+    await frigateFetch(this.config, url, { method: 'DELETE' })
   }
 
   /**
@@ -101,16 +96,19 @@ export class FrigateTimelapseProvider implements TimelapseProvider {
       settleUrl(frigateUrls.exportFile, this.config.remoteUrl, {
         file: encodeURIComponent(file),
       }),
-      { headers: frigateAuthHeaders(this.config) },
+      {
+        headers: frigateAuthHeaders(this.config),
+        ...(this.config.tlsInsecure
+          ? { tls: { rejectUnauthorized: false } }
+          : {}),
+      } as RequestInit,
     )
   }
 
   private async findExport(jobId: string): Promise<FrigateExport | null> {
     const url = settleUrl(frigateUrls.exportList, this.config.remoteUrl)
 
-    const response = await fetch(url, {
-      headers: frigateAuthHeaders(this.config),
-    })
+    const response = await frigateFetch(this.config, url)
 
     if (!response.ok) {
       // Distinguishable from "lost": the caller keeps polling on a throw.

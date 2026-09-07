@@ -5,6 +5,12 @@
 # hop is what production went two days without, and what our seeded test
 # events skip entirely.
 
+# On, so the rig exercises the authenticated API the way a real node does.
+# Without this the adapter talks to port 5000, which never checks a token, and
+# a malformed JWT passes unnoticed — which is exactly what happened.
+auth:
+  enabled: true
+
 mqtt:
   enabled: true
   host: mosquitto

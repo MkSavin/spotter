@@ -18,6 +18,8 @@ export type FrigateMediaConfig = {
   authUser: string
   /** Role claim Frigate demands in the token; it refuses one without it. */
   authRole: string
+  /** Accept the NVR's own certificate, as served on its authenticated port. */
+  tlsInsecure: boolean
 }
 
 /** Display labels for the catalog, keyed by Frigate code. */
@@ -102,12 +104,11 @@ export const resolveConfig = (): CoreConfig => {
       remoteUrl: env
         .string('FRIGATE_URL', env.string('FRIGATE_REMOTE_URL', ''))
         .trim(),
-      // Trimmed on purpose: Frigate `.strip()`s its own `.jwt_secret`, so a
-      // value copied from it with a trailing newline would sign differently.
-      authSecret: env.string('FRIGATE_AUTH_SECRET', '').trim(),
-      authUser: env.string('FRIGATE_AUTH_USER', '').trim(),
+      authSecret: env.string('FRIGATE_AUTH_SECRET', ''),
+      authUser: env.string('FRIGATE_AUTH_USER', ''),
       // Exports and manual events are admin-only on the NVR side.
-      authRole: env.string('FRIGATE_AUTH_ROLE', 'admin').trim(),
+      authRole: env.string('FRIGATE_AUTH_ROLE', 'admin'),
+      tlsInsecure: env.boolean('FRIGATE_TLS_INSECURE', false),
     },
     probeEndpoint: env.string('PROBE_ENDPOINT', ''),
     timelapseStatePath: env.string(

@@ -1,6 +1,6 @@
 import type { Stenograph } from 'stenograph'
 import type { CoreConfig } from '../config'
-import { frigateAuthHeaders, frigateUrls, settleUrl } from './frigateClient'
+import { frigateFetch, frigateUrls, settleUrl } from './frigateClient'
 
 export type MqttConfigState =
   | { state: 'enabled'; host: string }
@@ -22,12 +22,10 @@ export const readMqttConfig = async (
   config: CoreConfig,
 ): Promise<MqttConfigState> => {
   try {
-    const response = await fetch(
+    const response = await frigateFetch(
+      config.frigate,
       settleUrl(frigateUrls.config, config.frigate.remoteUrl),
-      {
-        headers: frigateAuthHeaders(config.frigate),
-        signal: AbortSignal.timeout(10_000),
-      },
+      { signal: AbortSignal.timeout(10_000) },
     )
 
     if (!response.ok) {

@@ -7,6 +7,7 @@ const config = {
   authSecret: 'secret',
   authUser: 'admin',
   authRole: 'admin',
+  tlsInsecure: false,
 }
 
 const originalFetch = globalThis.fetch

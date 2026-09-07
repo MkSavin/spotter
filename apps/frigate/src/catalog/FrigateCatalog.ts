@@ -3,11 +3,7 @@ import type { CatalogEntry } from '@spotter/transport'
 import type { Stenograph } from 'stenograph'
 import type { CoreConfig } from '../config'
 import { toCatalogEntries } from '../config'
-import {
-  frigateAuthHeaders,
-  frigateUrls,
-  settleUrl,
-} from '../frigate/frigateClient'
+import { frigateFetch, frigateUrls, settleUrl } from '../frigate/frigateClient'
 
 /** How long one `/api/config` read stays good before it is fetched again. */
 export const CONFIG_TTL_MS = 60_000
@@ -62,9 +58,8 @@ export class FrigateCatalog implements Catalog {
   } | null> {
     try {
       const url = settleUrl(frigateUrls.config, this.config.frigate.remoteUrl)
-      const response = await fetch(url, {
+      const response = await frigateFetch(this.config.frigate, url, {
         method: 'GET',
-        headers: frigateAuthHeaders(this.config.frigate),
       })
 
       if (!response.ok) {

@@ -1,6 +1,6 @@
 import type { Stenograph } from 'stenograph'
 import type { FrigateMediaConfig } from '../config'
-import { frigateAuthHeaders, frigateUrls, settleUrl } from './frigateClient'
+import { frigateFetch, frigateUrls, settleUrl } from './frigateClient'
 
 /**
  * Frigate can create an event on demand, and it records real footage for it —
@@ -25,14 +25,12 @@ export const createManualEvent = async (
   logger: Stenograph,
 ): Promise<string | undefined> => {
   try {
-    const response = await fetch(
+    const response = await frigateFetch(
+      config,
       settleUrl(frigateUrls.createEvent, config.remoteUrl, { camera, label }),
       {
         method: 'POST',
-        headers: {
-          ...frigateAuthHeaders(config),
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ duration, include_recording: true, score: 1 }),
         signal: AbortSignal.timeout(15_000),
       },
@@ -65,14 +63,12 @@ export const endManualEvent = async (
   logger: Stenograph,
 ): Promise<void> => {
   try {
-    await fetch(
+    await frigateFetch(
+      config,
       settleUrl(frigateUrls.endEvent, config.remoteUrl, { id: eventId }),
       {
         method: 'PUT',
-        headers: {
-          ...frigateAuthHeaders(config),
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
         signal: AbortSignal.timeout(15_000),
       },

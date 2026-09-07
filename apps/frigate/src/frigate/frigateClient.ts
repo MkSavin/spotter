@@ -60,7 +60,7 @@ export const settleUrl = (
  *
  * Frigate requires `sub`, `role` and `exp`, and rejects the token outright when
  * any is missing — a token without `role` fails no matter how right the secret
- * is. Timestamps are whole seconds because it compares them as integers.
+ * is. Timestamps are whole seconds, as JWT defines them.
  */
 export const mintFrigateJwt = (config: FrigateMediaConfig): string => {
   const now = Math.floor(Date.now() / 1000)
@@ -77,6 +77,25 @@ export const mintFrigateJwt = (config: FrigateMediaConfig): string => {
   )
 }
 
+/**
+ * `fetch` for the NVR: bearer token plus the TLS policy.
+ *
+ * The authenticated port serves a self-signed certificate Frigate generates
+ * itself, so reaching it at all means accepting that certificate. Gated behind
+ * `FRIGATE_TLS_INSECURE` rather than always on, since the same URL may sit
+ * behind a proxy with a real one.
+ */
+export const frigateFetch = (
+  config: FrigateMediaConfig,
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> =>
+  fetch(url, {
+    ...init,
+    headers: { ...frigateAuthHeaders(config), ...init.headers },
+    ...(config.tlsInsecure ? { tls: { rejectUnauthorized: false } } : {}),
+  } as RequestInit)
+
 /** Authorization header carrying a fresh Frigate JWT. */
 export const frigateAuthHeaders = (
   config: FrigateMediaConfig,
@@ -92,4 +111,7 @@ export const frigateMediaRequest = (
 ): Request =>
   new Request(settleUrl(template, config.remoteUrl, params), {
     headers: frigateAuthHeaders(config),
-  })
+    // Same reason as `frigateFetch`: whoever fetches this Request must accept
+    // the NVR's own certificate.
+    ...(config.tlsInsecure ? { tls: { rejectUnauthorized: false } } : {}),
+  } as RequestInit)

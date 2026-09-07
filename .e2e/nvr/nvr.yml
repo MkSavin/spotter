@@ -43,11 +43,15 @@ services:
   frigate:
     image: ghcr.io/blakeblackshear/frigate:0.17.2
     networks: [nvr]
+    environment:
+      # Shared with the adapter below: both sign and verify with this.
+      FRIGATE_JWT_SECRET: &jwt-secret rig-jwt-secret-000000000000000000000000000000000000000000000000
     shm_size: '128mb'
     # Shifted off Frigate's own numbers: 5000 is AirPlay on macOS, and the rig
     # should not fight whatever the developer already runs.
     ports:
       - '5050:5000'
+      - '8971:8971'
       - '8654:8554'
     volumes:
       # Writable: Frigate migrates its own config across versions, and a
@@ -101,9 +105,13 @@ services:
       REDIS_URL: redis://redis:6379
       SOURCE_TYPE: frigate
       MQTT_BROKER: mqtt://mosquitto:1883
-      FRIGATE_URL: http://frigate:5000
+      # 8971 is the authenticated port, and it speaks TLS with a self-signed
+      # certificate; 5000 lets anything through and would hide a broken token.
+      FRIGATE_URL: https://frigate:8971
       FRIGATE_AUTH_USER: admin
-      FRIGATE_AUTH_SECRET: rig
+      FRIGATE_AUTH_SECRET: *jwt-secret
+      # Frigate signs 8971 with a certificate it generates itself.
+      FRIGATE_TLS_INSECURE: 'true'
       S3_HOST: http://minio:9000
       S3_ACCESS: spotter
       S3_SECRET: spotter-nvr-rig

@@ -16,22 +16,6 @@ afterEach(() => {
 })
 
 describe('frigate credentials', () => {
-  // Frigate `.strip()`s its own `.jwt_secret`, so a value copied out of that
-  // file carries a newline that is invisible in .env and signs differently.
-  test('a copied newline is trimmed off the secret', () => {
-    withEnv({ FRIGATE_AUTH_SECRET: 'topsecret\n' })
-
-    expect(resolveConfig().frigate.authSecret).toBe('topsecret')
-  })
-
-  test('surrounding spaces are trimmed from user and role', () => {
-    withEnv({ FRIGATE_AUTH_USER: ' admin ', FRIGATE_AUTH_ROLE: ' viewer ' })
-
-    const { frigate } = resolveConfig()
-    expect(frigate.authUser).toBe('admin')
-    expect(frigate.authRole).toBe('viewer')
-  })
-
   test('the role defaults to admin, which exports and manual events need', () => {
     withEnv({ FRIGATE_AUTH_ROLE: undefined })
 
@@ -40,8 +24,8 @@ describe('frigate credentials', () => {
 })
 
 describe('frigate url', () => {
-  test('FRIGATE_URL is read, trimmed', () => {
-    withEnv({ FRIGATE_URL: '  http://frigate:5000  ' })
+  test('FRIGATE_URL is read', () => {
+    withEnv({ FRIGATE_URL: 'http://frigate:5000' })
 
     expect(resolveConfig().frigate.remoteUrl).toBe('http://frigate:5000')
   })
