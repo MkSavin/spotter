@@ -101,8 +101,9 @@ const jwtSign = (
   const hashAlgorithm = getHashAlgorithm(algorithm)
   const hmac = createHmac(hashAlgorithm, secret)
   hmac.update(message)
-  const signature = hmac.digest('hex')
-  const signatureEncoded = base64UrlEncode(signature)
+  // base64url of the raw digest, per RFC 7515. Encoding the hex text instead
+  // yields a signature twice as long that no other implementation accepts.
+  const signatureEncoded = hmac.digest('base64url')
 
   return `${message}.${signatureEncoded}`
 }
@@ -117,7 +118,7 @@ const jwtDecode = (token: string) => {
 
   const header = JSON.parse(headerBuf.toString())
   const payload = JSON.parse(payloadBuf.toString())
-  const signature = signatureBuf.toString() // hex string in this implementation
+  const signature = signatureBuf.toString('base64url')
 
   return {
     header,
@@ -151,10 +152,9 @@ const jwtVerify = (
   const hmac = createHmac(hashAlgorithm, secret)
   const message = `${headerPart}.${payloadPart}`
   hmac.update(message)
-  const expectedHex = hmac.digest('hex')
-  const expectedEncoded = base64UrlEncode(expectedHex)
+  const expected = hmac.digest('base64url')
 
-  if (expectedEncoded !== signaturePart) throw new Error('Invalid signature')
+  if (expected !== signaturePart) throw new Error('Invalid signature')
 
   const now = Math.floor(Date.now() / 1000)
   if (payload.exp !== undefined && now > payload.exp)

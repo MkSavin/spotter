@@ -71,6 +71,21 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 (HS256, `FRIGATE_AUTH_*`). **Только здесь** живут креды NVR; рантайм фетчит этот `Request` и
 стейджит байты в S3 — по сети уходит лишь ключ S3.
 
+### Если в Frigate включена авторизация
+
+Мы не логинимся, а подписываем JWT сами — значит `FRIGATE_AUTH_SECRET` должен быть **тем же секретом**, которым Frigate проверяет подпись. Свой он ищет так: `FRIGATE_JWT_SECRET` в окружении → файл в `/run/secrets/` → опции Home Assistant → `config/.jwt_secret`. Ничего нет — генерирует сам и пишет в `.jwt_secret`.
+
+Как настроить: сгенерировать `openssl rand -hex 32`, положить в `FRIGATE_JWT_SECRET` компоуза Frigate и в `FRIGATE_AUTH_SECRET` нашего `.env`. Задание `FRIGATE_JWT_SECRET` перебивает существующий `.jwt_secret` — сессии в UI разлогинятся. `FRIGATE_AUTH_USER` — существующий пользователь NVR.
+
+Симптом расхождения — `401` на `/api/stats` и `/api/config`, а с ними молча ломаются медиа и каталог. Поэтому 401/403 отличается от прочих сбоев: `readNvrHealth` возвращает `unauthorized`, адаптер логирует это ошибкой один раз на переход, а не раз в минуту, и поднимает `unauthorized` в heartbeat — `/status` показывает это выше всех остальных строк, потому что остальные её следствия.
+
+Проверить, что секреты совпадают:
+
+```sh
+docker exec frigate cat /config/.jwt_secret
+docker exec spotter-frigate printenv FRIGATE_AUTH_SECRET
+```
+
 ## TimelapseProvider — экспорт записей
 
 [FrigateTimelapseProvider](src/timelapse/FrigateTimelapseProvider.ts) реализует порт `TimelapseProvider` поверх `POST /api/export/{camera}/start/{start}/end/{end}`. Экспорт **асинхронный**: ручка возвращает `export_id`, дальше состояние читается из `GET /api/exports` до `in_progress: false`.

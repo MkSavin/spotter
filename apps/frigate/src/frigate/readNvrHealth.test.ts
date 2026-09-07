@@ -118,6 +118,23 @@ describe('readNvrHealth', () => {
     expect(deadCameras(health.cameras)).toHaveLength(1)
   })
 
+  test('401 — отказ авторизации, а не сбой опроса', async () => {
+    // A refusal will not clear on the next poll, and every media request fails
+    // the same way, so it must not hide among transient errors.
+    respond({}, 401)
+    expect(await readNvrHealth(config)).toEqual({
+      state: 'unauthorized',
+      status: 401,
+    })
+  })
+
+  test('403 — та же беда: NVR ответил и отказал', async () => {
+    respond({}, 403)
+    expect(await readNvrHealth(config)).toMatchObject({
+      state: 'unauthorized',
+    })
+  })
+
   test('нерабочий API — unknown, а не "всё хорошо"', async () => {
     respond({}, 500)
     expect((await readNvrHealth(config)).state).toBe('unknown')

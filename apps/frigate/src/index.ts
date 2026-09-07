@@ -56,6 +56,7 @@ runSink({
   probeActive: () => Boolean(config.probeEndpoint),
   heartbeatDetails: () => probeDetails(config),
   cameraHealth: cameraHealth.current,
+  sourceUnauthorized: cameraHealth.unauthorized,
 }).catch((error) => {
   applicationLogger.error(error)
   process.exit(1)

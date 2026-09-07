@@ -8,8 +8,16 @@ export const HEALTH_POLL_MS = 60_000
 export type CameraHealthWatch = {
   /** Latest reading, or undefined while the NVR has not answered yet. */
   current: () => { dead: string[]; stalled: string[] } | undefined
+  /** Whether the NVR is rejecting our credentials. */
+  unauthorized: () => boolean
   stop: () => void
 }
+
+/** Said once per transition, not once a minute: the fix is a human's to make. */
+const UNAUTHORIZED_HELP =
+  'NVR rejects our credentials — every media request will fail the same way. ' +
+  "FRIGATE_AUTH_SECRET must equal the NVR's own JWT secret " +
+  '(FRIGATE_JWT_SECRET, or config/.jwt_secret), and FRIGATE_AUTH_USER an existing user.'
 
 /**
  * Polls the NVR's own camera counters in the background.
@@ -25,10 +33,20 @@ export const watchCameraHealth = (
   intervalMs = HEALTH_POLL_MS,
 ): CameraHealthWatch => {
   let latest: { dead: string[]; stalled: string[] } | undefined
+  let denied = false
   let reported = ''
 
   const poll = async (): Promise<void> => {
     const health = await readNvrHealth(config)
+
+    if (health.state === 'unauthorized') {
+      if (!denied) logger.error(`${health.status}: ${UNAUTHORIZED_HELP}`)
+      denied = true
+      return
+    }
+
+    if (denied) logger.info('NVR accepts our credentials again')
+    denied = false
 
     if (health.state !== 'ok') {
       // Keep the last good reading: a failed probe is not evidence of health,
@@ -70,6 +88,7 @@ export const watchCameraHealth = (
 
   return {
     current: () => latest,
+    unauthorized: () => denied,
     stop: () => clearInterval(timer),
   }
 }

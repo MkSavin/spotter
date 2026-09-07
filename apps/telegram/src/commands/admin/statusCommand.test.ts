@@ -97,6 +97,33 @@ describe('/status: тишина источника', () => {
     expect(text).not.toContain('NVR не получает видео')
   })
 
+  test('отказ авторизации виден и в шапке, и у источника', async () => {
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 60_000,
+      eventCount: 5,
+      since: 90_000,
+      unauthorized: true,
+    })
+
+    // Without this the reader sees a connected source that quietly does
+    // nothing, and no reason why.
+    expect(text).toContain('NVR отклоняет авторизацию')
+    expect(text).toContain('NVR не принимает авторизацию')
+    expect(text).toContain('FRIGATE_AUTH_SECRET')
+  })
+
+  test('без отказа авторизации о ней не говорится', async () => {
+    const text = await render({
+      source: 'frigate',
+      lastEventAt: Date.now() - 60_000,
+      eventCount: 5,
+      since: 90_000,
+    })
+
+    expect(text).not.toContain('авторизаци')
+  })
+
   test('здоровые камеры не печатают лишнего', async () => {
     const text = await render({
       source: 'frigate',

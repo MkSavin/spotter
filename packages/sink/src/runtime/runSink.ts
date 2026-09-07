@@ -82,6 +82,8 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
    * that can ask their NVR should; the rest leave it unset.
    */
   cameraHealth?: () => { dead: string[]; stalled: string[] } | undefined
+  /** Whether the NVR is rejecting the adapter's credentials. */
+  sourceUnauthorized?: () => boolean
 }
 
 /**
@@ -214,6 +216,7 @@ export const runSink = async <TConfig extends SinkConfig>(
         // are different answers, and only one of them is reassuring.
         ...(health?.dead.length ? { deadCameras: health.dead } : {}),
         ...(health?.stalled.length ? { stalledCameras: health.stalled } : {}),
+        ...(options.sourceUnauthorized?.() ? { unauthorized: true } : {}),
       }
     },
   })

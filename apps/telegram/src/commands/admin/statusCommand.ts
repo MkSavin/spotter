@@ -60,6 +60,12 @@ const renderSource = (service: ServiceStatus): string => {
   const activity = service.source
   if (!activity) return ''
 
+  // Above the rest, because it explains the rest: while the NVR rejects us,
+  // media, catalog and camera counters all fail together.
+  const denied = activity.unauthorized
+    ? `\n    🚨 <b>NVR не принимает авторизацию</b> — медиа и каталог недоступны`
+    : ''
+
   // Shown above everything else about the source: while the link is down, the
   // event figures below describe a past that stopped updating.
   const contact = isSourceUnreachable(activity)
@@ -76,14 +82,14 @@ const renderSource = (service: ServiceStatus): string => {
   if (!activity.lastEventAt) {
     const waiting = formatUptime(activity.since)
     const mark = isSourceSilent(activity) ? '🔴' : '⏳'
-    return `${contact}\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)${cameraLine}`
+    return `${denied}${contact}\n    ${mark} <code>${activity.source}</code>: событий не было (${waiting} с запуска)${cameraLine}`
   }
 
   const ago = formatUptime(
     Math.round((Date.now() - activity.lastEventAt) / 1000),
   )
   const mark = isSourceSilent(activity) ? '🔴' : '🎥'
-  return `${contact}\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}${cameraLine}`
+  return `${denied}${contact}\n    ${mark} <code>${activity.source}</code>: последнее событие ${ago} назад, всего ${activity.eventCount}${cameraLine}`
 }
 
 /**
@@ -158,6 +164,19 @@ class StatusCommand extends SpotterCommand {
             .join(', ')} — проверь публикацию событий в MQTT\n\n`
         : ''
 
+    const unauthorized = services.filter(
+      (service) => service.source?.unauthorized,
+    )
+    // First of the alarms: the others are its symptoms, not separate faults.
+    const authAlarm =
+      unauthorized.length > 0
+        ? `🚨 <b>NVR отклоняет авторизацию:</b> ${unauthorized
+            .map((service) => `<code>${service.source?.source}</code>`)
+            .join(
+              ', ',
+            )} — <code>FRIGATE_AUTH_SECRET</code> должен совпадать с JWT-секретом NVR\n\n`
+        : ''
+
     const cameraAlarm =
       broken.length > 0
         ? `🔴 <b>NVR не получает видео:</b> ${broken
@@ -168,7 +187,7 @@ class StatusCommand extends SpotterCommand {
     await context.replyWithHTML(
       `🧩 <b>Состояние инфраструктуры</b>
 
-${cameraAlarm}${alarm}${blocks.join('\n\n')}
+${authAlarm}${cameraAlarm}${alarm}${blocks.join('\n\n')}
 
 ${offline > 0 ? `⚠️ Не отвечают: ${offline}\n\n` : ''}Платформа: <code>Bun ${Bun.version_with_sha}</code>`,
     )

@@ -13,6 +13,12 @@ export type CameraHealth = {
 
 export type NvrHealth =
   | { state: 'ok'; cameras: CameraHealth[] }
+  /**
+   * The NVR answered, and refused. A misconfiguration rather than a hiccup: it
+   * will not clear on the next poll, and every media request fails the same
+   * way, so it is reported instead of retried quietly.
+   */
+  | { state: 'unauthorized'; status: number }
   | { state: 'unknown'; reason: string }
 
 /** Cameras with detection on that are not producing frames. */
@@ -53,6 +59,10 @@ export const readNvrHealth = async (config: CoreConfig): Promise<NvrHealth> => {
         signal: AbortSignal.timeout(10_000),
       },
     )
+
+    if (response.status === 401 || response.status === 403) {
+      return { state: 'unauthorized', status: response.status }
+    }
 
     if (!response.ok) {
       return {

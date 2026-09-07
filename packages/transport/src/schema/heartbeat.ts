@@ -60,6 +60,14 @@ export const sourceActivitySchema = z.object({
   /** Cameras with video the detector never sees — no event can be produced. */
   stalledCameras: z.array(z.string().min(1)).optional(),
   /**
+   * The NVR is refusing the adapter's credentials.
+   *
+   * Worth its own field because it explains the others: media requests, the
+   * catalog and the camera counters all fail together, and without saying why
+   * the reader sees a source that is connected yet does nothing.
+   */
+  unauthorized: z.boolean().optional(),
+  /**
    * Whether this source's transport carries housekeeping traffic at all.
    *
    * Without it, "no contact" cannot be told apart from "this adapter never
