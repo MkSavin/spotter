@@ -179,31 +179,33 @@ const fingerprint = (variable: string): string =>
  * and only falls back to the file, so editing the file while the var is set
  * changes nothing — the mismatch that reads as a wrong secret in `.env`.
  */
-const nvrSecret = async (): Promise<{ source: string; print: string }> => {
+const nvrSecret = async (): Promise<{
+  source: string
+  digest: string
+} | null> => {
   const env =
     await $`docker exec frigate sh -c ${`node -e '${fingerprint('FRIGATE_JWT_SECRET')}'`}`
       .quiet()
       .nothrow()
-  const fromEnv = env.stdout.toString().trim()
-  if (fromEnv && fromEnv !== '(пусто)') {
-    return { source: 'FRIGATE_JWT_SECRET (env)', print: fromEnv }
+  const fromEnv = env.stdout
+    .toString()
+    .trim()
+    .match(/sha=([0-9a-f]{12})/)
+  if (fromEnv?.[1]) {
+    return { source: 'FRIGATE_JWT_SECRET (env)', digest: fromEnv[1] }
   }
 
   const file =
     await $`docker exec frigate sh -c ${'tr -d "\n" < /config/.jwt_secret | sha256sum'}`
       .quiet()
       .nothrow()
-  const digest = file.stdout.toString().trim().split(/\s+/)[0]
-  return digest
-    ? { source: 'config/.jwt_secret', print: `sha=${digest.slice(0, 12)}` }
-    : { source: 'не найден', print: '—' }
-}
-
-/** Frigate says so once at boot, and then never again. */
-const nvrHasUsers = async (): Promise<boolean> => {
-  const logs = await $`docker logs frigate`.quiet().nothrow()
-  const text = logs.stdout.toString() + logs.stderr.toString()
-  return !/no users exist/i.test(text)
+  const digest = file.stdout
+    .toString()
+    .trim()
+    .match(/^([0-9a-f]{12})/)
+  return digest?.[1]
+    ? { source: 'config/.jwt_secret', digest: digest[1] }
+    : null
 }
 
 /**
@@ -212,27 +214,26 @@ const nvrHasUsers = async (): Promise<boolean> => {
  * exec` into the NVR's own container is worth it.
  */
 const explainRefusal = async (composeArgs: string[]): Promise<string> => {
-  const ours = await inService(
+  const probe = await inService(
     composeArgs,
     'spotter-frigate',
     `bun -e '${fingerprint('FRIGATE_AUTH_SECRET')}'`,
   )
+  const ours = probe.out.match(/sha=([0-9a-f]{12})/)?.[1]
   const theirs = await nvrSecret().catch(() => null)
 
+  if (!ours) {
+    return 'FRIGATE_AUTH_SECRET в контейнере пуст — задай его в .env и пересоздай сервис'
+  }
   if (!theirs) {
-    return `наш FRIGATE_AUTH_SECRET: ${ours.out}. Контейнер frigate недоступен отсюда — сравни сам с его JWT-секретом`
+    return `наш FRIGATE_AUTH_SECRET: ${probe.out}. Секрет NVR прочитать не удалось (контейнер frigate недоступен под этим именем) — сравни сам`
   }
 
-  if (!(await nvrHasUsers())) {
-    return 'в Frigate нет ни одного пользователя — при включённой авторизации он отклонит любой токен. Создай пользователя в его интерфейсе'
+  if (ours !== theirs.digest) {
+    return `секреты РАЗНЫЕ. У нас sha=${ours}, у NVR sha=${theirs.digest} из ${theirs.source}. Приведи FRIGATE_AUTH_SECRET к значению оттуда${theirs.source.includes('env') ? ' — правка config/.jwt_secret ничего не даст, переменная её перекрывает' : ''}`
   }
 
-  const same =
-    ours.out !== '(пусто)' &&
-    ours.out.includes(theirs.print.replace('sha=', ''))
-  return same
-    ? `секреты совпадают (${ours.out}), значит дело не в них: проверь FRIGATE_AUTH_USER — он должен существовать в Frigate`
-    : `секреты РАЗНЫЕ. У нас: ${ours.out}. У NVR: ${theirs.print}, источник — ${theirs.source}. Приведи FRIGATE_AUTH_SECRET к значению из этого источника`
+  return `секреты совпадают (sha=${ours}, источник NVR — ${theirs.source}), значит дело не в них. Скорее всего запрос идёт через проксю, которая срезает заголовок Authorization: проверь, что она его пробрасывает`
 }
 
 const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
