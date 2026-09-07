@@ -106,7 +106,9 @@ export const verify = async (bridge: string): Promise<boolean> => {
         hostname: bridge,
         port: 6379,
         socket: {
-          open: (socket) => socket.write('PING\r\n'),
+          open: (socket) => {
+            socket.write('PING\r\n')
+          },
           data: (socket, data) => {
             socket.end()
             resolve(data.toString().includes('PONG'))

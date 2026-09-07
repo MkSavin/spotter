@@ -97,6 +97,18 @@ const readEntries = async (
   return entries
 }
 
+/**
+ * Streams whose entries are worthless once they are late.
+ *
+ * A heartbeat states what was true 30 seconds ago and goes stale after 90, so
+ * replaying an old one publishes a lie about the node's health. Progress
+ * reports are the same: the request they describe has long since finished.
+ */
+const PERISHABLE = ['spotter.heartbeat', 'spotter.media.progress']
+
+const isPerishable = (stream: string): boolean =>
+  PERISHABLE.some((name) => stream === name || stream.startsWith(`${name}.`))
+
 const describe = (entry: Entry): string => {
   const eventId = entry.value.match(/"eventId"\s*:\s*"([^"]+)"/)?.[1]
   return `${entry.id}  ${eventId ?? entry.value.slice(0, 48)}`
@@ -202,17 +214,23 @@ export const replay = async (composeArgs: string[]): Promise<boolean> => {
     const entries = await readEntries(composeArgs, service, stream)
     let restored = 0
 
+    // Stale by definition: replaying these states an outdated fact as current.
+    if (isPerishable(stream)) {
+      console.log(`  ${stream} — ${entries.length}, пропущено (устаревает)`)
+      continue
+    }
+
     for (const entry of entries) {
       // Without the origin there is nowhere to put it back; leave it for a look.
       if (!entry.stream || !entry.value) continue
-      await redis(composeArgs, [
+      await redis(composeArgs, service, [
         'XADD',
         entry.stream,
         '*',
         'value',
         entry.value,
       ])
-      await redis(composeArgs, ['XDEL', stream, entry.id])
+      await redis(composeArgs, service, ['XDEL', stream, entry.id])
       restored++
     }
 
