@@ -1,5 +1,47 @@
 # @spotter/sink
 
+## 1.7.0
+
+### Minor Changes
+
+- 30e1727: fix: make Frigate authentication actually work, and rename the URL variable
+  
+  Three separate faults each produced a 401 with a perfectly correct secret, which is why changing the secret never helped:
+  
+  - **No `role` claim.** Frigate refuses a token without one outright — `if "role" not in token.claims: return fail_response` — before it ever checks the signature. It now comes from `FRIGATE_AUTH_ROLE`, `admin` by default since exports and manual events require it.
+  - **Fractional timestamps.** `exp` was `Date.now() / 1000`; Frigate compares integers.
+  - **Whitespace.** Frigate `.strip()`s the secret it reads from `.jwt_secret` but not the one from `FRIGATE_JWT_SECRET`, so a value copied out of that file carries an invisible newline and signs differently. `FRIGATE_AUTH_*` are trimmed now.
+  
+  `./spotter doctor` sent the raw secret as the bearer token instead of a signed JWT, so it reported a credentials problem against any NVR with auth enabled. It signs properly now.
+  
+  `FRIGATE_REMOTE_URL` becomes `FRIGATE_URL` — the address only has to be reachable from the adapter's container, and "remote" read as though it had to be public. The old name is still honoured.
+  
+  `normalizeHostUrl` stripped a trailing slash only for hosts without a port, so `http://frigate:5000/` sent every request to `//api/...`.
+- 431ae20: fix: reach an authenticated Frigate, verified against a real one
+  
+  The rig only ever talked to port 5000, which checks no token at all, so a malformed JWT passed unnoticed. It now runs Frigate with `auth.enabled: true` and a shared secret, and the whole suite passes against it — twelve tests, event to delivered clip, over the authenticated port.
+  
+  Doing that surfaced what production was hitting:
+  
+  - **No `role` claim.** Frigate refuses the token before it checks the signature, so no secret could ever have helped. Taken from `FRIGATE_AUTH_ROLE`, `admin` by default.
+  - **The authenticated port is HTTPS.** 8971 serves a certificate Frigate generates itself; plain HTTP there answers 400, and the certificate is rejected unless `FRIGATE_TLS_INSECURE` says otherwise. Every call to the NVR now goes through one `frigateFetch` that carries both the token and that policy, rather than eleven hand-rolled fetches.
+  
+  Each failure mode was confirmed against the running NVR: a token without `role`, one signed with a secret carrying a stray newline, and the old hex-encoded signature all return 401; the fixed one returns 200.
+  
+  `./spotter doctor` sent the raw secret as the bearer token instead of a signed JWT, so it reported a credentials fault against any NVR with auth on.
+  
+  `FRIGATE_REMOTE_URL` becomes `FRIGATE_URL`, old name still honoured.
+
+### Patch Changes
+
+- 0e53330: fix: put the claims Frigate actually requires in the token
+  
+  A token without a `role` claim is refused outright — `if "role" not in token.claims: return fail_response` — so authentication failed with a perfectly correct secret, which made the secret look like the problem. The role comes from `FRIGATE_AUTH_ROLE`, defaulting to `admin` because exports and manual events are admin-only.
+  
+  `exp` and `iat` are whole seconds now. Frigate compares them as integers, and `Date.now() / 1000` is fractional.
+  
+  `normalizeHostUrl` dropped the trailing slash only for hosts without a port: its character class had no `:`, so `http://frigate:5000/` kept the slash and every request went to `//api/...`. Rewritten without a regex over the whole URL, still by hand rather than through `new URL()`, which would discard a path prefix behind a reverse proxy.
+
 ## 1.6.2
 
 ### Patch Changes
