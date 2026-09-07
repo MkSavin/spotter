@@ -3,7 +3,7 @@ import { bufferToJson } from '@spotter/transport'
 import { connectAsync as mqttConnectAsync } from 'mqtt'
 import type { CoreConfig } from '../config'
 import { reportMqttConfig } from '../frigate/checkMqttConfig'
-import { parseFrigateEvent } from '../parsing/parseFrigateEvent'
+import { parseFrigateEvent, summarizeEvent } from '../parsing/parseFrigateEvent'
 import { parseFrigateReview } from '../parsing/parseFrigateReview'
 import { MqttRegulator } from '../regulators/MqttRegulator'
 import { ReviewVerdicts } from './ReviewVerdicts'
@@ -66,8 +66,10 @@ export class FrigateSource extends Source<CoreConfig> {
           logger.sub(topic, event.id).debug('Event emitted')
         } catch (error) {
           // Frigate regularly sends incomplete/buggy events — skip, don't crash.
-          logger.warn(error)
-          logger.verbose('Event data:', value)
+          // The message alone: these are expected, and a stack trace of our own
+          // parser says nothing about why the NVR sent this.
+          logger.warn((error as Error).message)
+          logger.verbose('Event:', summarizeEvent(value))
         }
       })
       .on('frigate/reviews', async ({ contents }) => {

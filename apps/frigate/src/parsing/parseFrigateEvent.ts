@@ -37,3 +37,26 @@ export const parseFrigateEvent = (contents: any): SpotterEvent => {
     type,
   })
 }
+
+/**
+ * The few fields that say why an event was rejected.
+ *
+ * The raw payload carries `before` and `after` in full — a couple of kilobytes
+ * of bounding boxes, attributes and ratios per line, none of which explains a
+ * parse failure.
+ */
+export const summarizeEvent = (contents: any): Record<string, unknown> => {
+  const event = contents?.after ?? contents?.before
+  if (!event) return { type: contents?.type }
+
+  return {
+    type: contents?.type,
+    id: event.id,
+    camera: event.camera,
+    label: event.label,
+    positionChanges: event.position_changes,
+    stationary: event.stationary,
+    hasClip: event.has_clip,
+    hasSnapshot: event.has_snapshot,
+  }
+}

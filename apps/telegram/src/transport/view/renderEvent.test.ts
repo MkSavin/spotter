@@ -41,14 +41,14 @@ describe('renderEvent clip marker', () => {
     expect(renderEvent(event(), context)).not.toContain('Без видео')
   })
 
-  test('both axes show at once: no snapshot and no clip', () => {
+  test('nothing at all is said once, not as two adjacent marks', () => {
     const text = renderEvent(event(), context, {
       media: 'absent',
       clipless: true,
     })
 
-    expect(text).toContain('🙈 Без снимка')
-    expect(text).toContain('🎞️ Без видео')
+    expect(text).toContain('🙈 Без снимка и видео')
+    expect(text).not.toContain('🎞️ Без видео')
   })
 
   test('a pending snapshot coexists with a known-missing clip', () => {
@@ -67,8 +67,7 @@ describe('renderEvent clip marker', () => {
       clipless: true,
     }).split('\n')
 
-    expect(lines[1]).toContain('Без снимка')
-    expect(lines[1]).toContain('Без видео')
+    expect(lines[1]).toContain('Без снимка и видео')
     expect(lines[2]).toStartWith('📅')
   })
 

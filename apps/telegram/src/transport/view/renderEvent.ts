@@ -27,6 +27,9 @@ const MEDIA_MARKS: Partial<Record<MediaState, string>> = {
  */
 const NO_CLIP_MARK = '🎞️ Без видео'
 
+/** Neither one: said once instead of twice on the same line. */
+const NOTHING_MARK = '🙈 Без снимка и видео'
+
 export type RenderEventOptions = {
   media?: MediaState
   /** Whether to say the event has no clip. Only meaningful once it has ended. */
@@ -56,11 +59,15 @@ export const renderEvent = (
   const code = eventCode(event.id)
   const timing = renderEventTiming(event, context.config.timezone)
 
-  // Two independent axes: an event can lack both a snapshot and a clip.
-  const marks = [
-    options.media ? MEDIA_MARKS[options.media] : undefined,
-    options.clipless ? NO_CLIP_MARK : undefined,
-  ].filter(Boolean)
+  // Two independent axes, but when both are empty they read as one fact:
+  // nothing to look at. Two adjacent "нет" marks say it twice.
+  const marks =
+    options.media === 'absent' && options.clipless
+      ? [NOTHING_MARK]
+      : [
+          options.media ? MEDIA_MARKS[options.media] : undefined,
+          options.clipless ? NO_CLIP_MARK : undefined,
+        ].filter(Boolean)
 
   return `<b>${title}</b> <code>${code}</code>
 <b>${label}</b> ${score} | <b>${camera}</b>${marks.map((mark) => ` | ${mark}`).join('')}

@@ -231,7 +231,7 @@ describe('deliveryEventAction clip marker', () => {
     cleanup()
   })
 
-  test('an empty delivery says both: no snapshot and no clip', async () => {
+  test('an empty delivery says it once: neither snapshot nor clip', async () => {
     const context = makeContext()
 
     await deliveryEventAction(
@@ -240,8 +240,7 @@ describe('deliveryEventAction clip marker', () => {
     )
 
     const text = context.editMessageText.mock.calls[0][2] as string
-    expect(text).toContain('🙈 Без снимка')
-    expect(text).toContain('🎞️ Без видео')
+    expect(text).toContain('🙈 Без снимка и видео')
     cleanup()
   })
 })
