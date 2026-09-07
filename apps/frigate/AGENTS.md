@@ -82,8 +82,8 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 Проверить, что секреты совпадают:
 
 ```sh
-docker exec frigate cat /config/.jwt_secret
-docker exec spotter-frigate printenv FRIGATE_AUTH_SECRET
+docker exec frigate cat /config/.jwt_secret   # чужой контейнер, не наш compose
+./spotter exec frigate printenv FRIGATE_AUTH_SECRET
 ```
 
 ## TimelapseProvider — экспорт записей
