@@ -165,6 +165,76 @@ const checkMqtt = async (
   return checks
 }
 
+/**
+ * Fingerprints a secret without printing it: length plus a short hash is enough
+ * to tell two secrets apart, which is the whole question behind a 401.
+ */
+const fingerprint = (variable: string): string =>
+  `const s=process.env.${variable}||"";` +
+  `console.log(s?("len="+s.length+" sha="+require("node:crypto")` +
+  `.createHash("sha256").update(s).digest("hex").slice(0,12)):"(пусто)")`
+
+/**
+ * Where the NVR itself takes its secret from. Frigate reads the env var first
+ * and only falls back to the file, so editing the file while the var is set
+ * changes nothing — the mismatch that reads as a wrong secret in `.env`.
+ */
+const nvrSecret = async (): Promise<{ source: string; print: string }> => {
+  const env =
+    await $`docker exec frigate sh -c ${`node -e '${fingerprint('FRIGATE_JWT_SECRET')}'`}`
+      .quiet()
+      .nothrow()
+  const fromEnv = env.stdout.toString().trim()
+  if (fromEnv && fromEnv !== '(пусто)') {
+    return { source: 'FRIGATE_JWT_SECRET (env)', print: fromEnv }
+  }
+
+  const file =
+    await $`docker exec frigate sh -c ${'tr -d "\n" < /config/.jwt_secret | sha256sum'}`
+      .quiet()
+      .nothrow()
+  const digest = file.stdout.toString().trim().split(/\s+/)[0]
+  return digest
+    ? { source: 'config/.jwt_secret', print: `sha=${digest.slice(0, 12)}` }
+    : { source: 'не найден', print: '—' }
+}
+
+/** Frigate says so once at boot, and then never again. */
+const nvrHasUsers = async (): Promise<boolean> => {
+  const logs = await $`docker logs frigate`.quiet().nothrow()
+  const text = logs.stdout.toString() + logs.stderr.toString()
+  return !/no users exist/i.test(text)
+}
+
+/**
+ * Explains a refusal instead of restating it: compares the two secrets and
+ * names the side that is wrong. Runs only on a 401, where the extra `docker
+ * exec` into the NVR's own container is worth it.
+ */
+const explainRefusal = async (composeArgs: string[]): Promise<string> => {
+  const ours = await inService(
+    composeArgs,
+    'spotter-frigate',
+    `bun -e '${fingerprint('FRIGATE_AUTH_SECRET')}'`,
+  )
+  const theirs = await nvrSecret().catch(() => null)
+
+  if (!theirs) {
+    return `наш FRIGATE_AUTH_SECRET: ${ours.out}. Контейнер frigate недоступен отсюда — сравни сам с его JWT-секретом`
+  }
+
+  if (!(await nvrHasUsers())) {
+    return 'в Frigate нет ни одного пользователя — при включённой авторизации он отклонит любой токен. Создай пользователя в его интерфейсе'
+  }
+
+  const same =
+    ours.out !== '(пусто)' &&
+    ours.out.includes(theirs.print.replace('sha=', ''))
+  return same
+    ? `секреты совпадают (${ours.out}), значит дело не в них: проверь FRIGATE_AUTH_USER — он должен существовать в Frigate`
+    : `секреты РАЗНЫЕ. У нас: ${ours.out}. У NVR: ${theirs.print}, источник — ${theirs.source}. Приведи FRIGATE_AUTH_SECRET к значению из этого источника`
+}
+
 const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
   // Parsed inside the container: truncating the JSON here cut `cameras` off and
   // reported a healthy Frigate as broken.
@@ -174,13 +244,13 @@ const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
   const script = [
     'const {createHmac} = require("node:crypto");',
     'const e = process.env;',
-    'const url = (e.FRIGATE_URL || e.FRIGATE_REMOTE_URL || "").trim()',
+    'const url = (e.FRIGATE_URL || e.FRIGATE_REMOTE_URL || "")',
     '.replace(/\\?.*$/, "").replace(/\\/+$/, "");',
     'const b = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");',
     'const now = Math.floor(Date.now() / 1000);',
-    'const m = b({alg:"HS256",typ:"JWT"}) + "." + b({sub:(e.FRIGATE_AUTH_USER||"").trim(),',
-    'role:(e.FRIGATE_AUTH_ROLE||"admin").trim(),iat:now,exp:now+600});',
-    'const t = m + "." + createHmac("sha256",(e.FRIGATE_AUTH_SECRET||"").trim())',
+    'const m = b({alg:"HS256",typ:"JWT"}) + "." + b({sub:e.FRIGATE_AUTH_USER,',
+    'role:e.FRIGATE_AUTH_ROLE||"admin",iat:now,exp:now+600});',
+    'const t = m + "." + createHmac("sha256",e.FRIGATE_AUTH_SECRET||"")',
     '.update(m).digest("base64url");',
     'const r = await fetch(url + "/api/config",{headers:{Authorization:"Bearer " + t}});',
     'if(!r.ok){console.log("HTTP " + r.status);process.exit(0)}',
@@ -197,13 +267,14 @@ const checkFrigate = async (composeArgs: string[]): Promise<Check[]> => {
   const parsed = probe.out.match(/OK (\d+) (\S+)/)
 
   if (!parsed) {
+    const refused = probe.out.includes('401') || probe.out.includes('403')
     return [
       {
         name: 'Frigate /api/config',
         status: 'fail',
         detail: probe.out.slice(0, 160) || 'нет ответа',
-        hint: probe.out.includes('401')
-          ? 'NVR отклоняет авторизацию: FRIGATE_AUTH_SECRET в .env должен совпадать с JWT-секретом Frigate (FRIGATE_JWT_SECRET или config/.jwt_secret), FRIGATE_AUTH_USER — существующий пользователь'
+        hint: refused
+          ? await explainRefusal(composeArgs)
           : 'проверь FRIGATE_URL и FRIGATE_AUTH_SECRET в .env',
       },
     ]
