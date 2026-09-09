@@ -68,13 +68,22 @@ export const eventController: StreamMessageController<ServerContext> = async (
 
   if (event.type !== 'end') return
 
-  // Clip is requested on demand (event.clip). `hasSnapshot` is not checked:
-  // Frigate writes the snapshot as tracking ends, so it is still false here.
+  // Clip is requested on demand (event.clip).
   const want: MediaWant[] = ['snapshot']
 
   const source = resolveSource(event)
 
-  const request: MediaRequest = { eventId: event.id, source, want }
+  // The moment lets the adapter cut a frame from the recording without asking
+  // the NVR where the event was — it cannot answer this soon after the end.
+  const request: MediaRequest = {
+    eventId: event.id,
+    source,
+    want,
+    camera: event.camera,
+    startTime: event.startTime,
+    endTime: event.endTime,
+    snapshotAbsent: !event.hasSnapshot,
+  }
   await producer.publish(mediaStreams.mediaRequest(source), request)
 
   logger.debug('Published eager media request (snapshot)')

@@ -36,6 +36,8 @@ export type CoreConfig = SinkConfig & {
     type: SourceCode
     frigate: {
       broker: string
+      /** Drop events the NVR never wrote media for (`position_changes: 0`). */
+      skipMotionless: boolean
     }
   }
 
@@ -98,6 +100,7 @@ export const resolveConfig = (): CoreConfig => {
       type: env.string('SOURCE_TYPE', 'frigate') as SourceCode,
       frigate: {
         broker: env.string('MQTT_BROKER', ''),
+        skipMotionless: env.boolean('SKIP_MOTIONLESS_EVENTS', true),
       },
     },
     frigate: {

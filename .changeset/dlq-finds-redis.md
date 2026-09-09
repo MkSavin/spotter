@@ -2,4 +2,4 @@
 'spotter': patch
 ---
 
-`./spotter dlq` работает на ingest-узле, где Redis называется `local-redis`: раньше команда молча читала пустоту и сообщала, что записей нет. Заодно показывает незавершённые записи (PEL) — сбой короче retry-бюджета оставляет всё там, а dead-letter при этом пуста.
+`./spotter dlq` works on an ingest node, where Redis is named `local-redis`: the command used to read an empty database in silence and report that there was nothing there. It also lists pending entries (PEL) — an outage shorter than the retry budget leaves everything there while the dead-letter stream stays empty.

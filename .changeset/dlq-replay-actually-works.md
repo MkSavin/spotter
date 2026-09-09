@@ -2,6 +2,6 @@
 'spotter': patch
 ---
 
-`./spotter dlq --replay` действительно возвращает записи: вызовы к Redis шли без имени сервиса и молча падали, а команда всё равно отчитывалась об успехе. Скоропортящиеся потоки (`spotter.heartbeat`, `spotter.media.progress`) теперь пропускаются — их запись устаревает за полторы минуты, и возврат публиковал бы устаревшее как текущее.
+`./spotter dlq --replay` actually puts entries back: the Redis calls were made without a service name and failed silently, while the command reported success anyway. Perishable streams (`spotter.heartbeat`, `spotter.media.progress`) are now skipped — their entries go stale within ninety seconds, and replaying one would publish something outdated as current.
 
-Каталог `.integration` включён в `tsconfig.json` — CLI узла не проверялся типами, из-за чего этот баг и доехал до эксплуатации.
+`.integration` is included in `tsconfig.json`: the node CLI was never typechecked, which is how this bug reached production.

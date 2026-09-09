@@ -72,24 +72,40 @@ export const createMediaController = <TConfig extends SinkConfig>(
     }
 
     if (request.want.includes('snapshot')) {
-      const fetchRequest = await provider.resolveSnapshot(request.eventId)
-      if (fetchRequest) {
-        const key = stagedSnapshotKey(prefix, sourceId, request.eventId)
-        const result = await stageMedia(
-          s3,
-          key,
-          fetchRequest,
-          'image/jpeg',
-          logger,
-        )
-        if (result.staged) rawSnapshotKey = key
-        else if (result.reason === 'absent') absent.push('snapshot')
+      if (request.snapshotAbsent) {
+        absent.push('snapshot')
+        logger.debug(`NVR holds no snapshot for ${request.eventId}`)
+      } else {
+        const fetchRequest = await provider.resolveSnapshot(request.eventId)
+        if (fetchRequest) {
+          const key = stagedSnapshotKey(prefix, sourceId, request.eventId)
+          const result = await stageMedia(
+            s3,
+            key,
+            fetchRequest,
+            'image/jpeg',
+            logger,
+          )
+          if (result.staged) rawSnapshotKey = key
+          else if (result.reason === 'absent') absent.push('snapshot')
+        }
       }
 
       // No snapshot of its own: cut a frame out of the recording instead, so a
       // sub-second event still gets a picture.
       if (!rawSnapshotKey && provider.resolveEventFrame) {
-        const frameRequest = await provider.resolveEventFrame(request.eventId)
+        const moment =
+          request.camera && request.startTime !== undefined
+            ? {
+                camera: request.camera,
+                startTime: request.startTime,
+                endTime: request.endTime,
+              }
+            : undefined
+        const frameRequest = await provider.resolveEventFrame(
+          request.eventId,
+          moment,
+        )
         if (frameRequest) {
           const key = stagedSnapshotKey(prefix, sourceId, request.eventId)
           const result = await stageMedia(

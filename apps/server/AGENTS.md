@@ -45,10 +45,11 @@ spotter.event.media_processed ──▶ eventMediaController
                                     └─▶ publish spotter.delivery.event (action: media, +clip/snapshotKey)
 ```
 
-- **`hasSnapshot` не проверяется.** Frigate пишет снапшот
-  [в момент завершения трекинга](https://docs.frigate.video/configuration/snapshots/), поэтому
-  на `end` флаг ещё `false` — фильтр по нему оставлял события без фото. Если снапшота правда
-  нет, адаптер ответит пустым `mediaProcessed`.
+- **`hasSnapshot` определяет путь, а не факт запроса.** Frigate пишет файл на диск до того, как
+  публикует `end` (`object_processing.py`: `write_snapshot_to_disk()` перед `dispatcher.publish`),
+  поэтому флаг в `end` окончателен: `true` — файл уже лежит, `false` — не появится никогда.
+  При `false` в запрос идёт `snapshotAbsent`, и адаптер сразу режет кадр из непрерывной записи,
+  не тратя попытку на 404.
 - **Snapshot — eager, clip — по запросу.** На `end` запрашивается только `snapshot`;
   клип транскодится лениво, когда получатель жмёт кнопку «Видео» (команда `event.clip`,
   см. ниже). Так не транскодим клипы, которые никто не смотрит.

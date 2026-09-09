@@ -47,13 +47,14 @@ runSink({ config, logger, information, sourceId: config.sourceId, source, mediaP
 ### Парсинг событий Frigate
 [src/parsing/parseFrigateEvent.ts](src/parsing/parseFrigateEvent.ts): берёт `contents.after`, требует
 `id`/`camera`/`label` (иначе `throw`), нормализует `type` (`new`/`start` → `start`), **фильтрует
-баговые** события (`position_changes === 0` → `throw`, **только для `update`**,
+неподвижные** события (`position_changes === 0` → `throw`, на всех стадиях,
 [обсуждение](https://github.com/blakeblackshear/frigate/discussions/9974)), на выходе валидирует
 `parseSpotterEvent`. Не убирай эти проверки — Frigate регулярно шлёт неполные события.
 
-Фильтр намеренно не трогает `start`/`end`: Frigate штатно шлёт `new` с `position_changes: 0`, а
-потеря `start` рвёт жизненный цикл — фронтенд не узнаёт message-id и шлёт событие заново на каждой
-следующей доставке (дубли в чате).
+Фильтр повторяет логику самого Frigate: `should_save_snapshot` и `should_retain_recording` при
+`position_changes == 0` возвращают `false`, поэтому ни снимка, ни клипа у такого события не будет
+никогда — дойти оно может только пустым. Отсекается целиком, а не на одной стадии: пропущенный
+`start` без `end` оставил бы жизненный цикл незакрытым. Отключается `SKIP_MOTIONLESS_EVENTS=false`.
 
 ### Reviews — вердикт NVR вместо порога score
 

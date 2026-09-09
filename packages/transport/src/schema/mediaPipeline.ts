@@ -27,6 +27,10 @@ export const mediaRequestSchema = z.object({
   eventId: z.string().min(1),
   source: z.string().min(1),
   want: z.array(mediaWantSchema).min(1),
+  camera: z.string().min(1).optional(),
+  startTime: z.number().optional(),
+  endTime: z.number().nullable().optional(),
+  snapshotAbsent: z.boolean().optional(),
 })
 export type MediaRequest = z.infer<typeof mediaRequestSchema>
 

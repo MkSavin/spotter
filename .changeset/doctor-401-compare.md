@@ -2,4 +2,4 @@
 'spotter': patch
 ---
 
-`./spotter doctor` больше не сообщает о совпадении секретов, когда прочитать секрет NVR не удалось: сравниваются извлечённые отпечатки, а не подстроки, и пустой результат чтения отличается от найденного. Подсказка про несуществующего пользователя убрана — Frigate принимает токен и для незнакомого `sub`, так что причиной 401 это быть не может.
+`./spotter doctor` no longer reports matching secrets when the NVR's own secret could not be read: it compares extracted fingerprints rather than substrings, and tells an empty read apart from a found one. The hint about a nonexistent user is gone — Frigate accepts a token for an unknown `sub` too, so that cannot be the reason for a 401.

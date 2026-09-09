@@ -58,7 +58,9 @@ export class FrigateSource extends Source<CoreConfig> {
         }
 
         try {
-          const event = parseFrigateEvent(value)
+          const event = parseFrigateEvent(value, {
+            skipMotionless: this.config.source.frigate.skipMotionless,
+          })
           // Frigate's own verdict when it has already reached us; consumers
           // decide what an `alert` is worth versus a `detection`.
           const severity = verdicts.severityOf(event.id)

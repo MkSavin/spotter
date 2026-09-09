@@ -1,11 +1,18 @@
 import { parseSpotterEvent, type SpotterEvent } from '@spotter/transport'
 
+export type ParseFrigateEventOptions = {
+  skipMotionless?: boolean
+}
+
 /**
  * Maps a raw Frigate MQTT payload (`frigate/events`) to the canonical
  * `SpotterEvent` contract, validating it before it leaves the adapter. Throws on
  * unparsable or suspicious events so the controller can skip them.
  */
-export const parseFrigateEvent = (contents: any): SpotterEvent => {
+export const parseFrigateEvent = (
+  contents: any,
+  { skipMotionless = true }: ParseFrigateEventOptions = {},
+): SpotterEvent => {
   const event = contents?.after
 
   if (!event?.id || !event.camera || !event.label) {
@@ -17,10 +24,11 @@ export const parseFrigateEvent = (contents: any): SpotterEvent => {
       ? 'start'
       : contents.type
 
-  // Frigate sometimes emits buggy zero-movement events — skip them.
-  // https://github.com/blakeblackshear/frigate/discussions/9974
-  // Updates only: without a `start` the frontend re-sends the event as new.
-  if (type === 'update' && event.position_changes === 0) {
+  // Frigate writes neither snapshot nor clip when `position_changes` is 0
+  // (should_save_snapshot / should_retain_recording), so such an event can only
+  // ever be delivered empty. Dropped at every stage: skipping the `end` alone
+  // would leave the lifecycle open.
+  if (skipMotionless && event.position_changes === 0) {
     throw new Error('Event has no position changes, skipping due to suspicion')
   }
 

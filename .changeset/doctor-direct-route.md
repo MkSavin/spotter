@@ -2,4 +2,4 @@
 'spotter': patch
 ---
 
-При совпадающих секретах `./spotter doctor` пробует тот же токен по прямому адресу NVR. Если там он принимается, причина 401 — не креды, а прокси перед Frigate, забирающая заголовок `Authorization` себе; doctor называет рабочий адрес для `FRIGATE_URL`.
+When the secrets match, `./spotter doctor` retries the same token against the NVR's direct address. If it is accepted there, the 401 is not about credentials but about a proxy in front of Frigate keeping the `Authorization` header to itself; doctor names the address that works for `FRIGATE_URL`.

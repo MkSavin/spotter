@@ -2,4 +2,4 @@
 'spotter': patch
 ---
 
-Команда `./spotter dlq` показывает записи, отброшенные регулятором после всех попыток, а `./spotter dlq --replay` возвращает их в исходный стрим. Сбой длиннее retry-бюджета (5 попыток с интервалом 5 минут) складывает туда все события; до сих пор достать их оттуда было нечем.
+`./spotter dlq` lists the entries the regulator gave up on, and `./spotter dlq --replay` puts them back on their original stream. An outage longer than the retry budget (5 attempts, 5 minutes apart) sends every event there, and until now there was no way to get them back out.

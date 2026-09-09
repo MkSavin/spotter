@@ -190,6 +190,56 @@ describe('createMediaController', () => {
     ).toBe(true)
   })
 
+  test('skips the snapshot fetch when the NVR reported none', async () => {
+    const fetched: string[] = []
+    globalThis.fetch = mock(async (request: Request) => {
+      fetched.push(String(request.url))
+      return new Response(new Uint8Array([1, 2, 3]))
+    }) as never
+
+    const { context } = makeContext()
+    const controller = createMediaController({
+      ...provider,
+      resolveEventFrame: (id) => new Request(`https://nvr/frame-of/${id}`),
+    })
+
+    await controller(
+      message({
+        eventId: 'e4',
+        source: 'frigate-home',
+        want: ['snapshot'],
+        snapshotAbsent: true,
+        camera: 'front',
+        startTime: 100,
+        endTime: 110,
+      }),
+      context,
+    )
+
+    expect(fetched).toEqual(['https://nvr/frame-of/e4'])
+  })
+
+  test('an absent snapshot with no recording to fall back on is final', async () => {
+    globalThis.fetch = mock(async () => new Response('')) as never
+
+    const { context, published } = makeContext()
+    const controller = createMediaController(provider)
+
+    await controller(
+      message({
+        eventId: 'e5',
+        source: 'frigate-home',
+        want: ['snapshot'],
+        snapshotAbsent: true,
+      }),
+      context,
+    )
+
+    expect(
+      published.some((entry) => entry.stream === mediaStreams.mediaProcessed),
+    ).toBe(true)
+  })
+
   test('a 404 on one kind still retries while another may appear', async () => {
     globalThis.fetch = mock(async (request: Request) =>
       String((request as Request).url).includes('clip')

@@ -3,6 +3,6 @@
 '@spotter/telegram': patch
 ---
 
-Отброшенное событие логируется одной строкой сообщения и сводкой значимых полей вместо полного payload с `before` и стектрейса нашего же парсера.
+A skipped event is logged as a single message line and a summary of the fields that matter, rather than the full payload with `before` and a stack trace of our own parser.
 
-Событие без снимка и без клипа помечается один раз — `🙈 Без снимка и видео` вместо двух соседних отметок.
+An event with neither snapshot nor clip is marked once — `🙈 Без снимка и видео` instead of two adjacent marks.
