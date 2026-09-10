@@ -39,6 +39,32 @@ export const stalledCameras = (cameras: CameraHealth[]): CameraHealth[] =>
       camera.detectionFps === 0,
   )
 
+/** Cameras switched off in the NVR's own config — not a fault to report. */
+const readDisabledCameras = async (
+  config: CoreConfig,
+): Promise<Set<string>> => {
+  try {
+    const response = await frigateFetch(
+      config.frigate,
+      settleUrl(frigateUrls.config, config.frigate.remoteUrl),
+      { signal: AbortSignal.timeout(10_000) },
+    )
+    if (!response.ok) return new Set()
+
+    const body = (await response.json()) as {
+      cameras?: Record<string, { enabled?: boolean }>
+    }
+
+    return new Set(
+      Object.entries(body.cameras ?? {})
+        .filter(([, camera]) => camera.enabled === false)
+        .map(([name]) => name),
+    )
+  } catch {
+    return new Set()
+  }
+}
+
 /**
  * Being connected says nothing about whether the NVR has video.
  * See docs/foundings/silent-failures.md.
@@ -73,18 +99,22 @@ export const readNvrHealth = async (config: CoreConfig): Promise<NvrHealth> => {
       >
     }
 
-    const cameras = Object.entries(body.cameras ?? {}).map(
-      ([camera, stats]): CameraHealth => ({
-        camera,
-        cameraFps: stats.camera_fps ?? 0,
-        detectionFps: stats.detection_fps ?? 0,
-        /**
-         * Absent means an older NVR that does not report it; assume on, so a
-         * dead camera is still reported rather than silently excused.
-         */
-        detectionEnabled: stats.detection_enabled !== false,
-      }),
-    )
+    // Stats list every camera in the config, switched off ones included, and
+    // `detection_enabled` is `detect.enabled` — not the camera's own `enabled`.
+    const disabled = await readDisabledCameras(config)
+
+    const cameras = Object.entries(body.cameras ?? {})
+      .filter(([camera]) => !disabled.has(camera))
+      .map(
+        ([camera, stats]): CameraHealth => ({
+          camera,
+          cameraFps: stats.camera_fps ?? 0,
+          detectionFps: stats.detection_fps ?? 0,
+          // Absent means an older NVR that does not report it; assume on, so a
+          // dead camera is still reported rather than silently excused.
+          detectionEnabled: stats.detection_enabled !== false,
+        }),
+      )
 
     return { state: 'ok', cameras }
   } catch (error) {

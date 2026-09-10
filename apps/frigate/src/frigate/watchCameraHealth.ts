@@ -30,7 +30,8 @@ export const watchCameraHealth = (
 ): CameraHealthWatch => {
   let latest: { dead: string[]; stalled: string[] } | undefined
   let denied = false
-  let reported = ''
+  let reportedDead = ''
+  let reportedStalled = ''
 
   const poll = async (): Promise<void> => {
     const health = await readNvrHealth(config)
@@ -57,21 +58,23 @@ export const watchCameraHealth = (
     )
     latest = { dead, stalled }
 
-    /**
-     * Log the transition, not the state: at one poll a minute, repeating an
-     * unchanged warning would bury everything else.
-     */
-    const signature = `${dead.join(',')}|${stalled.join(',')}`
-    if (signature === reported) return
-    reported = signature
+    // Tracked apart: `detection_fps` dips to zero on an idle camera, and a
+    // shared signature would reprint the unchanged half on every flap.
+    const deadSignature = dead.join(',')
+    const stalledSignature = stalled.join(',')
+    const deadChanged = deadSignature !== reportedDead
+    const stalledChanged = stalledSignature !== reportedStalled
+    if (!deadChanged && !stalledChanged) return
+    reportedDead = deadSignature
+    reportedStalled = stalledSignature
 
-    if (dead.length > 0) {
-      logger.error(
+    if (deadChanged && dead.length > 0) {
+      logger.warn(
         `NVR reports no video from: ${dead.join(', ')} — no events can be produced for them`,
       )
     }
-    if (stalled.length > 0) {
-      logger.error(
+    if (stalledChanged && stalled.length > 0) {
+      logger.warn(
         `NVR has video but no detection on: ${stalled.join(', ')} — no events will be produced`,
       )
     }
