@@ -9,16 +9,8 @@ import { supplySubscribers } from '../helpers/supplySubscribers'
 type EventMedia = InputMediaPhoto | InputMediaVideo
 
 /**
- * Attaches transcoded media to an event's messages in place.
- *
- * For chats that already have the event message, the text/photo is edited into
- * the new media via `editMessageMedia` (Bot API ≥ 7.11 allows adding media to a
- * text message, and swapping photo → video). Chats that joined after the text
- * was sent get a fresh media message instead. Each send first tries the naive
- * (presigned-URL) strategy, then falls back to buffering the bytes.
- *
- * `keyboard` is the inline markup to keep on the message (the "Видео" button for
- * a snapshot, or `undefined` for the final video, which removes the button).
+ * Edits media into the existing message where there is one, else sends a new
+ * one. Presigned URL first, buffered bytes as fallback.
  */
 export const actualizeEventMedia = async (
   eventId: string,

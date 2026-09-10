@@ -1,16 +1,8 @@
 import { z } from 'zod'
 
 /**
- * Contract for asking an adapter to stage a detection on its NVR.
- *
- * A request to the adapter rather than a synthetic event on the bus, for the
- * same reason notification suspension is: only the adapter knows how its NVR
- * can be made to see something. For Frigate that means driving a stub detector
- * over ZMQ; the NVR then does its own tracking, recording and publishing.
- *
- * This is what makes the test honest. Seeding `spotter.event` directly proves
- * our idea of an event, never the NVR's — and the stretch between the two went
- * silent for two days in production without a single test noticing.
+ * Asks the adapter to make its NVR *see* something, rather than seeding an
+ * event ourselves. See docs/foundings/silent-failures.md.
  */
 export const probeRequestSchema = z.object({
   source: z.string().min(1),

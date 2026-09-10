@@ -1,12 +1,8 @@
 import type { RedisClient } from 'bun'
 
 /**
- * Bun's `RedisClient.connect()` does not reject promptly when the host is
- * unreachable (e.g. a Docker-only `redis` hostname used on the host): it keeps
- * retrying in the background, and if nothing else holds the event loop open the
- * process then exits silently with code 0 — no error, no logs. Racing the
- * connect against a timeout turns that silent death into a loud, debuggable
- * failure.
+ * Raced against a timeout: an unreachable host otherwise exits the process
+ * silently with code 0. See docs/foundings/redis-streams.md.
  */
 export const connectRedis = async (
   client: RedisClient,

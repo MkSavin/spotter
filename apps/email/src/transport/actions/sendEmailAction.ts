@@ -6,14 +6,8 @@ import { notifiedEvents } from '../../db/schema'
 import { renderEmail } from '../view/renderEmail'
 
 /**
- * Sends one notification email per event.
- *
- * Dedup / trigger policy (shared with the other frontends):
- * - Email only on `create` — `update`/`media` are silent, so a single event is
- *   one message, never a thread of edits (email can't edit-in-place anyway).
- * - `notified_events` guards against redelivery: `claim` is atomic, so the
- *   reclaim/retry path never double-sends. On SMTP failure the claim is rolled
- *   back and the entry is left pending, so the regulator retries it later.
+ * Only `create` sends: email cannot edit in place, so one event is one letter.
+ * `claim` is atomic and rolled back on SMTP failure, so the entry is retried.
  */
 export const sendEmailAction = async (
   delivery: DeliveryEvent,

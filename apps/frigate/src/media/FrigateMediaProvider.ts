@@ -32,14 +32,8 @@ export class FrigateMediaProvider implements MediaProvider {
   }
 
   /**
-   * A still cut from the continuous recording. Frigate only writes an event
-   * snapshot once tracking ends and picks a "best" frame, so a sub-second
-   * event has none — but the recording still covers that moment.
-   *
-   * The caller's `moment` is preferred over the API: this runs right after the
-   * event ends, when Frigate has typically not made it queryable yet, so
-   * looking it up would return nothing exactly when the fallback is needed.
-   * The lookup remains for requests minted without one.
+   * `moment` is preferred over the API, which cannot answer this soon after
+   * the end. See docs/foundings/frigate-event-media.md.
    */
   async resolveEventFrame(
     eventId: string,
@@ -59,8 +53,10 @@ export class FrigateMediaProvider implements MediaProvider {
 
     if (!known) return null
 
-    // Midpoint rather than the start: the object is more likely in frame once
-    // it has moved into view.
+    /**
+     * Midpoint rather than the start: the object is more likely in frame once
+     * it has moved into view.
+     */
     const time = known.endTime
       ? (known.startTime + known.endTime) / 2
       : known.startTime

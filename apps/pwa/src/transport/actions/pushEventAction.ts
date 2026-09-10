@@ -28,14 +28,8 @@ const cacheEvent = (
 }
 
 /**
- * Delivery → push. Only `create` produces a notification (one alert per event);
- * `update`/`media` silently refresh the feed cache so an open PWA redraws the
- * card without re-buzzing the device.
- *
- * Dedup (level 1): `notified_events.claim` is atomic, so stream reclaim never
- * double-pushes. Per-device send failures are handled inside the fan-out (dead
- * endpoints pruned, healthy ones kept) — the claim is only released on an
- * unexpected error, so the regulator can retry the whole event.
+ * Only `create` notifies; `update`/`media` refresh the feed without buzzing.
+ * `claim` is atomic, so a reclaim never double-pushes.
  */
 export const pushEventAction = async (
   delivery: DeliveryEvent,

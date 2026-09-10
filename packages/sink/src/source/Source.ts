@@ -11,12 +11,8 @@ export type EventSink = (event: SpotterEvent) => Promise<void>
 export type SourceHandle = {
   stop: () => Promise<void>
   /**
-   * When the NVR last said anything on the transport, event or not.
-   *
-   * Optional because not every transport has housekeeping traffic to hear. For
-   * those that do, this is the only signal that separates a quiet scene from a
-   * dead link — events alone cannot, and in September 2026 that gap cost two
-   * days of silence nobody noticed.
+   * The only signal separating a quiet scene from a dead link.
+   * See docs/foundings/silent-failures.md.
    */
   lastContactAt?: () => number | undefined
 }

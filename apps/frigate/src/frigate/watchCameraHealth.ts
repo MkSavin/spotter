@@ -20,12 +20,8 @@ const UNAUTHORIZED_HELP =
   '(FRIGATE_JWT_SECRET, or config/.jwt_secret), and FRIGATE_AUTH_USER an existing user.'
 
 /**
- * Polls the NVR's own camera counters in the background.
- *
- * On a timer rather than per heartbeat: the beat must stay cheap and must not
- * wait on the NVR, and camera health changes on the scale of minutes. State
- * transitions are logged, so a stream that drops at 02:00 leaves a line saying
- * so instead of only a gap where events used to be.
+ * On a timer, so the heartbeat stays cheap and never waits on the NVR.
+ * Transitions are logged, so a stream dropping at 02:00 leaves a line.
  */
 export const watchCameraHealth = (
   config: CoreConfig,
@@ -61,8 +57,10 @@ export const watchCameraHealth = (
     )
     latest = { dead, stalled }
 
-    // Log the transition, not the state: at one poll a minute, repeating an
-    // unchanged warning would bury everything else.
+    /**
+     * Log the transition, not the state: at one poll a minute, repeating an
+     * unchanged warning would bury everything else.
+     */
     const signature = `${dead.join(',')}|${stalled.join(',')}`
     if (signature === reported) return
     reported = signature

@@ -40,15 +40,8 @@ export const stalledCameras = (cameras: CameraHealth[]): CameraHealth[] =>
   )
 
 /**
- * Asks the NVR how its cameras are actually doing.
- *
- * Being connected to the broker says nothing about whether the NVR has video:
- * a camera whose stream drops leaves the adapter healthy, the API answering and
- * the UI working, while no event can possibly be produced. The NVR knows within
- * seconds; without reading this, we only find out by noticing hours of silence.
- *
- * A camera with detection switched off is not a fault — it is a choice, and
- * reporting it would train the reader to ignore the warning.
+ * Being connected says nothing about whether the NVR has video.
+ * See docs/foundings/silent-failures.md.
  */
 export const readNvrHealth = async (config: CoreConfig): Promise<NvrHealth> => {
   try {
@@ -85,8 +78,10 @@ export const readNvrHealth = async (config: CoreConfig): Promise<NvrHealth> => {
         camera,
         cameraFps: stats.camera_fps ?? 0,
         detectionFps: stats.detection_fps ?? 0,
-        // Absent means an older NVR that does not report it; assume on, so a
-        // dead camera is still reported rather than silently excused.
+        /**
+         * Absent means an older NVR that does not report it; assume on, so a
+         * dead camera is still reported rather than silently excused.
+         */
         detectionEnabled: stats.detection_enabled !== false,
       }),
     )

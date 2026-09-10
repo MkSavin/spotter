@@ -17,12 +17,8 @@ export type LivenessOptions = {
 }
 
 /**
- * Refreshes a file for as long as the service is actually working, so a
- * container that is running but wedged can be told apart from a healthy one.
- *
- * A timer alone would only prove the event loop turns — which it does even
- * when every Redis command fails. `check` is what makes the marker meaningful,
- * so it must probe the dependency the service cannot work without.
+ * `check` must probe the dependency the service cannot work without.
+ * See docs/foundings/redis-streams.md.
  */
 export const startLiveness = ({
   path = LIVENESS_PATH,

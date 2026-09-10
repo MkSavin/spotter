@@ -9,13 +9,8 @@ import type { SinkContext } from '../runtime/context'
 import type { TimelapseTracker } from './TimelapseTracker'
 
 /**
- * Handles `spotter.timelapse.request.<source>`: asks the NVR to start the
- * export and hands the job to the tracker.
- *
- * Deliberately returns as soon as the export is accepted. Waiting for it here
- * would hold the stream entry pending well past `reclaimMinIdleMs`, and the
- * reaper would hand the same request to another consumer — producing a second
- * export of the same span.
+ * Returns as soon as the export is accepted; waiting would outlast the reclaim
+ * window. See docs/foundings/redis-streams.md.
  */
 export const createTimelapseController = <TConfig extends SinkConfig>(
   tracker: TimelapseTracker,

@@ -1,10 +1,6 @@
 /**
- * Port for NVRs that can suspend their own notifications for a camera.
- *
- * Optional, like `TimelapseProvider`: an NVR without the concept simply does
- * not supply one, and the consumer is never registered. Separate from
- * `MediaProvider` because it neither fetches nor produces media — it changes
- * the NVR's own behaviour.
+ * Optional: an NVR without the concept supplies none and the consumer is
+ * never registered. Changes the NVR's behaviour rather than fetching media.
  */
 export abstract class NotificationSuspender {
   /**

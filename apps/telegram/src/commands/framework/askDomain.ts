@@ -2,12 +2,8 @@ import { type CommandReply, trySendCommand } from '@spotter/transport'
 import type { BotContext } from '../../context'
 
 /**
- * Sends a domain command on the sender's behalf and answers the two failures
- * every caller shares: an unreachable server and a plain refusal.
- *
- * Returns the reply's data only when the domain said yes, so a caller that
- * forgets to check cannot mistake a refusal for a result. A caller needing the
- * refusal itself — to phrase `not-found` its own way — passes `onRefusal`.
+ * Returns data only when the domain said yes, so a caller that forgets to
+ * check cannot mistake a refusal for a result.
  */
 export const askDomain = async (
   context: BotContext,

@@ -1,14 +1,8 @@
 import type { EventSeverity } from '@spotter/transport'
 
 /**
- * The severity Frigate assigned to a review item, keyed by the tracked-object
- * ids it covers.
- *
- * A review is Frigate's own verdict on a stretch of activity: it has already
- * applied the zones, object filters and required-zone rules the owner set up,
- * and marks the result `alert` or `detection`. Reading it is strictly better
- * than re-deriving the same judgement from a score threshold here — and it is
- * configured where the owner expects to configure it, in Frigate's own UI.
+ * Frigate's own verdict, with the owner's zones and filters already applied —
+ * better than re-deriving it from a score threshold here.
  */
 export type ReviewVerdict = {
   severity: EventSeverity

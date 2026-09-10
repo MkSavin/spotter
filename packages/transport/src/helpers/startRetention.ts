@@ -21,12 +21,8 @@ export type RetentionOptions = {
 }
 
 /**
- * Periodically drops rows past their retention window.
- *
- * Every service keeps a table that only ever grows — the domain's event log,
- * the frontends' dedup ledgers — and none of them are read once they age out.
- * Left alone they inflate the SQLite file that shares a disk with the NVR's
- * recordings, so each owner schedules its own trim through this helper.
+ * Every service keeps a table that only grows, on the same disk as the NVR's
+ * recordings, so each owner schedules its own trim.
  */
 export const startRetention = ({
   label,
@@ -46,7 +42,7 @@ export const startRetention = ({
     }
   }
 
-  // On start too: a service that restarts often would otherwise never sweep.
+  /** On start too: a service that restarts often would otherwise never sweep. */
   sweep()
   const timer = setInterval(sweep, intervalMs)
   timer.unref?.()

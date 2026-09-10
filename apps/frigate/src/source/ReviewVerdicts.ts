@@ -4,17 +4,8 @@ import type { EventSeverity } from '@spotter/transport'
 const VERDICT_TTL_MS = 5 * 60_000
 
 /**
- * Remembers the severity Frigate assigned to each tracked object.
- *
- * `frigate/events` and `frigate/reviews` are independent topics with no
- * ordering between them, and a review usually lands slightly *after* the
- * `new` event it covers. So both directions are handled: a verdict already
- * here stamps the event on its way out, and one that arrives later is applied
- * to the `update`/`end` that follows — which is soon enough, since the alert
- * that matters is dispatched on `end`.
- *
- * Bounded by a TTL rather than by count: entries are only interesting for as
- * long as their event is still moving through the pipeline.
+ * Events and reviews are unordered, so a verdict is applied in either
+ * direction. See docs/foundings/frigate-api-quirks.md.
  */
 export class ReviewVerdicts {
   private readonly verdicts = new Map<

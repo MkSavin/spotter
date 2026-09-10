@@ -1,13 +1,8 @@
 import { z } from 'zod'
 
 /**
- * How much attention an event deserves, as judged by the NVR rather than by a
- * score threshold here: it already knows the zones, object filters and times of
- * day the owner configured.
- *
- * `alert` — worth waking someone; `detection` — worth recording. Optional
- * because an NVR without the concept simply never sets it, and everything then
- * behaves as it did before.
+ * Judged by the NVR, which knows the owner's zones and filters. Optional: an
+ * NVR without the concept never sets it.
  */
 export const eventSeveritySchema = z.enum(['alert', 'detection'])
 export type EventSeverity = z.infer<typeof eventSeveritySchema>

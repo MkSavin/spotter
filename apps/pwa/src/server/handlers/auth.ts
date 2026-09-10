@@ -6,12 +6,8 @@ import { json, parseBody } from '../http'
 import { authBody } from '../schemas'
 
 /**
- * Redeems an access code and authorizes this install.
- *
- * The code is checked by the domain, not here: `device.redeem` draws on the
- * same pool `/user_sign` mints for the bot, so access is granted once rather
- * than once per frontend, and the role that comes back is the real one the
- * server will enforce on every later command.
+ * Checked by the domain, from the same pool `/user_sign` mints, so access is
+ * granted once rather than once per frontend.
  */
 export const authHandler = async (
   request: Request,
@@ -59,8 +55,10 @@ export const authHandler = async (
     role: string
   }
 
-  // Stored as-is rather than hashed: unlike a password it is high-entropy and
-  // single-purpose, and revoking means deleting the row either way.
+  /**
+   * Stored as-is rather than hashed: unlike a password it is high-entropy and
+   * single-purpose, and revoking means deleting the row either way.
+   */
   const token = randomBytes(32).toString('hex')
 
   devicesRepo.authorize(context.db, {

@@ -27,14 +27,8 @@ export interface MediaProvider {
     eventId: string,
   ): MediaFetch | null | Promise<MediaFetch | null>
   /**
-   * Resolve a still from the continuous recording covering the event, for
-   * events the NVR never wrote a snapshot for. Optional: adapters without
-   * recordings simply omit it.
-   *
-   * `moment` comes from the event itself so the fallback does not depend on the
-   * NVR having caught up: the recording covers the moment long before the event
-   * is queryable. Without it the adapter may look the event up, and get nothing
-   * for precisely the events this exists to rescue.
+   * A still from the recording, for events the NVR wrote no snapshot for.
+   * `moment` comes from the event; see docs/foundings/frigate-event-media.md.
    */
   resolveEventFrame?(
     eventId: string,

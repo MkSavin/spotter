@@ -9,14 +9,8 @@ export type MqttConfigState =
   | { state: 'unknown'; reason: string }
 
 /**
- * Reads `mqtt` out of the NVR's own config.
- *
- * Frigate publishes events over MQTT only when that section enables it, and its
- * minimal config ships with `enabled: false`. With MQTT off the NVR still looks
- * entirely healthy from outside — the UI works, the API answers, snapshots and
- * `frigate/available` are still retained on the broker — while no event is ever
- * published. That is indistinguishable from a broken adapter unless someone
- * goes and reads the config, which is exactly what this does.
+ * With MQTT off the NVR looks entirely healthy yet publishes nothing.
+ * See docs/foundings/frigate-api-quirks.md.
  */
 export const readMqttConfig = async (
   config: CoreConfig,

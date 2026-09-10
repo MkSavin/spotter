@@ -7,15 +7,8 @@ import type { CoreConfig } from '../config'
 const ALL_CAMERAS = 'all'
 
 /**
- * Suspends Frigate's own notifications over MQTT.
- *
- * Frigate takes a minute count on `frigate/<camera>/notifications/suspend`.
- * Lifting one has no dedicated topic — republishing `ON` to
- * `notifications/set` clears it.
- *
- * The connection is opened on first use and kept: suspending is rare, so a
- * permanent second connection alongside the source's would earn its keep only
- * on the deployments that never call it.
+ * Opened on first use and kept; suspending is rare.
+ * See docs/foundings/frigate-api-quirks.md.
  */
 export class FrigateNotificationSuspender extends NotificationSuspender {
   private client?: MqttClient

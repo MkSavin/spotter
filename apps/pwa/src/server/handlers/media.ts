@@ -24,17 +24,8 @@ export const parseRange = (
 }
 
 /**
- * Streams an event's media through this server instead of handing the browser a
- * presigned S3 URL.
- *
- * A presigned URL is cross-origin, and object storage commonly answers a
- * browser preflight with no `Access-Control-*` headers at all — so `<img>` shows
- * nothing and `<video>`, which needs Range requests, fails outright. None of
- * that is visible from the Telegram frontend, where the same URL is fetched by
- * Telegram's own servers rather than by a browser.
- *
- * Proxying also keeps storage credentials and the bucket layout out of the
- * browser, and puts the media behind the app's own authorization.
+ * Proxied rather than presigned: a browser cannot use a presigned S3 URL.
+ * See docs/foundings/http-and-push.md.
  */
 export const mediaHandler = async (
   request: Request,
@@ -42,7 +33,7 @@ export const mediaHandler = async (
   kind: MediaKind,
   context: CoreContext,
 ): Promise<Response> => {
-  // Media tags cannot set a header, so this route also accepts `?token=`.
+  /** Media tags cannot set a header, so this route also accepts `?token=`. */
   const auth = authorize(request, context, 'authorized', {
     allowQueryToken: true,
   })
@@ -58,8 +49,10 @@ export const mediaHandler = async (
   const file = context.s3.file(key)
 
   try {
-    // Range matters for video: without it the browser cannot seek, and Safari
-    // refuses to play the clip at all.
+    /**
+     * Range matters for video: without it the browser cannot seek, and Safari
+     * refuses to play the clip at all.
+     */
     const range = parseRange(request.headers.get('range'))
 
     if (range) {

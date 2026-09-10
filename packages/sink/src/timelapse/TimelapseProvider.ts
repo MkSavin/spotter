@@ -24,12 +24,8 @@ export type TimelapseProgress =
   | { state: 'lost' }
 
 /**
- * Port for NVRs that can export a span of recordings as a single video.
- *
- * Kept separate from `MediaProvider` because the shape of the interaction is
- * different: an export is started, then polled, then downloaded, and it may
- * outlive the request that asked for it. Adapters whose NVR cannot do this
- * simply do not implement it.
+ * Separate from `MediaProvider`: an export is started, polled and downloaded,
+ * and it may outlive the request that asked for it.
  */
 export interface TimelapseProvider {
   /** Starts an export. Returns `null` when the NVR declines the span. */

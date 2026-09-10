@@ -28,15 +28,8 @@ type Options = {
 }
 
 /**
- * Turns adapter heartbeats into alerts about the NVR behind them.
- *
- * On a timer rather than on arrival, and that is the point: the failure this
- * exists for is an NVR that stops publishing while the adapter keeps beating
- * happily. Waiting for a message that says "I am broken" is exactly how two
- * days of silence went unnoticed — nobody sends that message.
- *
- * Transitions only. A fault that reported itself every minute would be muted
- * within a day, and then the next one would go unseen too.
+ * On a timer, not on arrival: nobody sends a message saying "I am broken".
+ * Transitions only. See docs/foundings/silent-failures.md.
  */
 export class SourceWatcher {
   private readonly latest = new Map<
@@ -100,7 +93,7 @@ export class SourceWatcher {
         this.options.onAlert({
           source: activity.source,
           node: beat.node,
-          // Report what it recovered *from*, which is what the reader was told.
+          /** Report what it recovered *from*, which is what the reader was told. */
           fault: announced,
           recovered: true,
           forSeconds: Math.round((now - began) / 1000),
@@ -108,8 +101,10 @@ export class SourceWatcher {
         continue
       }
 
-      // A source escalating from silent to unreachable keeps its start time:
-      // the outage did not begin again, it got worse.
+      /**
+       * A source escalating from silent to unreachable keeps its start time:
+       * the outage did not begin again, it got worse.
+       */
       const began = this.since.get(key) ?? now
       this.since.set(key, began)
       this.announced.set(key, fault)

@@ -1,15 +1,6 @@
 import { z } from 'zod'
 
-/**
- * How much work a service's consumer group is sitting on, per stream.
- *
- * `lag` is the number of entries never handed to anyone — the honest measure of
- * "is this service keeping up", and the one an autoscaler wants. `pending` is
- * work already claimed but not yet acked; a small number is normal traffic, a
- * growing one means handlers are failing or stuck. `oldestPendingMs` separates
- * those two cases: a backlog that is merely large clears, one that is old does
- * not.
- */
+/** Consumer-group backlog per stream. See docs/foundings/silent-failures.md. */
 export const queueDepthSchema = z.object({
   stream: z.string().min(1),
   lag: z.number().nonnegative(),
@@ -21,72 +12,33 @@ export type QueueDepth = z.infer<typeof queueDepthSchema>
 
 /**
  * When an NVR adapter last saw an event from its source.
- *
- * A source that goes quiet is invisible otherwise: the adapter stays connected,
- * keeps answering its healthcheck and reports a healthy heartbeat, while the
- * NVR behind it has stopped publishing. That is not hypothetical — it is how a
- * break went unnoticed for a day, with the bot saying nothing.
- *
- * `lastEventAt` is absent until the first event of the process: a just-started
- * adapter has nothing to report yet, which is not the same as silence.
+ * See docs/foundings/silent-failures.md.
  */
 export const sourceActivitySchema = z.object({
   /** Source id, e.g. `frigate`. */
   source: z.string().min(1),
   /** Producer clock, epoch ms. Absent when no event has arrived yet. */
   lastEventAt: z.number().positive().optional(),
-  /**
-   * When the NVR last said anything at all on the transport, event or not.
-   *
-   * The signal `lastEventAt` cannot give: an NVR publishes housekeeping on a
-   * timer regardless of what happens in front of the cameras, so silence here
-   * means the link is down, while silence in events might just be a quiet
-   * night. Absent when the adapter has heard nothing since it started, and for
-   * sources whose transport has no such traffic.
-   */
+  /** Housekeeping traffic, not events: silence here means the link is down. */
   lastContactAt: z.number().positive().optional(),
   /** Events seen since the process started. */
   eventCount: z.number().nonnegative(),
   /** Seconds the process has been up, so a consumer can tell young from quiet. */
   since: z.number().nonnegative(),
-  /**
-   * Cameras the NVR itself reports as broken, by its own counters.
-   *
-   * Silence alone cannot tell a quiet driveway from a dropped stream; the NVR
-   * knows within seconds. Absent when the adapter cannot read that, which is
-   * not the same as everything being fine.
-   */
+  /** By the NVR's own counters. Absent when unreadable, which is not "fine". */
   deadCameras: z.array(z.string().min(1)).optional(),
   /** Cameras with video the detector never sees — no event can be produced. */
   stalledCameras: z.array(z.string().min(1)).optional(),
-  /**
-   * The NVR is refusing the adapter's credentials.
-   *
-   * Worth its own field because it explains the others: media requests, the
-   * catalog and the camera counters all fail together, and without saying why
-   * the reader sees a source that is connected yet does nothing.
-   */
+  /** Explains the other fields: media, catalog and counters all fail together. */
   unauthorized: z.boolean().optional(),
-  /**
-   * Whether this source's transport carries housekeeping traffic at all.
-   *
-   * Without it, "no contact" cannot be told apart from "this adapter never
-   * reports contact", and a consumer would alarm on every source that simply
-   * does not have the concept.
-   */
+  /** Tells "no contact" apart from "never reports contact". */
   reportsContact: z.boolean().optional(),
 })
 export type SourceActivity = z.infer<typeof sourceActivitySchema>
 
 /**
- * Liveness and version report from a single service.
- *
- * Every service announces itself on start and then on a timer. Consumers keep
- * the latest report per service and treat a stale one as "not reporting" — a
- * crashed service stops sending rather than announcing its own death.
- *
- * Carried on a stream, not a key: keys do not cross the forwarder, so a
- * cloud-side consumer would never see reports from the ingest node.
+ * Liveness and version report from one service.
+ * See docs/foundings/silent-failures.md.
  */
 export const heartbeatSchema = z.object({
   /** Package name without the scope, e.g. `telegram`. */
@@ -100,21 +52,11 @@ export const heartbeatSchema = z.object({
   at: z.number().positive(),
   /** Free-form extras: NVR build, ffmpeg, redis server version. */
   details: z.record(z.string(), z.string()).optional(),
-  /**
-   * Depth of every stream this service consumes. Absent for services that
-   * consume nothing, and omitted entirely when all queues are empty — the
-   * common case, and not worth the bytes on every beat.
-   */
+  /** Omitted when every queue is empty — the common case. */
   queues: z.array(queueDepthSchema).optional(),
   /** Set only by adapters that own an NVR source; absent everywhere else. */
   source: sourceActivitySchema.optional(),
-  /**
-   * The adapter's detector is a stub, so real detection is off.
-   *
-   * A field rather than a free-form detail because it changes what every other
-   * line on the status page means: a source reporting healthy while this is set
-   * is reporting on events we asked for, not on anything that happened.
-   */
+  /** Detector is a stub: a healthy source then reports staged events only. */
   probeActive: z.boolean().optional(),
 })
 export type Heartbeat = z.infer<typeof heartbeatSchema>
@@ -127,42 +69,22 @@ export const HEARTBEAT_INTERVAL_MS = 30_000
 /** Reports older than this count as offline. */
 export const HEARTBEAT_STALE_MS = HEARTBEAT_INTERVAL_MS * 3
 
-/**
- * Silence from a source worth reporting. Six hours is deliberately generous: a
- * quiet camera overnight is normal, a quiet one for a quarter of a day is not,
- * and a threshold that cries wolf gets ignored precisely when it matters.
- */
+/** Deliberately generous. See docs/foundings/silent-failures.md. */
 export const SOURCE_SILENT_MS = 6 * 60 * 60 * 1000
 
 /**
- * How long the NVR may say nothing at all before the link counts as broken.
- *
- * Minutes, not hours, and that is the whole point: housekeeping traffic does
- * not depend on anything happening in front of the cameras, so a few missed
- * rounds is already an answer.
- *
- * Measured, not assumed: Frigate 0.17 publishes `frigate/stats` every 60
- * seconds. Fifteen minutes leaves room for a restart and a rough patch and
- * still catches a dropped link within the hour — against six hours for event
- * silence, which cannot be shortened without crying wolf on every quiet night.
+ * Minutes, not hours: housekeeping does not depend on the cameras.
+ * See docs/foundings/silent-failures.md.
  */
 export const SOURCE_UNREACHABLE_MS = 15 * 60 * 1000
 
-/**
- * Whether the NVR has stopped talking to us entirely.
- *
- * Distinct from `isSourceSilent`, and stronger: a quiet driveway produces no
- * events, but it cannot stop the NVR's own housekeeping. This is the check
- * that would have caught the September 2026 outage within minutes instead of
- * two days.
- */
+/** Stronger than `isSourceSilent`: a quiet driveway cannot stop housekeeping. */
 export const isSourceUnreachable = (
   activity: SourceActivity,
   now = Date.now(),
   thresholdMs = SOURCE_UNREACHABLE_MS,
 ): boolean => {
-  // Nothing heard since start is only alarming once we have waited long enough
-  // to have heard something.
+  // Only alarming once we have waited long enough to have heard something.
   if (!activity.lastContactAt)
     return (
       activity.since * 1000 > thresholdMs && activity.reportsContact === true
@@ -171,10 +93,7 @@ export const isSourceUnreachable = (
   return now - activity.lastContactAt > thresholdMs
 }
 
-/**
- * Whether a source has been quiet long enough to warn about. A process that has
- * not been up that long yet cannot know, so it never warns.
- */
+/** A process not up that long yet cannot know, so it never warns. */
 export const isSourceSilent = (
   activity: SourceActivity,
   now = Date.now(),

@@ -17,13 +17,8 @@ const bearer = (request: Request): string | null => {
 }
 
 /**
- * The token from `?token=`, for requests a browser makes without our code in
- * the loop.
- *
- * `<img>` and `<video>` cannot carry an Authorization header, so media routes
- * would be unreachable to the very elements that need them. The query token is
- * the same grant, and it never leaves the app's own origin — unlike a presigned
- * S3 URL, which hands out the object itself.
+ * `<img>` and `<video>` cannot carry a header, so the same grant travels in
+ * the query. See docs/foundings/http-and-push.md.
  */
 const queryToken = (request: Request): string | null => {
   const value = new URL(request.url, 'http://localhost').searchParams.get(

@@ -13,12 +13,8 @@ const CLIP_ERRORS: Record<string, string> = {
 }
 
 /**
- * Registers the "Видео" inline-button handler. Tapping it requests an on-demand
- * clip transcode (event.clip RPC); the transcoded video flows back through the
- * normal media → delivery path and is edited onto every subscriber's message.
- *
- * Any member of an already-authorized chat may request the clip — the button
- * only exists on event messages delivered to authorized chats.
+ * Requests an on-demand transcode; the video returns through the normal media
+ * path. Any member of an authorized chat may tap it.
  */
 export const registerClipCallback = (bot: Bot<BotContext, BotApi>): void => {
   bot.callbackQuery(clipCallbackPattern, async (context) => {

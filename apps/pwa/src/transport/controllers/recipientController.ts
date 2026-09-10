@@ -6,12 +6,8 @@ import type { TransportContext } from '../../context'
 import { devicesRepo } from '../../db/repository'
 
 /**
- * Keeps a device's cached role in step with the domain.
- *
- * Without this a demoted user keeps the UI of their old role until they
- * re-authorize — the server would refuse the commands, but offering buttons
- * that always fail is its own kind of broken. A revoked recipient loses its
- * devices outright.
+ * A demoted user would otherwise keep the UI of their old role until they
+ * re-authorize, offering buttons that always fail.
  */
 export const recipientController = parsedController(
   safeParseDeliveryRecipient,

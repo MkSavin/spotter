@@ -9,21 +9,27 @@ export const frigateUrls = {
   clip: '{host}/api/events/{id}/clip.mp4',
   snapshot: '{host}/api/events/{id}/snapshot.jpg',
   event: '{host}/api/events/{id}',
-  // A frame pulled from the continuous recording, for events too short for
-  // Frigate to have written a snapshot of their own.
+  /**
+   * A frame pulled from the continuous recording, for events too short for
+   * Frigate to have written a snapshot of their own.
+   */
   recordingFrame: '{host}/api/{camera}/recordings/{time}/snapshot.jpg',
   latestFrame: '{host}/api/{camera}/latest.jpg',
   config: '{host}/api/config',
   version: '{host}/api/version',
-  // Live camera/detector counters: the only way to learn the NVR lost video.
+  /** Live camera/detector counters: the only way to learn the NVR lost video. */
   stats: '{host}/api/stats',
-  // Manual events: real recordings, but no `frigate/events` MQTT update — the
-  // caller publishes the canonical event itself.
+  /**
+   * Manual events: real recordings, but no `frigate/events` MQTT update — the
+   * caller publishes the canonical event itself.
+   */
   createEvent: '{host}/api/events/{camera}/{label}/create',
   endEvent: '{host}/api/events/{id}/end',
-  // Recording exports. `exportFile` is served by Frigate's nginx, not the API,
-  // so it takes a bare file name rather than the container-internal path the
-  // export record reports.
+  /**
+   * Recording exports. `exportFile` is served by Frigate's nginx, not the API,
+   * so it takes a bare file name rather than the container-internal path the
+   * export record reports.
+   */
   exportStart: '{host}/api/export/{camera}/start/{start}/end/{end}',
   exportList: '{host}/api/exports',
   exportDelete: '{host}/api/export/{id}',
@@ -31,12 +37,8 @@ export const frigateUrls = {
 } as const
 
 /**
- * Strips trailing slashes and query noise from the configured host URL.
- *
- * Hand-rolled rather than `new URL()`: the value may carry a path prefix behind
- * a reverse proxy, which `origin` would discard. The port matters — the earlier
- * character class excluded `:`, so `http://frigate:5000/` kept its slash and
- * every request went to `//api/...`.
+ * Hand-rolled rather than `new URL()`, which would discard a path prefix.
+ * See docs/foundings/frigate-api-quirks.md.
  */
 export const normalizeHostUrl = (hostUrl: string): string =>
   hostUrl.trim().replace(/\?.*$/, '').replace(/\/+$/, '')
@@ -55,12 +57,8 @@ export const settleUrl = (
 }
 
 /**
- * Mints a short-lived Frigate JWT. The secret never leaves this process — only
- * staged S3 keys travel downstream.
- *
- * Frigate requires `sub`, `role` and `exp`, and rejects the token outright when
- * any is missing — a token without `role` fails no matter how right the secret
- * is. Timestamps are whole seconds, as JWT defines them.
+ * The secret never leaves this process; only S3 keys travel downstream.
+ * See docs/foundings/frigate-api-quirks.md.
  */
 export const mintFrigateJwt = (config: FrigateMediaConfig): string => {
   const now = Math.floor(Date.now() / 1000)
@@ -78,12 +76,8 @@ export const mintFrigateJwt = (config: FrigateMediaConfig): string => {
 }
 
 /**
- * `fetch` for the NVR: bearer token plus the TLS policy.
- *
- * The authenticated port serves a self-signed certificate Frigate generates
- * itself, so reaching it at all means accepting that certificate. Gated behind
- * `FRIGATE_TLS_INSECURE` rather than always on, since the same URL may sit
- * behind a proxy with a real one.
+ * The authenticated port serves Frigate's own self-signed certificate, so
+ * reaching it means accepting one — gated behind `FRIGATE_TLS_INSECURE`.
  */
 export const frigateFetch = (
   config: FrigateMediaConfig,
@@ -111,7 +105,9 @@ export const frigateMediaRequest = (
 ): Request =>
   new Request(settleUrl(template, config.remoteUrl, params), {
     headers: frigateAuthHeaders(config),
-    // Same reason as `frigateFetch`: whoever fetches this Request must accept
-    // the NVR's own certificate.
+    /**
+     * Same reason as `frigateFetch`: whoever fetches this Request must accept
+     * the NVR's own certificate.
+     */
     ...(config.tlsInsecure ? { tls: { rejectUnauthorized: false } } : {}),
   } as RequestInit)

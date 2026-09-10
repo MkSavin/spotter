@@ -8,15 +8,8 @@ import type { Stenograph } from 'stenograph'
 import type { Catalog } from './Catalog'
 
 /**
- * Snapshots the adapter's catalog (cameras + object types) and stores it under
- * the `spotter.catalog.<source>` Redis key, then notifies consumers via the
- * `spotter.catalog.updated` stream. Consumers read the key on demand and cache
- * it — replacing the bot's hard-coded `cameraLabels`/`objectLabels`.
- *
- * `previous` short-circuits an unchanged snapshot so the refresh loop does not
- * wake every consumer on a timer. `force` publishes regardless, for a consumer
- * that restarted and missed the last one — it keeps the memo, so the log can
- * still tell a real change from a routine repeat.
+ * `previous` skips an unchanged snapshot so the refresh loop wakes nobody;
+ * `force` publishes anyway, for a consumer that restarted and missed one.
  */
 export const publishCatalog = async (
   catalog: Catalog,
@@ -60,9 +53,11 @@ export const publishCatalog = async (
 
   if (previous) previous.value = serialized
 
-  // Only a catalog that actually differs is news — cameras appeared or went
-  // away. A forced republish of an identical list is bookkeeping, and at one
-  // an hour per source it buries the lines worth reading.
+  /**
+   * Only a catalog that actually differs is news — cameras appeared or went
+   * away. A forced republish of an identical list is bookkeeping, and at one
+   * an hour per source it buries the lines worth reading.
+   */
   const message = `Published catalog for "${sourceId}": ${cameras.length} cameras, ${objectTypes.length} object types`
   if (unchanged) logger.debug(message)
   else if (isFirst || previous) logger.info(message)

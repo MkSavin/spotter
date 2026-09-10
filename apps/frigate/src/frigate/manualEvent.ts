@@ -2,14 +2,8 @@ import type { Stenograph } from 'stenograph'
 import type { FrigateMediaConfig } from '../config'
 import { frigateFetch, frigateUrls, settleUrl } from './frigateClient'
 
-/**
- * Frigate can create an event on demand, and it records real footage for it —
- * which makes an end-to-end test that exercises the actual media pipeline
- * instead of synthetic ids the NVR has never heard of.
- *
- * Frigate does not announce manual events on `frigate/events`, so the caller
- * publishes the canonical SpotterEvent itself.
- */
+// Real footage, so the media pipeline is exercised for real.
+// See docs/foundings/frigate-api-quirks.md.
 
 export type ManualEventOptions = {
   camera: string

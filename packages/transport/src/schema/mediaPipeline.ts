@@ -1,17 +1,7 @@
 import { z } from 'zod'
 
-/**
- * Contracts for the abstracted media pipeline.
- *
- * The NVR adapter (sink) is the only component that knows how to reach a
- * concrete NVR. Downstream services (server/bot, depot) speak only these
- * stream contracts:
- *
- *   request  → adapter stages raw bytes into S3 → `staged`
- *   staged   → depot transcodes from S3 by key   → `processed`
- *
- * No URLs, credentials or NVR tokens ever travel on the wire — only S3 keys.
- */
+// request → adapter stages into S3 → staged → depot transcodes → processed.
+// Only S3 keys travel on the wire, never URLs or NVR credentials.
 
 /** Kinds of media a consumer can ask an adapter to stage for an event. */
 export const mediaWantSchema = z.enum(['clip', 'snapshot'])
@@ -20,8 +10,8 @@ export type MediaWant = z.infer<typeof mediaWantSchema>
 // --- Event media: request → staged → processed ----------------------------
 
 /**
- * Asks the `<source>` adapter to fetch and stage the requested media for an
- * event. Routed to the per-source stream `spotter.media.request.<source>`.
+ * Routed to `spotter.media.request.<source>`. `camera`/`startTime` let the
+ * adapter find the event in the recording; see docs/foundings/frigate-event-media.md.
  */
 export const mediaRequestSchema = z.object({
   eventId: z.string().min(1),
@@ -34,10 +24,7 @@ export const mediaRequestSchema = z.object({
 })
 export type MediaRequest = z.infer<typeof mediaRequestSchema>
 
-/**
- * Adapter has staged the raw bytes into S3 under the given keys. Published to
- * `spotter.media.staged`; consumed by depot for transcoding.
- */
+/** Published to `spotter.media.staged`; consumed by depot. */
 export const mediaStagedSchema = z.object({
   eventId: z.string().min(1),
   source: z.string().min(1),
@@ -46,10 +33,7 @@ export const mediaStagedSchema = z.object({
 })
 export type MediaStaged = z.infer<typeof mediaStagedSchema>
 
-/**
- * Depot has transcoded the staged media and stored the result in S3. Published
- * to `spotter.event.media_processed`; replaces the legacy url-based payload.
- */
+/** Published to `spotter.event.media_processed`. */
 export const mediaProcessedSchema = z.object({
   eventId: z.string().min(1),
   clipKey: z.string().min(1).optional(),
@@ -74,9 +58,8 @@ export type MediaProgress = z.infer<typeof mediaProgressSchema>
 // --- Camera frame: request → staged → processed ---------------------------
 
 /**
- * Asks the `<source>` adapter to grab and stage the latest frame of a camera.
- * Routed to `spotter.camera.request.<source>`. `chatId`/`messageId` correlate
- * the eventual frame back to a frontend interaction.
+ * Routed to `spotter.camera.request.<source>`; the ids correlate the frame
+ * back to a frontend interaction.
  */
 export const cameraRequestSchema = z.object({
   source: z.string().min(1),
@@ -86,10 +69,7 @@ export const cameraRequestSchema = z.object({
 })
 export type CameraRequest = z.infer<typeof cameraRequestSchema>
 
-/**
- * Adapter has staged the raw camera frame into S3. Published to
- * `spotter.camera.staged`; consumed by depot.
- */
+/** Published to `spotter.camera.staged`; consumed by depot. */
 export const cameraStagedSchema = z.object({
   source: z.string().min(1),
   camera: z.string().min(1),
@@ -99,10 +79,7 @@ export const cameraStagedSchema = z.object({
 })
 export type CameraStaged = z.infer<typeof cameraStagedSchema>
 
-/**
- * Depot has processed the camera frame and stored the result in S3. Published
- * to `spotter.camera.frame_processed`.
- */
+/** Published to `spotter.camera.frame_processed`. */
 export const cameraProcessedSchema = z.object({
   camera: z.string().min(1),
   frameKey: z.string().min(1),
@@ -113,22 +90,13 @@ export type CameraProcessed = z.infer<typeof cameraProcessedSchema>
 
 // --- Stream names ----------------------------------------------------------
 
-/**
- * Canonical stream names for the media pipeline. Per-source request streams are
- * derived via the helpers so the `<source>` routing key stays consistent.
- */
+/** Per-source streams go through the helpers so the routing key stays consistent. */
 export const mediaStreams = {
   /** `spotter.media.request.<source>` — event media requests, per source. */
   mediaRequest: (source: string): string => `spotter.media.request.${source}`,
   /**
-   * `spotter.media.staged` — raw event *snapshot* staged in S3.
-   *
-   * Split from clips on purpose: a clip transcode occupies a worker for
-   * minutes, and while every depot read one stream a burst of clips starved
-   * the snapshots, which are what makes a notification informative. Routing by
-   * stream (rather than filtering after the read) is what lets a depot replica
-   * subscribe to snapshots only — a consumer never sees a stream it did not
-   * register.
+   * Split from clips so a burst of long transcodes cannot starve snapshots:
+   * a replica subscribes to one stream and never sees the other.
    */
   mediaStaged: 'spotter.media.staged',
   /** `spotter.media.staged.clip` — raw event clip staged in S3 (slow lane). */

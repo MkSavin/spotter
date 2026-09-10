@@ -1,14 +1,5 @@
-/**
- * Canonical stream-direction map — the single source of truth for what the
- * forwarder mirrors between the local (ingest) node and the remote (cloud) node.
- *
- * Direction is defined by where a stream is *produced*. With ingestion AND
- * transcoding on the local node (see production.ingest.yml), only the canonical
- * event, the catalog snapshot and the transcoded media results need to reach the
- * cloud bot; the raw `*.staged` streams stay local (the local depot consumes
- * them). The cloud bot, in turn, issues per-source media/frame requests that are
- * mirrored back down to the owning adapter.
- */
+// Direction is defined by where a stream is produced. Raw `*.staged` stays
+// local (the local depot consumes it); only results reach the cloud.
 
 import {
   catalogRequestStream,

@@ -8,8 +8,10 @@
 
 /** Minutes to add to a local wall-clock time to reach UTC, for a given zone. */
 const offsetMinutes = (zone: string, at: Date): number => {
-  // Format the instant in the target zone, read it back as if it were UTC, and
-  // the difference is the offset — no table of zones needed.
+  /**
+   * Format the instant in the target zone, read it back as if it were UTC, and
+   * the difference is the offset — no table of zones needed.
+   */
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: zone,
     hour12: false,
@@ -28,7 +30,7 @@ const offsetMinutes = (zone: string, at: Date): number => {
     field('year'),
     field('month') - 1,
     field('day'),
-    // 24 is how this formatter spells midnight.
+    /** 24 is how this formatter spells midnight. */
     field('hour') % 24,
     field('minute'),
     field('second'),
@@ -47,7 +49,7 @@ export const zonedTime = (
   minute = 0,
 ): number => {
   const guess = Date.UTC(year, month - 1, day, hour, minute)
-  // Two passes: the first offset may be the wrong side of a DST change.
+  /** Two passes: the first offset may be the wrong side of a DST change. */
   const first = offsetMinutes(zone, new Date(guess))
   const second = offsetMinutes(zone, new Date(guess - first * 60_000))
 
@@ -103,8 +105,10 @@ const parseDate = (
       : Number(match[3])
     : currentYear
 
-  // Reject impossible dates rather than letting Date roll them over: `32.01`
-  // would silently become the 1st of February.
+  /**
+   * Reject impossible dates rather than letting Date roll them over: `32.01`
+   * would silently become the 1st of February.
+   */
   const probe = new Date(Date.UTC(year, month - 1, day))
   if (
     month < 1 ||
@@ -148,15 +152,8 @@ const atMinutes = (zone: string, date: CalendarDate, minutes: number): number =>
   )
 
 /**
- * Understands what a person would plausibly type for a period:
- *
- *   `сегодня` / `вчера`              — that whole day
- *   `15.08`                          — that day, year inferred
- *   `15.08 09:00-18:00`              — part of that day
- *   `28.08 09:00 - 31.08 22:00`      — across several days
- *   `28.08-31.08`                    — from the start of one day to the end of another
- *
- * Returns `null` when the text is not a span, so the caller can re-ask.
+ * Parses what a person would plausibly type: `сегодня`, `15.08`,
+ * `15.08 09:00-18:00`, `28.08 09:00 - 31.08 22:00`. `null` when it is not a span.
  */
 export const parseDateSpan = (
   raw: string,
@@ -166,8 +163,10 @@ export const parseDateSpan = (
   const text = raw.trim().toLowerCase()
   if (!text) return null
 
-  // Split on the range dash, tolerating spaces around it. Dots and slashes
-  // inside a date are safe: only a dash separates the two sides.
+  /**
+   * Split on the range dash, tolerating spaces around it. Dots and slashes
+   * inside a date are safe: only a dash separates the two sides.
+   */
   const sides = text.split(/\s*[-–—]\s*/).filter(Boolean)
 
   // One side and a keyword: a whole named day.
@@ -188,7 +187,7 @@ export const parseDateSpan = (
     if (!date) return null
 
     return {
-      // Exclusive end: the next midnight, so the whole day is covered.
+      /** Exclusive end: the next midnight, so the whole day is covered. */
       start: atMinutes(zone, date, 0),
       end: atMinutes(zone, shiftDays(date, 1), 0),
     }
@@ -198,7 +197,7 @@ export const parseDateSpan = (
 
   const [left, right] = sides.map((side) => side.split(/\s+/).filter(Boolean))
 
-  // The left side always starts with a date; a keyword stands in for one.
+  /** The left side always starts with a date; a keyword stands in for one. */
   const leftKeyword = KEYWORDS[left[0]]
   let leftDate: CalendarDate | null
 
@@ -214,8 +213,10 @@ export const parseDateSpan = (
   const leftTime = left[1] ? parseTime(left[1]) : 0
   if (leftTime === null || left.length > 2) return null
 
-  // The right side may repeat the date (`28.08 09:00 - 31.08 22:00`) or give
-  // only a time, meaning the same day (`15.08 09:00-18:00`).
+  /**
+   * The right side may repeat the date (`28.08 09:00 - 31.08 22:00`) or give
+   * only a time, meaning the same day (`15.08 09:00-18:00`).
+   */
   let rightDate: CalendarDate
   let rightTime: number | null
 
@@ -228,11 +229,11 @@ export const parseDateSpan = (
     const asTime = parseTime(right[0])
 
     if (asTime !== null) {
-      // A bare time belongs to the starting day.
+      /** A bare time belongs to the starting day. */
       rightDate = leftDate
       rightTime = asTime
     } else {
-      // A bare date means the end of that day.
+      /** A bare date means the end of that day. */
       const parsed = parseDate(right[0], zone, now)
       if (!parsed) return null
       rightDate = shiftDays(parsed, 1)

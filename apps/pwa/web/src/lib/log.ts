@@ -1,13 +1,6 @@
 /**
- * Browser-side tracing, off unless the server says otherwise.
- *
- * The flag arrives at runtime (`/api/config`, mirrored onto `window`) rather
- * than at build time: the web app is compiled once into the image, so a
- * `VITE_*` define could not be switched on for a node that is already
- * deployed — which is exactly when the tracing is needed.
- *
- * Warnings and errors are always printed. They are rare, and losing the one
- * line that explains a failed login is worse than a little console noise.
+ * Flag arrives at runtime, not build time: the app is compiled once into the
+ * image and tracing is wanted on a node already deployed.
  */
 type Fields = Record<string, unknown>
 

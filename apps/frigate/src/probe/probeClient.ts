@@ -7,13 +7,8 @@ export type ProbeArmed = {
 }
 
 /**
- * Label to class id, matching the `labelmap` the rig's Frigate is configured
- * with.
- *
- * The probe has no model and no label map — it answers with raw class ids, and
- * Frigate resolves them through its own. So this table has to agree with the
- * NVR's config, and an unknown label is refused rather than quietly detected
- * as something else.
+ * The probe answers with raw class ids that Frigate resolves through its own
+ * labelmap, so this table must agree with it; an unknown label is refused.
  */
 export const PROBE_LABELS: Record<string, number> = {
   person: 0,

@@ -4,12 +4,8 @@ import type { Stenograph } from 'stenograph'
 import type { TimelapseJobRecord, TimelapseStore } from './TimelapseTracker'
 
 /**
- * A `TimelapseStore` kept as one JSON file.
- *
- * Deliberately not a database: an adapter tracks a handful of exports at a
- * time, and the whole point is to not lose them across a restart. Writes go
- * through a temp file and a rename so a crash mid-write cannot leave a
- * half-written file that fails to parse on the way back up.
+ * One JSON file, written through a temp file and a rename so a crash cannot
+ * leave something unparseable behind.
  */
 export class FileTimelapseStore implements TimelapseStore {
   private records = new Map<string, TimelapseJobRecord>()

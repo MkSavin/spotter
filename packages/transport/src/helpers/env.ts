@@ -1,11 +1,6 @@
 /**
- * Reads a variable, dropping a trailing `# hint` an `.env` example carried in.
- * Both Bun's `--env-file` and compose's `env_file` already strip these, but a
- * value injected another way (compose `environment:`, a shell export, CI) is
- * passed through verbatim — and a stray hint silently becomes the value.
- *
- * Only for constrained values (enum/number/boolean/list), never for free-form
- * ones: a secret or URL may legitimately contain a hash.
+ * Drops a trailing `# hint` for constrained values only, never for free-form
+ * ones. See docs/foundings/env-and-config.md.
  */
 const readHinted = (variable: string): string | undefined => {
   const value = process.env[variable]

@@ -20,12 +20,8 @@ const isDead = (error: unknown, client: RedisClient): boolean => {
 }
 
 /**
- * Owns a `RedisClient` and replaces it when it dies.
- *
- * Reconnecting in place is not an option: a Bun client that has outlived its
- * connection timeout never recovers, which is why restarting the container was
- * the only known cure. Commands run through `send`, which retries once against
- * a freshly built client.
+ * Replaced rather than reconnected: a timed-out Bun client never recovers.
+ * See docs/foundings/redis-streams.md.
  */
 export class RedisConnection {
   private client: RedisClient

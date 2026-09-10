@@ -16,12 +16,8 @@ export type Config = {
   telegram: {
     token: string
     /**
-     * Where the Bot API lives. Empty means Telegram's own servers.
-     *
-     * Not a knob invented for a test: it is what a self-hosted Bot API server
-     * needs, what Telegram's separate test infrastructure needs, and what lets
-     * a smoke run assert on the calls the bot makes without messaging a real
-     * chat.
+     * Empty means Telegram's own servers. Also what a self-hosted Bot API and
+     * Telegram's test infrastructure need.
      */
     apiRoot: string
     /**

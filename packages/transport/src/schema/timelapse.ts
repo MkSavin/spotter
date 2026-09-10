@@ -1,15 +1,7 @@
 import { z } from 'zod'
 
-/**
- * Contracts for timelapse exports.
- *
- * Unlike a snapshot or a clip, an export is not something the NVR hands over on
- * request: it re-encodes hours of recordings and can run for minutes. So the
- * pipeline is split in two — the adapter starts the export and acknowledges
- * immediately, then a poller watches it to completion and stages the result.
- * Holding the request open instead would exceed the regulator's reclaim window
- * and get the whole export started a second time.
- */
+// Split in two — start then poll — because an export runs for minutes.
+// See docs/foundings/redis-streams.md.
 
 /**
  * Playback speed. Frigate accepts exactly these two values on the export API;

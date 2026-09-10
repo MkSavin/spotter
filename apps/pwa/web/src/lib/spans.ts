@@ -1,10 +1,6 @@
 /**
- * Ready-made periods for a timelapse.
- *
- * The browser knows the user's own timezone, so unlike the bot — which has to
- * be told one — these are computed from local midnight directly. Labels carry
- * the actual date: a timelapse runs for minutes, and finding out afterwards
- * that "вчера" meant a different day is a wasted export.
+ * Computed from local midnight, which the browser knows. Labels carry the
+ * actual date: a wrong "вчера" costs a wasted export.
  */
 export type Span = { start: number; end: number }
 

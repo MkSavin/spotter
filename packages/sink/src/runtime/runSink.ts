@@ -87,12 +87,8 @@ export type RunSinkOptions<TConfig extends SinkConfig> = {
 }
 
 /**
- * Boots a sink adapter: wires Redis (+ S3 when configured), runs the source's
- * ingest loop (stamping `source` and publishing to `spotter.event`), registers
- * the media/camera request consumers when a MediaProvider is supplied and
- * publishes the catalog snapshot. Owns process lifecycle (SIGINT/SIGTERM). The
- * function resolves once startup completes; the process stays alive on the open
- * connections.
+ * Resolves once startup completes; the process stays alive on the open
+ * connections. Owns SIGINT/SIGTERM.
  */
 export const runSink = async <TConfig extends SinkConfig>(
   options: RunSinkOptions<TConfig>,
@@ -115,8 +111,10 @@ export const runSink = async <TConfig extends SinkConfig>(
     `Initializing ${information.name} v${information.version} (source: ${sourceId})...`,
   )
 
-  // Dedicated blocking connection for XREADGROUP; the producer connection stays
-  // free for XADD (ingested events + staged media) and the regulator's acks.
+  /**
+   * Dedicated blocking connection for XREADGROUP; the producer connection stays
+   * free for XADD (ingested events + staged media) and the regulator's acks.
+   */
   const subscriber = new RedisConnection(config.redis.url)
   const producer = new StreamProducer(
     new RedisConnection(config.redis.url),
@@ -169,10 +167,12 @@ export const runSink = async <TConfig extends SinkConfig>(
     s3,
   }
 
-  // Pluggable NVR ingestion: one source per sink instance. The source emits
-  // canonical SpotterEvents; we stamp the routing source and publish them.
-  // Tracked here rather than inside a source: this is the one point every
-  // event from every adapter must cross, so no source can forget to report.
+  /**
+   * Pluggable NVR ingestion: one source per sink instance. The source emits
+   * canonical SpotterEvents; we stamp the routing source and publish them.
+   * Tracked here rather than inside a source: this is the one point every
+   * event from every adapter must cross, so no source can forget to report.
+   */
   const startedAt = Date.now()
   let lastEventAt: number | undefined
   let eventCount = 0
@@ -192,9 +192,11 @@ export const runSink = async <TConfig extends SinkConfig>(
     version: information.version,
     details: options.heartbeatDetails,
     probeActive: options.probeActive,
-    // Re-read every beat: a source that stopped publishing looks identical to a
-    // healthy one from the outside, and this is the only signal that separates
-    // them.
+    /**
+     * Re-read every beat: a source that stopped publishing looks identical to a
+     * healthy one from the outside, and this is the only signal that separates
+     * them.
+     */
     source: () => {
       const health = options.cameraHealth?.()
       return {
@@ -202,8 +204,10 @@ export const runSink = async <TConfig extends SinkConfig>(
         lastEventAt,
         eventCount,
         since: Math.round((Date.now() - startedAt) / 1000),
-        // Read per beat through the handle, so it reflects the live transport
-        // rather than whatever was true when the heartbeat started.
+        /**
+         * Read per beat through the handle, so it reflects the live transport
+         * rather than whatever was true when the heartbeat started.
+         */
         ...(sourceHandle?.lastContactAt
           ? {
               reportsContact: true,
@@ -212,8 +216,10 @@ export const runSink = async <TConfig extends SinkConfig>(
                 : {}),
             }
           : {}),
-        // Omitted rather than empty: "no dead cameras" and "could not ask"
-        // are different answers, and only one of them is reassuring.
+        /**
+         * Omitted rather than empty: "no dead cameras" and "could not ask"
+         * are different answers, and only one of them is reassuring.
+         */
         ...(health?.dead.length ? { deadCameras: health.dead } : {}),
         ...(health?.stalled.length ? { stalledCameras: health.stalled } : {}),
         ...(options.sourceUnauthorized?.() ? { unauthorized: true } : {}),
@@ -221,8 +227,10 @@ export const runSink = async <TConfig extends SinkConfig>(
     },
   })
 
-  // Healthcheck signal: refreshed only while Redis actually answers, so a
-  // wedged-but-running container fails its healthcheck and gets restarted.
+  /**
+   * Healthcheck signal: refreshed only while Redis actually answers, so a
+   * wedged-but-running container fails its healthcheck and gets restarted.
+   */
   stopLiveness = startLiveness({
     check: async () => {
       await subscriber.send('PING', [])

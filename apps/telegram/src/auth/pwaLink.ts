@@ -1,14 +1,8 @@
 import type { ServiceStatus } from '@spotter/transport'
 
 /**
- * Where the PWA lives, if one is running and reachable.
- *
- * Taken from the PWA's own heartbeat rather than the bot's config: the two
- * would drift the first time the address moves, and a login link pointing at
- * the wrong host is worse than no link at all.
- *
- * Only online instances count. Offering a link to an install that stopped
- * reporting sends a person to a page that will not load.
+ * From the PWA's own heartbeat, not our config, which would drift. Online
+ * instances only: a link to a stopped install leads to a page that never loads.
  */
 export const pwaUrl = (services: ServiceStatus[]): string | null => {
   const found = services.find(

@@ -1,12 +1,8 @@
 import { z } from 'zod'
 
 /**
- * Contract for suspending an NVR's own notifications.
- *
- * Distinct from a frontend's mute: that silences one chat and is ours to
- * enforce, while this asks the NVR to stop announcing a camera at all — which
- * every consumer feels. Modelled as a request to the adapter because only it
- * knows how its NVR expresses the idea (Frigate: a retained MQTT publish).
+ * Unlike a frontend mute, this silences the NVR itself and every consumer
+ * feels it. Only the adapter knows how its NVR expresses the idea.
  */
 export const notificationSuspendSchema = z.object({
   source: z.string().min(1),

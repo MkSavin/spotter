@@ -22,13 +22,8 @@ export type CommandBusOptions = {
 }
 
 /**
- * Sends domain-mutating commands to server and awaits the correlated reply on
- * `spotter.command.reply`.
- *
- * A single background reader loop polls the reply stream and dispatches
- * replies to waiting promise callbacks keyed by requestId. Every frontend
- * instance uses its own `instanceId`, so any number of them — telegram and pwa
- * included — share one reply stream without stealing each other's replies.
+ * One reader loop dispatches replies by requestId; a per-instance `instanceId`
+ * lets every frontend share one reply stream without stealing replies.
  */
 export class CommandBus {
   private readonly instanceId: string
@@ -103,7 +98,7 @@ export class CommandBus {
   private async pollLoop(): Promise<void> {
     while (this.running) {
       try {
-        // Bun's RedisClient speaks RESP3
+        /** Bun's RedisClient speaks RESP3 */
         const result = (await this.subscriber.send('XREAD', [
           'COUNT',
           '100',

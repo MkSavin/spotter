@@ -31,31 +31,16 @@ export class Stenograph {
     this.format = options.format
   }
 
-  /**
-   * Disable logging
-   *
-   * @returns this
-   */
   disable(): this {
     this.enabled = false
     return this
   }
 
-  /**
-   * Enable logging
-   *
-   * @returns this
-   */
   enable(): this {
     this.enabled = true
     return this
   }
 
-  /**
-   * Append path
-   *
-   * @param path
-   */
   appendPath(path: string | string[]): this {
     this.pathParts =
       typeof path === 'string'
@@ -64,9 +49,6 @@ export class Stenograph {
     return this
   }
 
-  /**
-   * Create logger clone
-   */
   clone(): Stenograph {
     const cloned = new Stenograph({
       path: this.pathParts,
@@ -80,69 +62,36 @@ export class Stenograph {
     return cloned
   }
 
-  /**
-   * Enable (or disable) tracing
-   *
-   * @param flag
-   */
   trace(flag = true): this {
     this.gluedMessage.trace = flag
     return this
   }
 
-  /**
-   * Start group mode
-   *
-   * @param group
-   */
   group(group?: string): this {
     this.gluedMessage.group = group
     return this
   }
 
-  /**
-   * End group mode
-   */
   groupEnd(): this {
     this.gluedMessage.group = undefined
     return this
   }
 
-  /**
-   * Create child logger with new path definition
-   *
-   * @param path
-   */
   sub(...path: string[]): Stenograph {
     return this.clone().appendPath(path)
   }
 
-  /**
-   * Find level definition
-   *
-   * @param level
-   */
   findDefinition(
     level: StenographLevel,
   ): StenographLevelDefinition | undefined {
     return this.levels.find((definition) => definition.name === level)
   }
 
-  /**
-   * Append message data
-   *
-   * @param message
-   */
   glue(message: StenographSimplifiedMessage): this {
     this.gluedMessage = message
     return this
   }
 
-  /**
-   * Perform message logging
-   *
-   * @param message
-   */
   message(message: StenographSimplifiedMessage): this {
     const definition = this.findDefinition(message.level)
 
@@ -173,22 +122,10 @@ export class Stenograph {
     return this
   }
 
-  /**
-   * Hide sensitive information
-   *
-   * @param value
-   */
   sensitive(value: string): string {
     return `${value.at(0)} ${'#'.repeat(value.length - 2)} ${value.at(-1)}`
   }
 
-  /**
-   * Leveled log shorthand
-   *
-   * @param level
-   * @param content
-   * @private
-   */
   private logShorthand(level: StenographLevel, content: any[] = []): this {
     return this.message({
       level,

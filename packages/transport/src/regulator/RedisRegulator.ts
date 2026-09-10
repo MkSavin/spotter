@@ -12,8 +12,10 @@ import {
 
 export type { StreamMessage } from './parseStreamReply'
 
-// A durable Redis replaying its AOF can take a minute; 60 x 2s covers that
-// without hanging a genuinely broken startup forever.
+/**
+ * A durable Redis replaying its AOF can take a minute; 60 x 2s covers that
+ * without hanging a genuinely broken startup forever.
+ */
 const GROUP_LOADING_RETRIES = 60
 const GROUP_LOADING_DELAY_MS = 2000
 
@@ -155,12 +157,8 @@ export class RedisRegulator<Context extends BaseContext> {
   }
 
   /**
-   * Starts consuming WITHOUT blocking the caller: groups are created, a startup
-   * reclaim runs once, a periodic reaper is scheduled, and the read loop is left
-   * running detached. Open connections keep the process alive.
-   *
-   * @returns a handle whose `stop()` halts the loop and reaper (connections are
-   * closed by the caller).
+   * Detached: the read loop keeps running and open connections hold the
+   * process alive. `stop()` halts the loop and reaper, not the connections.
    */
   async run(
     context: Context,
@@ -203,8 +201,10 @@ export class RedisRegulator<Context extends BaseContext> {
       }
     }
 
-    // Poison message: it has failed too many times. Move the body to a dead-
-    // letter stream for inspection and ack the original so it stops cycling.
+    /**
+     * Poison message: it has failed too many times. Move the body to a dead-
+     * letter stream for inspection and ack the original so it stops cycling.
+     */
     const deadLetter = async (
       stream: string,
       id: string,
@@ -234,10 +234,12 @@ export class RedisRegulator<Context extends BaseContext> {
       )
     }
 
-    // Reclaim entries idle longer than minIdleMs (crashed/stuck consumers).
-    // XPENDING carries the delivery count, so poison messages are diverted to
-    // the DLQ before they are re-dispatched; everything else is XCLAIM'd to this
-    // consumer and retried.
+    /**
+     * Reclaim entries idle longer than minIdleMs (crashed/stuck consumers).
+     * XPENDING carries the delivery count, so poison messages are diverted to
+     * the DLQ before they are re-dispatched; everything else is XCLAIM'd to this
+     * consumer and retried.
+     */
     const reclaim = async (): Promise<void> => {
       for (const stream of streams) {
         const pending = parsePendingReply(
@@ -304,14 +306,8 @@ export class RedisRegulator<Context extends BaseContext> {
     ]
 
     /**
-     * A blocking read that is in flight when the server dies never settles —
-     * it neither resolves nor rejects, so awaiting it parks the loop forever
-     * and no error is ever raised to recover from. The process stays healthy
-     * to every outside check while consuming nothing at all.
-     *
-     * The deadline turns that silence into an error the loop can act on. It is
-     * generous relative to `BLOCK`: a read that merely found nothing returns
-     * on its own well before this fires.
+     * A read in flight when the server dies never settles, parking the loop.
+     * See docs/foundings/redis-streams.md.
      */
     const readDeadlineMs = blockMs + READ_DEADLINE_GRACE_MS
 

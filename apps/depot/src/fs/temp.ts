@@ -12,12 +12,8 @@ export type TempDirectoryController = {
 }
 
 /**
- * Removes directories this prefix left behind. A killed process (SIGKILL after
- * the stop grace period, OOM) never runs its cleanup, and each start makes a
- * fresh `mkdtemp`, so the old ones would accumulate untouched.
- *
- * Only entries older than `minAgeMs` are touched: a sibling replica may be
- * using a directory created moments ago.
+ * A killed process never runs its cleanup, so leftovers accumulate. Only
+ * entries older than `minAgeMs`: a sibling replica may be using a fresh one.
  */
 export const sweepStale = async (
   prefix: string,

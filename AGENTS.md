@@ -241,6 +241,18 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - **Домен/фронтенд не смешивать**: в `server` не должно быть grammy/рендера/Telegram-стейта; в `telegram` — доменной истины (роли/события как источник). Мутации домена из telegram — только через `command.request`.
 - `DIRECTORY_CLEANUP` (depot) меняет очистку temp-файлов; `S3_PRESIGN_EXPIRY` (telegram) — срок жизни пресайн-URL — см. AGENTS.md сервисов.
 
+## Находки
+
+Поведение чужих систем, выясненное по их исходникам и стоившее отладки. Комментарий в коде ссылается сюда, а не пересказывает — не выясняй заново.
+
+- [docs/foundings/frigate-event-media.md](docs/foundings/frigate-event-media.md) — когда Frigate пишет снимок и клип, а когда не напишет никогда.
+- [docs/foundings/frigate-api-quirks.md](docs/foundings/frigate-api-quirks.md) — JWT, адрес NVR, MQTT по умолчанию выключен, экспорт.
+- [docs/foundings/silent-failures.md](docs/foundings/silent-failures.md) — отказы, при которых всё выглядит здоровым; пороги тишины.
+- [docs/foundings/redis-streams.md](docs/foundings/redis-streams.md) — зависшее блокирующее чтение, `-LOADING`, клиенты Bun.
+- [docs/foundings/ffmpeg-hardware-transcode.md](docs/foundings/ffmpeg-hardware-transcode.md) — NVENC, пресеты, откат на CPU.
+- [docs/foundings/http-and-push.md](docs/foundings/http-and-push.md) — пресайн S3 в браузере, HTTP/1.0, коалесцирование push.
+- [docs/foundings/env-and-config.md](docs/foundings/env-and-config.md) — `# hint` из примера, ставший значением.
+
 ## Карта сервисов
 
 - [apps/server/AGENTS.md](apps/server/AGENTS.md) — headless-домен: события, медиа-оркестрация, recipients/авторизация, command-RPC.

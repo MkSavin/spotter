@@ -53,7 +53,7 @@ export const resolveVideoPreset = (
       outputParameters = ['-tune:v zerolatency']
       encoder = 'libx265'
       break
-    // case 'cpu-h264':
+    /** case 'cpu-h264': */
     default:
       outputParameters = ['-tune:v zerolatency']
       encoder = 'libx264'
@@ -62,9 +62,10 @@ export const resolveVideoPreset = (
 
   switch (acceleration) {
     case 'cuda':
-      // Decode on the GPU but hand nvenc ordinary frames: keeping them in VRAM
-      // (`-hwaccel_output_format cuda`) needs a cuda filter chain, and without
-      // one ffmpeg fails to negotiate a format and falls back to the CPU.
+      /**
+       * Decode on the GPU but hand nvenc ordinary frames.
+       * See docs/foundings/ffmpeg-hardware-transcode.md.
+       */
       inputParameters = [
         '-hide_banner',
         '-hwaccel cuda',
@@ -82,7 +83,7 @@ export const resolveVideoPreset = (
     case 'videotoolbox':
       inputParameters = ['-hide_banner']
       break
-    // case 'cpu':
+    /** case 'cpu': */
     default:
       inputParameters = ['-hide_banner']
       break
@@ -116,9 +117,10 @@ export const resolveVideoPreset = (
       break
     }
     case 'cuda': {
-      // Without these nvenc silently uses p4/medium, which on a small Pascal
-      // card is slower than the CPU it was meant to beat. `-cq` caps the size
-      // the way CRF does; `ll` tuning matches Frigate's own presets.
+      /**
+       * Without these nvenc silently picks a preset slower than the CPU.
+       * See docs/foundings/ffmpeg-hardware-transcode.md.
+       */
       const map: Record<PresetQuality, string[]> = {
         best: ['-preset:v p4', '-cq:v 24'],
         good: ['-preset:v p3', '-cq:v 26'],
@@ -132,7 +134,7 @@ export const resolveVideoPreset = (
       break
     }
     case 'vaapi': {
-      // vaapi has no -preset; quality is driven by the global quality knob.
+      /** vaapi has no -preset; quality is driven by the global quality knob. */
       const map: Record<PresetQuality, string[]> = {
         best: ['-global_quality 24'],
         good: ['-global_quality 26'],
@@ -167,7 +169,7 @@ const resolveImageQuality = (quality: PresetQuality | string): number => {
       return 60
     case 'awful':
       return 50
-    // case 'normal':
+    /** case 'normal': */
     default:
       return 80
   }
@@ -277,7 +279,7 @@ const runFfmpeg = async (
   onProgress?: ProgressReporter,
 ): Promise<void> => {
   let frames = 0
-  // Only steps forward are reported: ffmpeg repeats and sometimes rewinds.
+  /** Only steps forward are reported: ffmpeg repeats and sometimes rewinds. */
   let reported = -1
 
   await new Promise<void>((resolve, reject) => {
@@ -301,8 +303,10 @@ const runFfmpeg = async (
       fn()
     }
 
-    // Kill a stuck/overlong encode so the message can fail and be retried
-    // cleanly instead of pinning a consumer until the reaper duplicates it.
+    /**
+     * Kill a stuck/overlong encode so the message can fail and be retried
+     * cleanly instead of pinning a consumer until the reaper duplicates it.
+     */
     const timer = setTimeout(() => {
       command.kill('SIGKILL')
       finish(() =>
@@ -344,7 +348,7 @@ export const transcodeImage = async (
   processed: BunFile,
   image: ImageConfig,
   logger: Stenograph,
-  // Images convert in one shot; the parameter only keeps the two kinds alike.
+  /** Images convert in one shot; the parameter only keeps the two kinds alike. */
   _onProgress?: ProgressReporter,
 ): Promise<void> => {
   const rawPath = raw.name
@@ -361,13 +365,16 @@ export const transcodeImage = async (
   }
 
   const source = Bun.file(rawPath).image()
-  // Dimensions come from the source: conversion never resizes, and reading
-  // them back off disk would cost a second decode.
+  /**
+   * Dimensions come from the source: conversion never resizes, and reading
+   * them back off disk would cost a second decode.
+   */
   const { width, height } = await source.metadata()
 
-  // Progressive encoding is what keeps the output on par with libvips: Bun has
-  // no `optimiseCoding` knob, and without it the same quality lands ~18%
-  // heavier.
+  /**
+   * Progressive keeps the output on par with libvips; Bun has no
+   * `optimiseCoding`. See docs/foundings/ffmpeg-hardware-transcode.md.
+   */
   const encoded = await source
     .jpeg({ quality: resolveImageQuality(image.quality), progressive: true })
     .bytes()

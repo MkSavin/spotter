@@ -11,15 +11,8 @@ export const COMMAND_COOLDOWN_MS = 3_000
 export const THROTTLE_SWEEP_MS = 5 * 60_000
 
 /**
- * Per-chat command cooldown.
- *
- * The pipeline's slow parts are the NVR and ffmpeg, not us: a held-down
- * `/camera_snapshot` costs the camera far more than it costs the bot. The gate
- * therefore protects the NVR, which is why it lives in front of every command
- * rather than inside the ones that happen to be expensive.
- *
- * Deliberately in memory: this smooths a person leaning on a button, and a
- * cooldown that outlives a restart would punish the wrong request.
+ * Guards the NVR, not us, so it sits in front of every command. In memory on
+ * purpose: a cooldown outliving a restart would punish the wrong request.
  */
 export class CommandThrottle {
   private readonly last = new Map<string, number>()
