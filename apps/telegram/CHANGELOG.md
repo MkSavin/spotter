@@ -1,5 +1,21 @@
 # @spotter/telegram
 
+## 1.8.3
+
+### Patch Changes
+
+- 0d4d8c5: A skipped event is logged as a single message line and a summary of the fields that matter, rather than the full payload with `before` and a stack trace of our own parser.
+  
+  An event with neither snapshot nor clip is marked once — `🙈 Без снимка и видео` instead of two adjacent marks.
+- Updated dependencies [7ca6dcd]
+- Updated dependencies [28c3a7c]
+- Updated dependencies [d0c4920]
+- Updated dependencies [0a9052d]
+- Updated dependencies [23a697b]
+- Updated dependencies [e89e83c]
+- Updated dependencies [8de581a]
+  - @spotter/transport@1.11.1
+
 ## 1.8.2
 
 ### Patch Changes

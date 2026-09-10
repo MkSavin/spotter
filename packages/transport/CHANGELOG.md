@@ -1,5 +1,21 @@
 # @spotter/transport
 
+## 1.11.1
+
+### Patch Changes
+
+- 7ca6dcd: `./spotter dlq` lists the entries the regulator gave up on, and `./spotter dlq --replay` puts them back on their original stream. An outage longer than the retry budget (5 attempts, 5 minutes apart) sends every event there, and until now there was no way to get them back out.
+- 28c3a7c: `./spotter dlq` works on an ingest node, where Redis is named `local-redis`: the command used to read an empty database in silence and report that there was nothing there. It also lists pending entries (PEL) — an outage shorter than the retry budget leaves everything there while the dead-letter stream stays empty.
+- d0c4920: `./spotter dlq --replay` actually puts entries back: the Redis calls were made without a service name and failed silently, while the command reported success anyway. Perishable streams (`spotter.heartbeat`, `spotter.media.progress`) are now skipped — their entries go stale within ninety seconds, and replaying one would publish something outdated as current.
+  
+  `.integration` is included in `tsconfig.json`: the node CLI was never typechecked, which is how this bug reached production.
+- 0a9052d: `./spotter doctor` no longer reports matching secrets when the NVR's own secret could not be read: it compares extracted fingerprints rather than substrings, and tells an empty read apart from a found one. The hint about a nonexistent user is gone — Frigate accepts a token for an unknown `sub` too, so that cannot be the reason for a 401.
+- 23a697b: When the secrets match, `./spotter doctor` retries the same token against the NVR's direct address. If it is accepted there, the 401 is not about credentials but about a proxy in front of Frigate keeping the `Authorization` header to itself; doctor names the address that works for `FRIGATE_URL`.
+- e89e83c: `./spotter doctor` explains Frigate's authorization refusal instead of repeating it: it compares the secret fingerprints on both sides, names where the NVR takes its own from (env overrides the file), and checks whether any users exist at all.
+- 8de581a: Motionless events no longer reach the chat. Frigate writes neither a snapshot nor a clip when `position_changes` is 0 — `should_save_snapshot` and `should_retain_recording` both reject on that field — so such an event could only ever arrive empty. The filter is back on every lifecycle stage instead of `update` alone; set `SKIP_MOTIONLESS_EVENTS=false` to keep them.
+  
+  Snapshots are now fetched according to the event's own flag rather than blindly. Frigate writes the file to disk before it announces the end, so `hasSnapshot` on an `end` is final: when it is false the adapter cuts a frame from the continuous recording straight away instead of spending a request on a certain 404. The frame is located by the event's own timestamps rather than by querying the NVR, which does not yet know the event that soon and used to refuse silently.
+
 ## 1.11.0
 
 ### Minor Changes
