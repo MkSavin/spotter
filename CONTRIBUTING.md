@@ -74,6 +74,6 @@ if (seen.has(event.id)) return
   `refactor`, `revert`, `style`, `test`.
   Регистр заголовка не проверяется — пиши как читается (`fix: Biome upgrade`).
   Проверить сообщение локально: `echo 'fix: ...' | bunx commitlint`.
-- К изменению, влияющему на пользователей, добавляй changeset: `bunx changeset`.
+- К изменению, влияющему на пользователей, добавляй changeset: `bun --bun changeset`.
 - Версионирование и сборка образов — автоматические, по мержу в `master`.
   Детали — в [docs/operations.md](docs/operations.md).
