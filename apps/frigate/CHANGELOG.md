@@ -1,5 +1,25 @@
 # @spotter/sink
 
+## 1.7.1
+
+### Patch Changes
+
+- 8de581a: Motionless events no longer reach the chat. Frigate writes neither a snapshot nor a clip when `position_changes` is 0 — `should_save_snapshot` and `should_retain_recording` both reject on that field — so such an event could only ever arrive empty. The filter is back on every lifecycle stage instead of `update` alone; set `SKIP_MOTIONLESS_EVENTS=false` to keep them.
+  
+  Snapshots are now fetched according to the event's own flag rather than blindly. Frigate writes the file to disk before it announces the end, so `hasSnapshot` on an `end` is final: when it is false the adapter cuts a frame from the continuous recording straight away instead of spending a request on a certain 404. The frame is located by the event's own timestamps rather than by querying the NVR, which does not yet know the event that soon and used to refuse silently.
+- 0d4d8c5: A skipped event is logged as a single message line and a summary of the fields that matter, rather than the full payload with `before` and a stack trace of our own parser.
+  
+  An event with neither snapshot nor clip is marked once — `🙈 Без снимка и видео` instead of two adjacent marks.
+- Updated dependencies [7ca6dcd]
+- Updated dependencies [28c3a7c]
+- Updated dependencies [d0c4920]
+- Updated dependencies [0a9052d]
+- Updated dependencies [23a697b]
+- Updated dependencies [e89e83c]
+- Updated dependencies [8de581a]
+  - @spotter/transport@1.11.1
+  - @spotter/sink@1.6.3
+
 ## 1.7.0
 
 ### Minor Changes
