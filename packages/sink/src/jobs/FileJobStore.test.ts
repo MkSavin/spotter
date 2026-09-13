@@ -3,8 +3,8 @@ import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { defaultLogger } from 'stenograph'
-import { FileTimelapseStore } from './FileTimelapseStore'
-import type { TimelapseJobRecord } from './TimelapseTracker'
+import type { TimelapseJobRecord } from '../timelapse/TimelapseTracker'
+import { FileJobStore } from './FileJobStore'
 
 defaultLogger.disable()
 
@@ -23,14 +23,14 @@ const record = (jobId: string): TimelapseJobRecord => ({
 const tempFile = () =>
   path.join(tmpdir(), `spotter-tl-${crypto.randomUUID()}`, 'exports.json')
 
-describe('FileTimelapseStore', () => {
+describe('FileJobStore', () => {
   test('survives the process: a new instance reads what the old one wrote', async () => {
     const file = tempFile()
 
-    const first = new FileTimelapseStore(file, defaultLogger)
+    const first = new FileJobStore(file, defaultLogger)
     await first.put(record('front_a'))
 
-    const second = new FileTimelapseStore(file, defaultLogger)
+    const second = new FileJobStore(file, defaultLogger)
     expect((await second.list()).map((entry) => entry.jobId)).toEqual([
       'front_a',
     ])
@@ -38,7 +38,7 @@ describe('FileTimelapseStore', () => {
 
   test('drop removes the record', async () => {
     const file = tempFile()
-    const store = new FileTimelapseStore(file, defaultLogger)
+    const store = new FileJobStore(file, defaultLogger)
 
     await store.put(record('front_a'))
     await store.put(record('front_b'))
@@ -50,7 +50,7 @@ describe('FileTimelapseStore', () => {
   })
 
   test('a missing file is an empty store, not a failure', async () => {
-    const store = new FileTimelapseStore(tempFile(), defaultLogger)
+    const store = new FileJobStore(tempFile(), defaultLogger)
     expect(await store.list()).toEqual([])
   })
 
@@ -59,7 +59,7 @@ describe('FileTimelapseStore', () => {
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, '{ this is not json', 'utf8')
 
-    const store = new FileTimelapseStore(file, defaultLogger)
+    const store = new FileJobStore(file, defaultLogger)
     expect(await store.list()).toEqual([])
 
     // And it recovers into a usable state.
@@ -69,7 +69,7 @@ describe('FileTimelapseStore', () => {
 
   test('concurrent writes do not lose records', async () => {
     const file = tempFile()
-    const store = new FileTimelapseStore(file, defaultLogger)
+    const store = new FileJobStore(file, defaultLogger)
 
     await Promise.all([
       store.put(record('front_a')),
@@ -77,7 +77,7 @@ describe('FileTimelapseStore', () => {
       store.put(record('front_c')),
     ])
 
-    const reread = new FileTimelapseStore(file, defaultLogger)
+    const reread = new FileJobStore(file, defaultLogger)
     expect((await reread.list()).map((entry) => entry.jobId).sort()).toEqual([
       'front_a',
       'front_b',

@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { FileJobStore } from '@spotter/sink'
 import {
   mediaStreams,
   RedisConnection,
@@ -13,8 +14,9 @@ import information from '../package.json'
 import { resolveConfig } from './config'
 import type { CoreContext } from './context'
 import { cameraStagedController } from './controllers/cameraStagedController'
-import { mediaStagedController } from './controllers/mediaStagedController'
+import { createMediaStagedController } from './controllers/mediaStagedController'
 import { sweepStale, temp } from './fs/temp'
+import { type TranscodeJobRecord, TranscodeQueue } from './jobs/TranscodeQueue'
 import { applicationLogger } from './log'
 import { probeDetails } from './probeDetails'
 
@@ -53,12 +55,16 @@ const run = async (): Promise<void> => {
 
   let stopHeartbeat: (() => void) | null = null
   let stopLiveness: (() => void) | null = null
+  let queue: TranscodeQueue | null = null
 
   const shutdown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat?.()
     stopLiveness?.()
     await transport?.stop()
+    // Let an encode finish rather than orphan its output; anything still queued
+    // is picked up again from the store on the next start.
+    await queue?.stop()
     subscriber.close()
     producer.disconnect()
     await tempDir.remove()
@@ -79,6 +85,28 @@ const run = async (): Promise<void> => {
       return true
     },
   })
+
+  const context: CoreContext = {
+    directory: { temp: tempDir },
+    logger: applicationLogger,
+    config,
+    s3,
+    subscriber,
+    producer,
+  }
+
+  // Survives a restart: once the stream entry is acked, nothing else would
+  // redeliver the transcode.
+  queue = new TranscodeQueue({
+    context,
+    store: new FileJobStore<TranscodeJobRecord>(
+      config.transcodeStatePath,
+      applicationLogger,
+    ),
+    concurrency: config.video.concurrency,
+  })
+
+  const mediaStagedController = createMediaStagedController(queue)
 
   // Camera frames ride the snapshot lane: both are quick and user-facing.
   const regulator = new RedisRegulator<CoreContext>()
@@ -128,6 +156,11 @@ const run = async (): Promise<void> => {
       maxDeliveries: config.redis.maxDeliveries,
     },
   )
+
+  const resumed = await queue.recover(applicationLogger)
+  if (resumed > 0) {
+    applicationLogger.info(`Resumed ${resumed} unfinished transcode(s)`)
+  }
 
   applicationLogger.info('Application successfully started up')
 }

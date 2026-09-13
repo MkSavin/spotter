@@ -23,11 +23,12 @@ export type VideoConfig = {
   device: number
   skipConversion: boolean
   /**
-   * Hard cap on a single ffmpeg run. A stuck encode never releases the message,
-   * and once it idles past REDIS_RECLAIM_MIN_IDLE_MS the reaper would re-dispatch
-   * a duplicate transcode — so keep this comfortably below that idle threshold.
+   * Hard cap on a single ffmpeg run. Unrelated to the reclaim window now that
+   * transcoding runs outside the stream entry: this only kills a stuck encode.
    */
   timeoutMs: number
+  /** How many clips one replica encodes at once. */
+  concurrency: number
 }
 
 export type ImageConfig = {
@@ -49,6 +50,8 @@ export type CoreConfig = {
 
   /** Staged streams this replica subscribes to. */
   lane: Lane
+  /** Where accepted-but-unfinished transcodes are remembered across restarts. */
+  transcodeStatePath: string
 
   s3: S3Config
 
@@ -67,6 +70,10 @@ export const resolveConfig = (): CoreConfig => {
       clientId: information.name,
     }),
     lane: env.enum('DEPOT_LANE', lanes, 'all'),
+    transcodeStatePath: env.string(
+      'TRANSCODE_STATE_PATH',
+      '/data/transcode-jobs.json',
+    ),
     s3: resolveS3Config(),
     directory: {
       cleanupStrategy: env.enum(
@@ -81,7 +88,8 @@ export const resolveConfig = (): CoreConfig => {
       quality: env.enum('VIDEO_QUALITY', qualities, 'best'),
       device: env.number('VIDEO_DEVICE', 0),
       skipConversion: env.boolean('VIDEO_SKIP_CONVERSION', false),
-      timeoutMs: env.number('VIDEO_TIMEOUT_MS', 120000),
+      timeoutMs: env.number('VIDEO_TIMEOUT_MS', 14_400_000),
+      concurrency: env.number('VIDEO_CONCURRENCY', 1),
     },
     image: {
       quality: env.enum('IMAGE_QUALITY', qualities, 'best'),

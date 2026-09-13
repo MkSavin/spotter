@@ -5,6 +5,7 @@ import {
 } from '@spotter/transport'
 import type { S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
+import type { JobStore } from '../jobs/FileJobStore'
 import { stageMedia } from '../media/stageMedia'
 import type { TimelapseProvider } from './TimelapseProvider'
 
@@ -39,11 +40,7 @@ export type TimelapseJobRecord = {
  * started it, so without this a restart would leave the NVR producing a file
  * nobody is waiting for and the user staring at a message that never updates.
  */
-export interface TimelapseStore {
-  put(record: TimelapseJobRecord): void | Promise<void>
-  drop(jobId: string): void | Promise<void>
-  list(): TimelapseJobRecord[] | Promise<TimelapseJobRecord[]>
-}
+export type TimelapseStore = JobStore<TimelapseJobRecord>
 
 export type TimelapseTrackerOptions = {
   provider: TimelapseProvider

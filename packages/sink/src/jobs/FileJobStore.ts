@@ -1,14 +1,21 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { Stenograph } from 'stenograph'
-import type { TimelapseJobRecord, TimelapseStore } from './TimelapseTracker'
+/** Work that outlives the request that asked for it, remembered by `jobId`. */
+export interface JobStore<TRecord extends { jobId: string }> {
+  put(record: TRecord): void | Promise<void>
+  drop(jobId: string): void | Promise<void>
+  list(): TRecord[] | Promise<TRecord[]>
+}
 
 /**
  * One JSON file, written through a temp file and a rename so a crash cannot
  * leave something unparseable behind.
  */
-export class FileTimelapseStore implements TimelapseStore {
-  private records = new Map<string, TimelapseJobRecord>()
+export class FileJobStore<TRecord extends { jobId: string }>
+  implements JobStore<TRecord>
+{
+  private records = new Map<string, TRecord>()
   private loaded = false
   private writing: Promise<void> = Promise.resolve()
 
@@ -17,7 +24,7 @@ export class FileTimelapseStore implements TimelapseStore {
     private readonly logger: Stenograph,
   ) {}
 
-  async put(record: TimelapseJobRecord): Promise<void> {
+  async put(record: TRecord): Promise<void> {
     await this.load()
     this.records.set(record.jobId, record)
     await this.flush()
@@ -28,7 +35,7 @@ export class FileTimelapseStore implements TimelapseStore {
     if (this.records.delete(jobId)) await this.flush()
   }
 
-  async list(): Promise<TimelapseJobRecord[]> {
+  async list(): Promise<TRecord[]> {
     await this.load()
     return [...this.records.values()]
   }
@@ -39,7 +46,7 @@ export class FileTimelapseStore implements TimelapseStore {
 
     try {
       const raw = await fs.readFile(this.file, 'utf8')
-      const parsed = JSON.parse(raw) as TimelapseJobRecord[]
+      const parsed = JSON.parse(raw) as TRecord[]
 
       if (Array.isArray(parsed)) {
         for (const record of parsed) {
@@ -49,9 +56,9 @@ export class FileTimelapseStore implements TimelapseStore {
     } catch (error) {
       // A missing file is the normal first start; anything else means the file
       // is unusable, and refusing to start over it would be worse than losing
-      // the handful of exports it described.
+      // the handful of jobs it described.
       if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
-        this.logger.warn('Could not read the timelapse store', error)
+        this.logger.warn(`Could not read the job store ${this.file}`, error)
       }
     }
   }
@@ -71,7 +78,7 @@ export class FileTimelapseStore implements TimelapseStore {
       await fs.writeFile(temporary, payload, 'utf8')
       await fs.rename(temporary, this.file)
     } catch (error) {
-      this.logger.warn('Could not persist the timelapse store', error)
+      this.logger.warn(`Could not persist the job store ${this.file}`, error)
     }
   }
 }

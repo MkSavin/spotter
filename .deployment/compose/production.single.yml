@@ -102,6 +102,9 @@ services:
       REDIS_CLIENT_ID: '@spotter/depot'
     env_file:
       - ./.env
+    volumes:
+      # Accepted transcodes; without this a restart forgets them.
+      - depot-state:/data
     labels:
       com.centurylinklabs.watchtower.enable: 'true'
     depends_on:
@@ -176,6 +179,7 @@ services:
 
 volumes:
   frigate-state:
+  depot-state:
 
 networks:
   spotter:

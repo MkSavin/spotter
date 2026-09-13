@@ -76,26 +76,33 @@ export const processStaged = async (
 
   logger.debug(`Processing staged ${kind} from ${rawKey}`)
 
-  if (kind === 'video') {
-    await transcodeVideo(raw, processed, config.video, logger, onProgress)
-  } else {
-    await transcodeImage(raw, processed, config.image, logger, onProgress)
+  try {
+    if (kind === 'video') {
+      await transcodeVideo(raw, processed, config.video, logger, onProgress)
+    } else {
+      await transcodeImage(raw, processed, config.image, logger, onProgress)
+    }
+
+    const processedKey = path.join(
+      processedPath,
+      `${filePrefix}-${hash}.${extension}`,
+    )
+
+    await transient('s3 put', () =>
+      s3.file(processedKey).write(processed, { type: contentType }),
+    )
+
+    logger.debug(`Uploaded processed ${kind} to s3://${processedKey}`)
+
+    return processedKey
+  } finally {
+    // Also on failure: a timed-out transcode is retried, and leaving both files
+    // behind each time fills the disk the NVR records onto.
+    if (context.config.directory.cleanupStrategy === 'file-processed') {
+      await Promise.all([
+        raw.delete().catch(() => undefined),
+        processed.delete().catch(() => undefined),
+      ])
+    }
   }
-
-  const processedKey = path.join(
-    processedPath,
-    `${filePrefix}-${hash}.${extension}`,
-  )
-
-  await transient('s3 put', () =>
-    s3.file(processedKey).write(processed, { type: contentType }),
-  )
-
-  logger.debug(`Uploaded processed ${kind} to s3://${processedKey}`)
-
-  if (context.config.directory.cleanupStrategy === 'file-processed') {
-    await Promise.all([raw.delete(), processed.delete()])
-  }
-
-  return processedKey
 }

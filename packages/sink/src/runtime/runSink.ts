@@ -21,6 +21,7 @@ import {
 } from '../catalog/keepCatalogPublished'
 import type { SinkConfig } from '../config/sinkConfig'
 import { publishEvent } from '../helpers/publishEvent'
+import { FileJobStore } from '../jobs/FileJobStore'
 import { createCameraController } from '../media/createCameraController'
 import { createMediaController } from '../media/createMediaController'
 import type { MediaProvider } from '../media/MediaProvider'
@@ -28,7 +29,6 @@ import { createSuspendController } from '../notifications/createSuspendControlle
 import type { NotificationSuspender } from '../notifications/NotificationSuspender'
 import type { Source, SourceHandle } from '../source/Source'
 import { createTimelapseController } from '../timelapse/createTimelapseController'
-import { FileTimelapseStore } from '../timelapse/FileTimelapseStore'
 import type { TimelapseProvider } from '../timelapse/TimelapseProvider'
 import { TimelapseTracker } from '../timelapse/TimelapseTracker'
 import type { SinkContext } from './context'
@@ -248,10 +248,7 @@ export const runSink = async <TConfig extends SinkConfig>(
       deadlineMs: options.timelapseDeadlineMs,
       logger: logger.sub('timelapse'),
       store: options.timelapseStatePath
-        ? new FileTimelapseStore(
-            options.timelapseStatePath,
-            logger.sub('timelapse'),
-          )
+        ? new FileJobStore(options.timelapseStatePath, logger.sub('timelapse'))
         : undefined,
     })
 
