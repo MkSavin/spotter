@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { MediaStaged } from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
+import {
+  type TranscodeJobRecord,
+  TranscodeQueue,
+  type TranscodeRunner,
+} from './TranscodeQueue'
 
-const mediaStagedAction = mock()
-mock.module('../actions/mediaStagedAction', () => ({ mediaStagedAction }))
-
-const { TranscodeQueue } = await import('./TranscodeQueue')
-type TranscodeJobRecord = import('./TranscodeQueue').TranscodeJobRecord
+// Injected rather than module-mocked: `mock.module` is process-wide and would
+// hand this stub to whatever test file runs next.
+const run = mock() as unknown as TranscodeRunner & ReturnType<typeof mock>
 
 const staged: MediaStaged = {
   eventId: 'cam-1700000000.123-abc',
@@ -46,19 +49,19 @@ const makeContext = () => {
 }
 
 beforeEach(() => {
-  mediaStagedAction.mockReset()
+  run.mockReset()
 })
 
 describe('TranscodeQueue', () => {
   test('accept возвращается до конца транскодирования', async () => {
     // The whole point: the caller acks its stream entry while ffmpeg runs on.
     let finish = (): void => undefined
-    mediaStagedAction.mockImplementation(
+    run.mockImplementation(
       () => new Promise((resolve) => (finish = () => resolve(undefined))),
     )
 
     const { context } = makeContext()
-    const queue = new TranscodeQueue({ context, store: makeStore() })
+    const queue = new TranscodeQueue({ context, store: makeStore(), run })
 
     await queue.accept(staged, defaultLogger)
 
@@ -67,14 +70,14 @@ describe('TranscodeQueue', () => {
   })
 
   test('задание попадает в хранилище до запуска и снимается после', async () => {
-    mediaStagedAction.mockImplementation(async () => ({
+    run.mockImplementation(async () => ({
       eventId: staged.eventId,
       clipKey: 'event-media/clip.mp4',
     }))
 
     const store = makeStore()
     const { context, published } = makeContext()
-    const queue = new TranscodeQueue({ context, store })
+    const queue = new TranscodeQueue({ context, store, run })
 
     await queue.accept(staged, defaultLogger)
     await queue.stop()
@@ -87,13 +90,13 @@ describe('TranscodeQueue', () => {
 
   test('упавшее транскодирование остаётся в хранилище для следующего старта', async () => {
     // Nothing redelivers it: the stream entry was acked when it was accepted.
-    mediaStagedAction.mockImplementation(async () => {
+    run.mockImplementation(async () => {
       throw new Error('ffmpeg timed out')
     })
 
     const store = makeStore()
     const { context } = makeContext()
-    const queue = new TranscodeQueue({ context, store })
+    const queue = new TranscodeQueue({ context, store, run })
 
     await queue.accept(staged, defaultLogger)
     await queue.stop()
@@ -102,7 +105,7 @@ describe('TranscodeQueue', () => {
   })
 
   test('recover доводит до конца задания прошлого процесса', async () => {
-    mediaStagedAction.mockImplementation(async () => ({
+    run.mockImplementation(async () => ({
       eventId: staged.eventId,
       clipKey: 'event-media/clip.mp4',
     }))
@@ -111,12 +114,12 @@ describe('TranscodeQueue', () => {
       { jobId: staged.eventId, staged, startedAt: Date.now() - 60_000 },
     ])
     const { context, published } = makeContext()
-    const queue = new TranscodeQueue({ context, store })
+    const queue = new TranscodeQueue({ context, store, run })
 
     expect(await queue.recover(defaultLogger)).toBe(1)
     await queue.stop()
 
-    expect(mediaStagedAction).toHaveBeenCalledTimes(1)
+    expect(run).toHaveBeenCalledTimes(1)
     expect(published.at(-1)?.payload).toMatchObject({
       clipKey: 'event-media/clip.mp4',
     })
@@ -126,7 +129,7 @@ describe('TranscodeQueue', () => {
     let running = 0
     let peak = 0
     const release: Array<() => void> = []
-    mediaStagedAction.mockImplementation(() => {
+    run.mockImplementation(() => {
       running += 1
       peak = Math.max(peak, running)
       return new Promise((resolve) =>
@@ -142,6 +145,7 @@ describe('TranscodeQueue', () => {
       context,
       store: makeStore(),
       concurrency: 2,
+      run,
     })
 
     for (const id of ['a', 'b', 'c', 'd']) {

@@ -1,5 +1,9 @@
 import type { JobStore } from '@spotter/sink'
-import { type MediaStaged, mediaStreams } from '@spotter/transport'
+import {
+  type MediaProcessed,
+  type MediaStaged,
+  mediaStreams,
+} from '@spotter/transport'
 import type { Stenograph } from 'stenograph'
 import { mediaStagedAction } from '../actions/mediaStagedAction'
 import type { CoreContext } from '../context'
@@ -11,11 +15,18 @@ export type TranscodeJobRecord = {
   startedAt: number
 }
 
+/** The transcoding step itself, injected so a test can stand in for it. */
+export type TranscodeRunner = (
+  staged: MediaStaged,
+  context: CoreContext,
+) => Promise<MediaProcessed | undefined>
+
 export type TranscodeQueueOptions = {
   context: CoreContext
   store?: JobStore<TranscodeJobRecord>
   /** How many clips may be encoded at once. */
   concurrency?: number
+  run?: TranscodeRunner
 }
 
 /**
@@ -26,11 +37,13 @@ export class TranscodeQueue {
   private readonly pending: TranscodeJobRecord[] = []
   private readonly running = new Set<string>()
   private readonly concurrency: number
+  private readonly run: TranscodeRunner
   private stopped = false
   private idle: (() => void) | undefined
 
   constructor(private readonly options: TranscodeQueueOptions) {
     this.concurrency = options.concurrency ?? 1
+    this.run = options.run ?? mediaStagedAction
   }
 
   /** Records the job, then returns: the caller acks its stream entry at once. */
@@ -86,11 +99,11 @@ export class TranscodeQueue {
       this.pending.length > 0
     ) {
       const record = this.pending.shift()
-      if (record) void this.run(record, logger)
+      if (record) void this.execute(record, logger)
     }
   }
 
-  private async run(
+  private async execute(
     record: TranscodeJobRecord,
     logger: Stenograph,
   ): Promise<void> {
@@ -99,7 +112,7 @@ export class TranscodeQueue {
     this.running.add(record.jobId)
 
     try {
-      const result = await mediaStagedAction(record.staged, {
+      const result = await this.run(record.staged, {
         ...this.options.context,
         logger: jobLogger,
       })
