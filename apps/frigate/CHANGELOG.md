@@ -1,5 +1,15 @@
 # @spotter/sink
 
+## 1.7.2
+
+### Patch Changes
+
+- c3d8459: Camera health warns once per change instead of every minute. The two conditions are tracked apart, so a camera whose `detection_fps` dips to zero while idle no longer reprints the unchanged warning about another one.
+  
+  Cameras switched off in the NVR's config are no longer reported at all, and the remaining warnings are `warn`, not `error`: the adapter is working, the NVR is not.
+- Updated dependencies [2cd32cf]
+  - @spotter/sink@1.6.4
+
 ## 1.7.1
 
 ### Patch Changes

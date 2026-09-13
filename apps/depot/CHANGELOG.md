@@ -1,5 +1,18 @@
 # @spotter/depot
 
+## 1.3.3
+
+### Patch Changes
+
+- 2cd32cf: Transcoding no longer runs inside the Redis entry that asked for it. The entry is acked as soon as the job is recorded, so a clip may encode for hours while the reclaim window keeps meaning what it should: the replica died. `VIDEO_TIMEOUT_MS` rises to four hours and now only kills a stuck ffmpeg.
+  
+  Accepted jobs are kept on disk and resumed at startup, because nothing redelivers an acked entry. Each depot replica therefore needs its own `/data` volume, already added to the compose profiles.
+  
+  The timelapse store is now the shared `FileJobStore`, which both trackers use.
+- 2cd32cf: Temp files are now removed when a transcode fails, not only when it succeeds. A timed-out clip is retried, so each attempt used to leave a raw copy and a half-written mp4 on the same disk the NVR records onto.
+  
+  The transcode cap rises to 10 minutes, with the reclaim window to 20 for depot alone: at two minutes a clip was cut off three quarters of the way through. The service now refuses to start when the cap is not below the reclaim window, which would let a second replica pick up a clip still being encoded.
+
 ## 1.3.2
 
 ### Patch Changes
