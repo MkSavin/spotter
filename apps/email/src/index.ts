@@ -2,6 +2,7 @@ import process from 'node:process'
 import {
   CatalogCache,
   DEDUP_RETENTION_MS,
+  guardRejections,
   RedisConnection,
   type RegulatorHandle,
   readQueueDepths,
@@ -109,6 +110,7 @@ const main = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(applicationLogger)
 
   transport = await emailTransport(context)
 

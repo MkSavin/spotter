@@ -85,3 +85,17 @@ describe('FileJobStore', () => {
     ])
   })
 })
+
+describe('FileJobStore concurrency', () => {
+  test('a read that is already in flight is awaited, not skipped', async () => {
+    const file = tempFile()
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(file, JSON.stringify([record('front_a')]), 'utf8')
+
+    const store = new FileJobStore<TimelapseJobRecord>(file, defaultLogger)
+    const [first, second] = await Promise.all([store.list(), store.list()])
+
+    expect(first.map((entry) => entry.jobId)).toEqual(['front_a'])
+    expect(second.map((entry) => entry.jobId)).toEqual(['front_a'])
+  })
+})

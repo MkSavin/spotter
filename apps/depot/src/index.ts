@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { FileJobStore } from '@spotter/sink'
 import {
+  guardRejections,
   mediaStreams,
   RedisConnection,
   RedisRegulator,
@@ -57,7 +58,16 @@ const run = async (): Promise<void> => {
   let stopLiveness: (() => void) | null = null
   let queue: TranscodeQueue | null = null
 
-  const shutdown = async (signal: NodeJS.Signals) => {
+  let stopping: Promise<void> | undefined
+
+  const shutdown = (signal: NodeJS.Signals): Promise<void> => {
+    // A second signal must wait for the first pass, not tear down connections
+    // an in-flight encode is still using.
+    stopping ??= teardown(signal)
+    return stopping
+  }
+
+  const teardown = async (signal: NodeJS.Signals) => {
     applicationLogger.info(`Shutting down due to ${signal}...`)
     stopHeartbeat?.()
     stopLiveness?.()
@@ -73,6 +83,7 @@ const run = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(applicationLogger)
 
   await producer.connect()
   await subscriber.connect()
@@ -135,6 +146,13 @@ const run = async (): Promise<void> => {
       readQueueDepths(producer, regulator.streams, config.redis.group),
   })
 
+  // Before the regulator consumes anything: a message arriving first would be
+  // queued again by `recover` off the store.
+  const resumed = await queue.recover(applicationLogger)
+  if (resumed > 0) {
+    applicationLogger.info(`Resumed ${resumed} unfinished transcode(s)`)
+  }
+
   transport = await regulator.run(
     {
       directory: {
@@ -156,11 +174,6 @@ const run = async (): Promise<void> => {
       maxDeliveries: config.redis.maxDeliveries,
     },
   )
-
-  const resumed = await queue.recover(applicationLogger)
-  if (resumed > 0) {
-    applicationLogger.info(`Resumed ${resumed} unfinished transcode(s)`)
-  }
 
   applicationLogger.info('Application successfully started up')
 }

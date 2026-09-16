@@ -16,7 +16,7 @@ export class FileJobStore<TRecord extends { jobId: string }>
   implements JobStore<TRecord>
 {
   private records = new Map<string, TRecord>()
-  private loaded = false
+  private loading: Promise<void> | undefined
   private writing: Promise<void> = Promise.resolve()
 
   constructor(
@@ -40,10 +40,13 @@ export class FileJobStore<TRecord extends { jobId: string }>
     return [...this.records.values()]
   }
 
-  private async load(): Promise<void> {
-    if (this.loaded) return
-    this.loaded = true
+  /** Cached, not flagged: a second caller must await the same read, not skip it. */
+  private load(): Promise<void> {
+    this.loading ??= this.read()
+    return this.loading
+  }
 
+  private async read(): Promise<void> {
     try {
       const raw = await fs.readFile(this.file, 'utf8')
       const parsed = JSON.parse(raw) as TRecord[]

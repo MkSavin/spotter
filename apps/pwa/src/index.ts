@@ -3,6 +3,7 @@ import {
   CatalogCache,
   CommandBus,
   DEDUP_RETENTION_MS,
+  guardRejections,
   HeartbeatRegistry,
   RedisConnection,
   type RegulatorHandle,
@@ -141,6 +142,7 @@ const main = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(applicationLogger)
 
   server = createServer(context)
   transport = await pwaTransport(context)

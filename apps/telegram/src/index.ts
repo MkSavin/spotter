@@ -5,6 +5,7 @@ import { run, sequentialize } from '@grammyjs/runner'
 import {
   CatalogCache,
   CommandBus,
+  guardRejections,
   HeartbeatRegistry,
   probeRedisVersion,
   RedisConnection,
@@ -317,6 +318,7 @@ const polling = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(applicationLogger)
 
   bot = await initialize(coreContext)
 

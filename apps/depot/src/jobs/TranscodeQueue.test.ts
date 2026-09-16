@@ -125,6 +125,35 @@ describe('TranscodeQueue', () => {
     })
   })
 
+  test('одно событие не встаёт в очередь дважды', async () => {
+    // A redelivery can arrive while the first `accept` is still persisting.
+    run.mockImplementation(() => new Promise(() => undefined))
+
+    const store = makeStore()
+    const { context } = makeContext()
+    const queue = new TranscodeQueue({ context, store, run })
+
+    await Promise.all([
+      queue.accept(staged, defaultLogger),
+      queue.accept(staged, defaultLogger),
+    ])
+
+    expect(queue.depth).toBe(1)
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  test('recover не дублирует уже принятое задание', async () => {
+    run.mockImplementation(() => new Promise(() => undefined))
+
+    const store = makeStore()
+    const { context } = makeContext()
+    const queue = new TranscodeQueue({ context, store, run })
+
+    await queue.accept(staged, defaultLogger)
+    expect(await queue.recover(defaultLogger)).toBe(0)
+    expect(queue.depth).toBe(1)
+  })
+
   test('параллелизм ограничен настройкой', async () => {
     let running = 0
     let peak = 0

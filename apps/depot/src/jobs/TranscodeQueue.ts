@@ -36,6 +36,8 @@ export type TranscodeQueueOptions = {
 export class TranscodeQueue {
   private readonly pending: TranscodeJobRecord[] = []
   private readonly running = new Set<string>()
+  /** Claimed ids, held from `accept` until the job leaves `running`. */
+  private readonly claimed = new Set<string>()
   private readonly concurrency: number
   private readonly run: TranscodeRunner
   private stopped = false
@@ -48,8 +50,10 @@ export class TranscodeQueue {
 
   /** Records the job, then returns: the caller acks its stream entry at once. */
   async accept(staged: MediaStaged, logger: Stenograph): Promise<void> {
-    if (this.running.has(staged.eventId)) {
-      logger.debug(`Transcode of ${staged.eventId} is already running`)
+    // Claimed before the first await: a redelivery arriving mid-`remember`
+    // would otherwise pass the check and queue the same clip twice.
+    if (!this.claim(staged.eventId)) {
+      logger.debug(`Transcode of ${staged.eventId} is already queued`)
       return
     }
 
@@ -67,20 +71,23 @@ export class TranscodeQueue {
   /** Re-queues jobs a previous process accepted but never finished. */
   async recover(logger: Stenograph): Promise<number> {
     const records = (await this.options.store?.list()) ?? []
+    let resumed = 0
 
     for (const record of records) {
-      if (this.running.has(record.jobId)) continue
+      if (!this.claim(record.jobId)) continue
       logger.info(`Resuming transcode of ${record.jobId}`)
       this.pending.push(record)
+      resumed += 1
     }
 
     this.pump(logger)
-    return records.length
+    return resumed
   }
 
   /** Stops taking new work and waits for what is already encoding. */
   async stop(): Promise<void> {
     this.stopped = true
+    for (const record of this.pending) this.claimed.delete(record.jobId)
     this.pending.length = 0
     if (this.running.size === 0) return
     await new Promise<void>((resolve) => {
@@ -90,6 +97,12 @@ export class TranscodeQueue {
 
   get depth(): number {
     return this.pending.length + this.running.size
+  }
+
+  private claim(jobId: string): boolean {
+    if (this.claimed.has(jobId)) return false
+    this.claimed.add(jobId)
+    return true
   }
 
   private pump(logger: Stenograph): void {
@@ -135,6 +148,7 @@ export class TranscodeQueue {
       )
     } finally {
       this.running.delete(record.jobId)
+      this.claimed.delete(record.jobId)
       if (!this.stopped) this.pump(logger)
       if (this.running.size === 0) this.idle?.()
     }

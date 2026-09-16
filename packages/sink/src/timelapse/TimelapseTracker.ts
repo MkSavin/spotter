@@ -176,20 +176,10 @@ export class TimelapseTracker {
       // The clock alone does not end an export: the next tick asks the NVR, and
       // only a `lost` answer gives up. Without this a slow-but-healthy export
       // is failed while its file is still being written.
-      void this.stillRunning(record, logger).then(async (alive) => {
-        if (alive) {
-          logger.info(
-            `Export ${record.jobId} is past its deadline but still running; extending`,
-          )
-          record.startedAt = Date.now()
-          await this.remember(record, logger)
-          this.rearm(record, logger, tick)
-          return
-        }
-
-        logger.warn(`Export ${record.jobId} exceeded its deadline; giving up`)
-        await this.forget(record.jobId, logger)
-        await this.fail(record.request, 'timeout')
+      void this.settleDeadline(record, logger, tick).catch((error) => {
+        // Nothing awaits this branch, and an unhandled rejection would take the
+        // whole process down with it.
+        logger.warn(`Deadline check of ${record.jobId} failed`, error)
       })
       return
     }
@@ -198,6 +188,28 @@ export class TimelapseTracker {
     // Never hold the process open just to poll an export.
     timer.unref?.()
     this.timers.set(record.jobId, timer)
+  }
+
+  private async settleDeadline(
+    record: TimelapseJobRecord,
+    logger: Stenograph,
+    tick: () => Promise<void>,
+  ): Promise<void> {
+    const alive = await this.stillRunning(record, logger)
+
+    if (alive) {
+      logger.info(
+        `Export ${record.jobId} is past its deadline but still running; extending`,
+      )
+      record.startedAt = Date.now()
+      await this.remember(record, logger)
+      this.rearm(record, logger, tick)
+      return
+    }
+
+    logger.warn(`Export ${record.jobId} exceeded its deadline; giving up`)
+    await this.forget(record.jobId, logger)
+    await this.fail(record.request, 'timeout')
   }
 
   /**

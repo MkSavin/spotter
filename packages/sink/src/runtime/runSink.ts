@@ -1,6 +1,7 @@
 import process from 'node:process'
 import {
   catalogRequestStream,
+  guardRejections,
   mediaStreams,
   notificationStreams,
   RedisConnection,
@@ -157,6 +158,7 @@ export const runSink = async <TConfig extends SinkConfig>(
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(logger)
 
   const context: SinkContext<TConfig> = {
     producer,

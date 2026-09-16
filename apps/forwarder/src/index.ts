@@ -1,5 +1,6 @@
 import process from 'node:process'
 import {
+  guardRejections,
   RedisConnection,
   RedisRegulator,
   StreamProducer,
@@ -115,6 +116,7 @@ const run = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(applicationLogger)
 
   applicationLogger.info('Application successfully started up')
 }

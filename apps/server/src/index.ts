@@ -1,6 +1,7 @@
 import process from 'node:process'
 import {
   CatalogCache,
+  guardRejections,
   probeRedisVersion,
   RedisConnection,
   type RegulatorHandle,
@@ -112,6 +113,7 @@ const run = async (): Promise<void> => {
 
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
+  guardRejections(applicationLogger)
 
   transport = await serverTransport(context)
 
