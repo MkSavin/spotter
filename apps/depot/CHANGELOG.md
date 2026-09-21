@@ -1,5 +1,24 @@
 # @spotter/depot
 
+## 1.3.4
+
+### Patch Changes
+
+- b803482: Close four race conditions found by auditing state that changes across an `await`.
+  
+  `TranscodeQueue` claimed a job id only after persisting it, so a redelivery arriving mid-write queued the same clip twice and two ffmpeg processes encoded one file. The id is now claimed synchronously, before the first `await`, and `recover` honours the same claim.
+  
+  `FileJobStore` set its loaded flag before reading the file, so a concurrent caller skipped the read and saw an empty store. The read is cached as a promise instead, which every caller awaits. At startup this was the difference between recovering unfinished jobs and silently dropping them.
+  
+  Depot recovers stored jobs before the regulator starts consuming; the other order let a message arriving in between be queued twice. Its shutdown is re-entrant, so a second signal waits for the first pass rather than closing connections an in-flight encode still uses.
+  
+  `TimelapseTracker` ran its deadline branch with no `.catch()`, and an unhandled rejection terminates a Bun process outright. Every entry point now also logs unhandled rejections through the new `guardRejections` helper, turning a silent container restart into something diagnosable.
+- 122c5d3: Say why a transcode failed. ffmpeg's exit code and `frame= 0` cannot tell a busy GPU from an unsupported input or a missing driver, and the line that can — `OpenEncodeSessionEx failed: out of memory` and its kin — never reached `error.message`, which carries only a truncated tail.
+  
+  `TranscodeError` now keeps the last stderr lines and ffmpeg's own reading of the input stream, both logged when a preset fails. The input description comes from the `codecData` event, scraped from the stderr the encode already writes: an ffprobe pass per clip would cost a second process every time and still see none of the device-side causes.
+- Updated dependencies [b803482]
+  - @spotter/transport@1.11.2
+
 ## 1.3.3
 
 ### Patch Changes
