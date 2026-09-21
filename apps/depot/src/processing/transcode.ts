@@ -7,6 +7,13 @@ type PresetAcceleration = 'cpu' | 'vaapi' | 'videotoolbox' | 'cuda'
 type PresetCodec = 'h264' | 'hevc'
 type PresetQuality = 'best' | 'good' | 'normal' | 'bad' | 'awful'
 
+/** The shape fluent-ffmpeg emits on `codecData`; it ships no types for it. */
+type FfmpegCodecData = {
+  video?: string
+  video_details?: string[]
+  duration?: string
+}
+
 type ProcessorPreset = {
   name: string
   outputParameters: string[]
@@ -181,10 +188,27 @@ export class TranscodeError extends Error {
     message: string,
     readonly frames: number,
     readonly timedOut: boolean,
+    /** Tail of ffmpeg's stderr: the line naming the cause lives here. */
+    readonly output: string[] = [],
+    /** What ffmpeg made of the input, when it got that far. */
+    readonly input?: string,
   ) {
     super(message)
   }
 }
+
+/** How many trailing stderr lines to keep for a failure report. */
+const STDERR_TAIL = 12
+
+/**
+ * ffmpeg's own reading of the input stream, scraped from the stderr it already
+ * writes. Cheaper than ffprobe, which would cost a second process per clip and
+ * still could not see why the GPU refused.
+ */
+const describeInput = (data: FfmpegCodecData): string =>
+  [data.video_details?.join(' ') ?? data.video, data.duration]
+    .filter(Boolean)
+    .join(' · ')
 
 /**
  * Whether a failed hardware transcode is worth retrying on the CPU. Judged by
@@ -194,6 +218,22 @@ export class TranscodeError extends Error {
  */
 export const shouldRetryOnCpu = (error: unknown): boolean =>
   error instanceof TranscodeError && !error.timedOut && error.frames === 0
+
+/**
+ * The diagnosis a bare exit code cannot give: what the input was, and the
+ * stderr lines around the failure. Which of those two is filled in already
+ * narrows the cause — no input means ffmpeg died before opening the clip.
+ */
+export const describeFailure = (
+  error: unknown,
+): Record<string, unknown> | undefined => {
+  if (!(error instanceof TranscodeError)) return undefined
+  return {
+    frames: error.frames,
+    ...(error.input ? { input: error.input } : {}),
+    ...(error.output.length > 0 ? { output: error.output } : {}),
+  }
+}
 
 /** CPU fallback for when the configured hardware encoder is missing. */
 const cpuFallbackPreset = (video: VideoConfig): ProcessorPreset =>
@@ -242,21 +282,33 @@ export const transcodeVideo = async (
     )
   } catch (error) {
     if (preset.name === fallback.name || !shouldRetryOnCpu(error)) {
+      // Logged here rather than by the caller: this is the last point that
+      // still knows what ffmpeg said.
+      logger.error(`Preset ${preset.name} failed`, describeFailure(error))
       throw error
     }
     // Losing the clip is worse than losing the speed-up. Warn loudly: a
     // silent fallback looks like working acceleration that is merely slow.
     logger.warn(
       `Preset ${preset.name} failed (${(error as Error).message}) — retrying on CPU`,
+      describeFailure(error),
     )
-    await runFfmpeg(
-      rawPath,
-      processedPath,
-      fallback,
-      video.timeoutMs,
-      logger,
-      onProgress,
-    )
+    try {
+      await runFfmpeg(
+        rawPath,
+        processedPath,
+        fallback,
+        video.timeoutMs,
+        logger,
+        onProgress,
+      )
+    } catch (fallbackError) {
+      logger.error(
+        `Preset ${fallback.name} failed`,
+        describeFailure(fallbackError),
+      )
+      throw fallbackError
+    }
   }
 
   logger.verbose('Processed video parameters', {
@@ -281,6 +333,8 @@ const runFfmpeg = async (
   let frames = 0
   /** Only steps forward are reported: ffmpeg repeats and sometimes rewinds. */
   let reported = -1
+  let input: string | undefined
+  const output: string[] = []
 
   await new Promise<void>((resolve, reject) => {
     logger.debug(`Using processing preset ${preset.name}`)
@@ -315,15 +369,37 @@ const runFfmpeg = async (
             `ffmpeg timed out after ${timeoutMs}ms`,
             frames,
             true,
+            [...output],
+            input,
           ),
         ),
       )
     }, timeoutMs)
 
     command
+      .on('stderr', (line: string) => {
+        // A ring, not a transcript: ffmpeg is chatty, and only the lines around
+        // the failure say anything. `error` carries a truncated tail at best.
+        const trimmed = line.trim()
+        if (trimmed.length === 0) return
+        output.push(trimmed)
+        if (output.length > STDERR_TAIL) output.shift()
+      })
+      .on('codecData', (data: FfmpegCodecData) => {
+        input = describeInput(data)
+        logger.verbose(`Input stream: ${input}`)
+      })
       .on('error', (error) =>
         finish(() =>
-          reject(new TranscodeError((error as Error).message, frames, false)),
+          reject(
+            new TranscodeError(
+              (error as Error).message,
+              frames,
+              false,
+              [...output],
+              input,
+            ),
+          ),
         ),
       )
       .on('progress', (progress) => {

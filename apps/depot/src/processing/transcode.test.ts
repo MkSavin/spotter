@@ -6,6 +6,7 @@ import type { BunFile } from 'bun'
 import { defaultLogger } from 'stenograph'
 import type { ImageConfig } from '../config'
 import {
+  describeFailure,
   resolveVideoPreset,
   shouldRetryOnCpu,
   TranscodeError,
@@ -73,6 +74,42 @@ describe('shouldRetryOnCpu', () => {
       false,
     )
     expect(shouldRetryOnCpu(undefined)).toBe(false)
+  })
+})
+
+describe('describeFailure', () => {
+  test('carries the stderr tail and the input ffmpeg reported', () => {
+    // The line naming the cause never reaches `error.message`, which is why
+    // exit 255 alone could not tell a busy GPU from an unsupported input.
+    const error = new TranscodeError(
+      'ffmpeg exited with code 255: Conversion failed!',
+      0,
+      false,
+      [
+        '[h264_nvenc @ 0x5] OpenEncodeSessionEx failed: out of memory (10)',
+        'Conversion failed!',
+      ],
+      'h264 (High) · yuv420p · 00:00:21.53',
+    )
+
+    expect(describeFailure(error)).toEqual({
+      frames: 0,
+      input: 'h264 (High) · yuv420p · 00:00:21.53',
+      output: [
+        '[h264_nvenc @ 0x5] OpenEncodeSessionEx failed: out of memory (10)',
+        'Conversion failed!',
+      ],
+    })
+  })
+
+  test('omits what ffmpeg never got far enough to say', () => {
+    expect(describeFailure(new TranscodeError('died', 0, false))).toEqual({
+      frames: 0,
+    })
+  })
+
+  test('ignores anything that is not a transcode failure', () => {
+    expect(describeFailure(new Error('nope'))).toBeUndefined()
   })
 })
 
