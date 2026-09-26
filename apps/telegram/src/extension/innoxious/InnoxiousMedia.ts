@@ -28,6 +28,61 @@ const fetchUrl = async (url: string): Promise<InputFile> => {
   return new InputFile(new Uint8Array(await response.arrayBuffer()))
 }
 
+/**
+ * The most Telegram downloads itself from a URL; past it the URL is refused
+ * with `failed to get HTTP URL content`. Decimal, to stay on the safe side.
+ */
+const URL_LIMIT: Record<MediaInput['type'], number> = {
+  photo: 5_000_000,
+  video: 20_000_000,
+  audio: 20_000_000,
+  document: 20_000_000,
+}
+
+/**
+ * Size from a one-byte ranged GET: a presigned URL is signed for GET, so a
+ * HEAD may be refused. `undefined` when the server will not say.
+ */
+const probeSize = async (url: string): Promise<number | undefined> => {
+  try {
+    const response = await fetch(url, { headers: { Range: 'bytes=0-0' } })
+    await response.body?.cancel()
+    const total = response.headers.get('content-range')?.split('/')[1]
+    const size = Number(
+      total ?? (response.ok ? response.headers.get('content-length') : NaN),
+    )
+    return Number.isFinite(size) ? size : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** A URL Telegram would refuse is sent as bytes without wasting an attempt. */
+const resolveRemote = async (handler: MediaHandler): Promise<MediaSource> => {
+  const url = handler.source as string
+  const size = await probeSize(url)
+  return size !== undefined && size > URL_LIMIT[handler.input.type]
+    ? fetchUrl(url)
+    : url
+}
+
+/** Cached while it holds: a failed read must be retried, not replayed. */
+const memoize = <T>(read: () => Promise<T>): { get: () => Promise<T> } => {
+  let pending: Promise<T> | undefined
+  return {
+    get: () => {
+      if (!pending) {
+        const attempt = read()
+        pending = attempt
+        attempt.catch(() => {
+          if (pending === attempt) pending = undefined
+        })
+      }
+      return pending
+    },
+  }
+}
+
 const fetchFile = async (path: string): Promise<InputFile> =>
   new InputFile(path)
 
@@ -63,7 +118,7 @@ const resolveNaiveSource = async (
     case 'local':
       return fetchUrl(handler.source)
     case 'remote':
-      return handler.source
+      return resolveRemote(handler)
   }
 }
 
@@ -93,47 +148,44 @@ const resolveAccurateInput = async <Input extends MediaInput>(
 
 export class InnoxiousMedia<Input extends MediaInput> {
   protected readonly handler: MediaHandler<Input>
-  private naivePromise: Promise<Input> | undefined
-  private accuratePromise: Promise<Input> | undefined
+  private readonly naiveInput = memoize(() =>
+    resolveNaiveInput<Input>(this.handler),
+  )
+  private readonly accurateInput = memoize(() =>
+    resolveAccurateInput<Input>(this.handler),
+  )
 
   constructor(input: Input) {
     this.handler = toMediaHandler(input)
   }
 
-  async naive(): Promise<Input> {
-    if (!this.naivePromise) this.naivePromise = resolveNaiveInput(this.handler)
-    return this.naivePromise
+  naive(): Promise<Input> {
+    return this.naiveInput.get()
   }
 
-  async accurate(): Promise<Input> {
-    if (!this.accuratePromise)
-      this.accuratePromise = resolveAccurateInput(this.handler)
-    return this.accuratePromise
+  accurate(): Promise<Input> {
+    return this.accurateInput.get()
   }
 }
 
 export class InnoxiousMediaGroup<Input extends MediaInput> {
   protected readonly handlers: MediaHandler<Input>[]
-  private naivePromise: Promise<Input[]> | undefined
-  private accuratePromise: Promise<Input[]> | undefined
+  private readonly naiveInput = memoize(() =>
+    Promise.all(this.handlers.map((h) => resolveNaiveInput<Input>(h))),
+  )
+  private readonly accurateInput = memoize(() =>
+    Promise.all(this.handlers.map((h) => resolveAccurateInput<Input>(h))),
+  )
 
   constructor(list: Input[]) {
     this.handlers = list.map(toMediaHandler)
   }
 
-  async naive(): Promise<Input[]> {
-    if (!this.naivePromise)
-      this.naivePromise = Promise.all(
-        this.handlers.map((h) => resolveNaiveInput<Input>(h)),
-      )
-    return this.naivePromise
+  naive(): Promise<Input[]> {
+    return this.naiveInput.get()
   }
 
-  async accurate(): Promise<Input[]> {
-    if (!this.accuratePromise)
-      this.accuratePromise = Promise.all(
-        this.handlers.map((h) => resolveAccurateInput<Input>(h)),
-      )
-    return this.accuratePromise
+  accurate(): Promise<Input[]> {
+    return this.accurateInput.get()
   }
 }

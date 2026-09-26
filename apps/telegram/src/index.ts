@@ -40,6 +40,7 @@ import { createDatabase, type TelegramDatabase } from './db/client'
 import {
   clipWaitsRepo,
   dialogStatesRepo,
+  eventClipPartsRepo,
   eventMessagesRepo,
   tgBindingsRepo,
   timelapseWaitsRepo,
@@ -264,7 +265,9 @@ const polling = async (): Promise<void> => {
   const stopMessageRetention = startRetention({
     label: 'event message',
     retentionMs: config.retention.messageDays * 24 * 60 * 60 * 1000,
-    prune: (cutoff) => eventMessagesRepo.prune(database, cutoff),
+    prune: (cutoff) =>
+      eventMessagesRepo.prune(database, cutoff) +
+      eventClipPartsRepo.prune(database, cutoff),
     logger: applicationLogger,
   })
 

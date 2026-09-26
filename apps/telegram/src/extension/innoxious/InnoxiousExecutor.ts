@@ -18,13 +18,13 @@ export class InnoxiousExecutor {
       >,
     ) => Promise<Result>,
   ): Promise<Result> {
+    // Reason only: the error object expands into a grammY source dump.
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         return await callback(() => media.naive() as any)
       } catch (error) {
-        logger.error(
-          'Error while publishing media by public (naive) strategy',
-          error,
+        logger.warn(
+          `Publishing media by public (naive) strategy failed: ${(error as Error)?.message}`,
         )
       }
     }
@@ -35,8 +35,7 @@ export class InnoxiousExecutor {
       return await callback(() => media.accurate() as any)
     } catch (error) {
       logger.error(
-        'Error while publishing media by buffered (accurate) strategy',
-        error,
+        `Publishing media by buffered (accurate) strategy failed: ${(error as Error)?.message}`,
       )
       throw error
     }

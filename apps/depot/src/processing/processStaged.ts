@@ -1,6 +1,7 @@
 import path from 'node:path'
 import Bun, { type BunFile } from 'bun'
 import type { CoreContext } from '../context'
+import { MB, splitVideo } from './splitVideo'
 import { TransientError, transient } from './TransientError'
 import {
   type ProgressReporter,
@@ -9,6 +10,12 @@ import {
 } from './transcode'
 
 export type StagedKind = 'video' | 'image'
+
+/** The processed object, plus its parts when a clip was over the part limit. */
+export type ProcessedMedia = {
+  key: string
+  parts?: string[]
+}
 
 export type ProcessStagedContext = CoreContext & {
   /** S3 prefix under which the transcoded result is stored. */
@@ -29,15 +36,15 @@ const kinds = {
 
 /**
  * Staged-path processing: downloads raw bytes from S3 by key, transcodes them
- * and uploads the result back to S3 — returning the processed S3 *key* (not a
- * URL). No NVR URLs or credentials are involved; depot only ever sees S3.
+ * and uploads the result back to S3 — returning the processed S3 *keys* (not
+ * URLs). No NVR URLs or credentials are involved; depot only ever sees S3.
  */
 export const processStaged = async (
   kind: StagedKind,
   rawKey: string | undefined,
   context: ProcessStagedContext,
   onProgress?: ProgressReporter,
-): Promise<string | undefined> => {
+): Promise<ProcessedMedia | undefined> => {
   if (!rawKey) {
     return undefined
   }
@@ -76,6 +83,8 @@ export const processStaged = async (
 
   logger.debug(`Processing staged ${kind} from ${rawKey}`)
 
+  let partFiles: string[] = []
+
   try {
     if (kind === 'video') {
       await transcodeVideo(raw, processed, config.video, logger, onProgress)
@@ -94,15 +103,53 @@ export const processStaged = async (
 
     logger.debug(`Uploaded processed ${kind} to s3://${processedKey}`)
 
-    return processedKey
+    if (kind !== 'video') return { key: processedKey }
+
+    partFiles = await cutParts(processed, context, logger)
+    if (partFiles.length === 0) return { key: processedKey }
+
+    const parts = await Promise.all(
+      partFiles.map(async (file, index) => {
+        const partKey = path.join(
+          processedPath,
+          `${filePrefix}-${hash}.part${index + 1}.${extension}`,
+        )
+        await transient('s3 put', () =>
+          s3.file(partKey).write(Bun.file(file), { type: contentType }),
+        )
+        return partKey
+      }),
+    )
+
+    logger.debug(`Uploaded ${parts.length} parts of ${processedKey}`)
+
+    return { key: processedKey, parts }
   } finally {
     // Also on failure: a timed-out transcode is retried, and leaving both files
     // behind each time fills the disk the NVR records onto.
     if (context.config.directory.cleanupStrategy === 'file-processed') {
-      await Promise.all([
-        raw.delete().catch(() => undefined),
-        processed.delete().catch(() => undefined),
-      ])
+      await Promise.all(
+        [raw, processed, ...partFiles.map((file) => Bun.file(file))].map(
+          (file) => file.delete().catch(() => undefined),
+        ),
+      )
     }
+  }
+}
+
+/** A failed cut still leaves the whole clip, which is worth delivering. */
+const cutParts = async (
+  processed: BunFile,
+  context: ProcessStagedContext,
+  logger: ProcessStagedContext['logger'],
+): Promise<string[]> => {
+  const { partLimitMb, timeoutMs } = context.config.video
+  if (!processed.name) return []
+
+  try {
+    return await splitVideo(processed.name, partLimitMb * MB, timeoutMs, logger)
+  } catch (error) {
+    logger.warn('Could not cut the clip into parts', error)
+    return []
   }
 }

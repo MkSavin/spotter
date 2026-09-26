@@ -74,6 +74,10 @@ mediaStagedController ──▶ mediaStagedAction ──▶ processStaged(video/
 - `processStaged` ([src/processing/processStaged.ts](src/processing/processStaged.ts)) — общая логика:
   скачать из S3 по `rawKey` → транскодировать (`transcode.ts`) → положить результат в S3,
   вернуть **ключ** (`processedPath`, `filePrefix`). URL/токены NVR не фигурируют.
+- Клип больше `VIDEO_PART_LIMIT_MB` (20 по умолчанию, `0` — не резать) дополнительно режется
+  [splitVideo.ts](src/processing/splitVideo.ts) на части не больше лимита — копированием потока,
+  без перекодирования. Целый клип остаётся в `clipKey` для потребителей без лимита (PWA), части
+  уходят в `clipParts`. Неудавшаяся резка не роняет клип: он доставляется целым.
 
 ## Файловая система (`src/fs/`)
 

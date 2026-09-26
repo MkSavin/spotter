@@ -9,6 +9,7 @@ import {
   type DialogStateRow,
   dialogStates,
   type EventMessage,
+  eventClipParts,
   eventMessages,
   type Role,
   type ServiceVersion,
@@ -231,6 +232,53 @@ export const eventMessagesRepo = {
       .delete(eventMessages)
       .where(lt(eventMessages.sentAt, cutoff))
       .returning({ eventId: eventMessages.eventId })
+      .all().length,
+}
+
+export const eventClipPartsRepo = {
+  /** Replies already carrying `part`, shaped like event messages. */
+  find: (db: TelegramDatabase, eventId: string, part: number): EventMessage[] =>
+    db
+      .select({ id: eventClipParts.messageId, chatId: eventClipParts.tgChatId })
+      .from(eventClipParts)
+      .where(
+        and(eq(eventClipParts.eventId, eventId), eq(eventClipParts.part, part)),
+      )
+      .all(),
+
+  record: (
+    db: TelegramDatabase,
+    eventId: string,
+    part: number,
+    messages: EventMessage[],
+  ): void => {
+    if (messages.length === 0) return
+
+    db.insert(eventClipParts)
+      .values(
+        messages.map((m) => ({
+          eventId,
+          tgChatId: m.chatId,
+          part,
+          messageId: m.id,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [
+          eventClipParts.eventId,
+          eventClipParts.tgChatId,
+          eventClipParts.part,
+        ],
+        set: { messageId: sql`excluded.message_id` },
+      })
+      .run()
+  },
+
+  prune: (db: TelegramDatabase, cutoff: Date): number =>
+    db
+      .delete(eventClipParts)
+      .where(lt(eventClipParts.sentAt, cutoff))
+      .returning({ eventId: eventClipParts.eventId })
       .all().length,
 }
 

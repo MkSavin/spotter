@@ -33,10 +33,17 @@ export const mediaStagedSchema = z.object({
 })
 export type MediaStaged = z.infer<typeof mediaStagedSchema>
 
+/**
+ * Shared by the media and delivery contracts: a clip over the part limit, cut
+ * in order. `clipKey` still holds the whole clip for consumers without a limit.
+ */
+export const clipPartsSchema = z.array(z.string().min(1)).min(2)
+
 /** Published to `spotter.event.media_processed`. */
 export const mediaProcessedSchema = z.object({
   eventId: z.string().min(1),
   clipKey: z.string().min(1).optional(),
+  clipParts: clipPartsSchema.optional(),
   snapshotKey: z.string().min(1).optional(),
 })
 export type MediaProcessed = z.infer<typeof mediaProcessedSchema>

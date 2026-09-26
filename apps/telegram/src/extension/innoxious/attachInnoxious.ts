@@ -24,6 +24,17 @@ export const attachInnoxious = (api: BotApi): void => {
       innoxiousExecutor.execute(media, async (resolver) =>
         api.sendVideo(chatId, (await resolver()).media, other, signal),
       ),
+
+    editMessageMedia: (chatId, messageId, media, other, signal) =>
+      innoxiousExecutor.execute(media, async (resolver) =>
+        api.editMessageMedia(
+          chatId,
+          messageId,
+          await resolver(),
+          other,
+          signal,
+        ),
+      ),
   }
 }
 

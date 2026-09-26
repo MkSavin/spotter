@@ -34,7 +34,20 @@ export type RenderEventOptions = {
   media?: MediaState
   /** Whether to say the event has no clip. Only meaningful once it has ended. */
   clipless?: boolean
+  /** How many parts the clip was cut into; the message itself carries part 1. */
+  parts?: number
 }
+
+const renderPartMark = (part: number, total: number): string =>
+  `🎞️ Часть ${part} из ${total}`
+
+/** Caption of a reply carrying a later part of the clip. */
+export const renderClipPart = (
+  event: SpotterEvent,
+  part: number,
+  total: number,
+): string =>
+  `${renderPartMark(part, total)} <code>${eventCode(event.id)}</code>`
 
 export const renderEvent = (
   event: SpotterEvent,
@@ -67,6 +80,9 @@ export const renderEvent = (
       : [
           options.media ? MEDIA_MARKS[options.media] : undefined,
           options.clipless ? NO_CLIP_MARK : undefined,
+          options.parts && options.parts > 1
+            ? renderPartMark(1, options.parts)
+            : undefined,
         ].filter(Boolean)
 
   return `<b>${title}</b> <code>${code}</code>

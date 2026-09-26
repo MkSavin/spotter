@@ -29,31 +29,6 @@ export const actualizeEventMedia = async (
     ...markup,
   }
 
-  const editInPlace = async (
-    chatId: string,
-    messageId: number,
-  ): Promise<void> => {
-    try {
-      await bot.api.editMessageMedia(
-        chatId,
-        messageId,
-        await innoxious.naive(),
-        markup,
-      )
-    } catch (naiveError) {
-      // Reason only: the error object expands into a grammY source dump.
-      logger.debug(
-        `editMessageMedia (naive) failed, retrying accurate: ${(naiveError as Error)?.message}`,
-      )
-      await bot.api.editMessageMedia(
-        chatId,
-        messageId,
-        await innoxious.accurate(),
-        markup,
-      )
-    }
-  }
-
   const { supplied, failed } = await supplySubscribers(messages, context, {
     create: async (chatId): Promise<EventMessage> => {
       const sent =
@@ -63,7 +38,12 @@ export const actualizeEventMedia = async (
       return { id: sent.message_id, chatId }
     },
     update: async (message): Promise<EventMessage> => {
-      await editInPlace(message.chatId, message.id)
+      await bot.api.innoxious.editMessageMedia(
+        message.chatId,
+        message.id,
+        innoxious,
+        markup,
+      )
       return message
     },
   })

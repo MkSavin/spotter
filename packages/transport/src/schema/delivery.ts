@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { clipPartsSchema } from './mediaPipeline'
 import { spotterEventSchema } from './spotterEvent'
 
 /**
@@ -12,6 +13,7 @@ export const deliveryEventSchema = z.object({
   eventId: z.string().min(1),
   event: spotterEventSchema,
   clipKey: z.string().min(1).optional(),
+  clipParts: clipPartsSchema.optional(),
   snapshotKey: z.string().min(1).optional(),
   action: z.enum(['create', 'update', 'media']),
 })

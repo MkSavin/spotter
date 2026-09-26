@@ -28,14 +28,31 @@ beforeEach(() => {
 
 describe('mediaStagedAction', () => {
   test('returns both processed keys on success', async () => {
-    processStaged.mockImplementation(async (kind: string) =>
-      kind === 'video' ? 'event-media/clip.mp4' : 'event-media/snap.jpg',
-    )
+    processStaged.mockImplementation(async (kind: string) => ({
+      key: kind === 'video' ? 'event-media/clip.mp4' : 'event-media/snap.jpg',
+    }))
 
     expect(await mediaStagedAction(payload, context)).toEqual({
       eventId: payload.eventId,
       clipKey: 'event-media/clip.mp4',
+      clipParts: undefined,
       snapshotKey: 'event-media/snap.jpg',
+    })
+  })
+
+  test('passes on the parts of a clip that was cut', async () => {
+    processStaged.mockImplementation(async (kind: string) =>
+      kind === 'video'
+        ? {
+            key: 'event-media/clip.mp4',
+            parts: ['event-media/clip.part1.mp4', 'event-media/clip.part2.mp4'],
+          }
+        : { key: 'event-media/snap.jpg' },
+    )
+
+    expect(await mediaStagedAction(payload, context)).toMatchObject({
+      clipKey: 'event-media/clip.mp4',
+      clipParts: ['event-media/clip.part1.mp4', 'event-media/clip.part2.mp4'],
     })
   })
 
@@ -44,7 +61,7 @@ describe('mediaStagedAction', () => {
     // an S3 blip here would drop the media for good.
     processStaged.mockImplementation(async (kind: string) => {
       if (kind === 'video') throw new TransientError('s3 get: reset')
-      return 'event-media/snap.jpg'
+      return { key: 'event-media/snap.jpg' }
     })
 
     await expect(mediaStagedAction(payload, context)).rejects.toThrow(
@@ -55,12 +72,13 @@ describe('mediaStagedAction', () => {
   test('still delivers the snapshot when the clip fails permanently', async () => {
     processStaged.mockImplementation(async (kind: string) => {
       if (kind === 'video') throw new Error('Invalid data found')
-      return 'event-media/snap.jpg'
+      return { key: 'event-media/snap.jpg' }
     })
 
     expect(await mediaStagedAction(payload, context)).toEqual({
       eventId: payload.eventId,
       clipKey: undefined,
+      clipParts: undefined,
       snapshotKey: 'event-media/snap.jpg',
     })
   })

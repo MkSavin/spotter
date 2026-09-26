@@ -106,3 +106,114 @@ describe('InnoxiousMedia', () => {
     }
   })
 })
+
+describe('InnoxiousMedia URL limit', () => {
+  /** Answers the ranged size probe, then serves the bytes. */
+  const makeSizedFetch = (size: number) =>
+    (async (_url: string, init?: RequestInit) => {
+      const ranged = new Headers(init?.headers).has('range')
+      return new Response(
+        ranged ? Uint8Array.from([0]) : Uint8Array.from([1, 2]),
+        {
+          status: ranged ? 206 : 200,
+          headers: ranged ? { 'content-range': `bytes 0-0/${size}` } : {},
+        },
+      )
+    }) as typeof fetch
+
+  test('a video over 20 MB is sent as bytes, not as a URL Telegram would refuse', async () => {
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.fetch = makeSizedFetch(59_510_000)
+
+      const media = new InnoxiousMedia({
+        type: 'video',
+        media: 'https://s3.example.com/clip.mp4',
+      })
+
+      expect((await media.naive()).media).toBeInstanceOf(InputFile)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('a video within the limit keeps its URL', async () => {
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.fetch = makeSizedFetch(19_000_000)
+
+      const media = new InnoxiousMedia({
+        type: 'video',
+        media: 'https://s3.example.com/clip.mp4',
+      })
+
+      expect((await media.naive()).media).toBe(
+        'https://s3.example.com/clip.mp4',
+      )
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('a photo has the smaller 5 MB limit', async () => {
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.fetch = makeSizedFetch(6_000_000)
+
+      const media = new InnoxiousMedia({
+        type: 'photo',
+        media: 'https://s3.example.com/snap.jpg',
+      })
+
+      expect((await media.naive()).media).toBeInstanceOf(InputFile)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})
+
+describe('InnoxiousMedia caching', () => {
+  test('a failed download is retried rather than replayed', async () => {
+    const originalFetch = globalThis.fetch
+    try {
+      let calls = 0
+      globalThis.fetch = (async () => {
+        calls += 1
+        if (calls === 1) throw new Error('connection reset')
+        return new Response(Uint8Array.from([1]))
+      }) as unknown as typeof fetch
+
+      const media = new InnoxiousMedia({
+        type: 'photo',
+        media: 'https://s3.example.com/snap.jpg',
+      })
+
+      await expect(media.accurate()).rejects.toThrow('connection reset')
+      expect((await media.accurate()).media).toBeInstanceOf(InputFile)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('a successful download is fetched once', async () => {
+    const originalFetch = globalThis.fetch
+    try {
+      let calls = 0
+      globalThis.fetch = (async () => {
+        calls += 1
+        return new Response(Uint8Array.from([1]))
+      }) as unknown as typeof fetch
+
+      const media = new InnoxiousMedia({
+        type: 'photo',
+        media: 'https://s3.example.com/snap.jpg',
+      })
+
+      await media.accurate()
+      await media.accurate()
+      expect(calls).toBe(1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+})

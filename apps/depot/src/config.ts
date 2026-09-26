@@ -29,6 +29,11 @@ export type VideoConfig = {
   timeoutMs: number
   /** How many clips one replica encodes at once. */
   concurrency: number
+  /**
+   * A clip above this many MB is also cut into parts no larger; `0` never
+   * cuts. 20 is Telegram's limit on media it fetches by URL.
+   */
+  partLimitMb: number
 }
 
 export type ImageConfig = {
@@ -90,6 +95,7 @@ export const resolveConfig = (): CoreConfig => {
       skipConversion: env.boolean('VIDEO_SKIP_CONVERSION', false),
       timeoutMs: env.number('VIDEO_TIMEOUT_MS', 14_400_000),
       concurrency: env.number('VIDEO_CONCURRENCY', 1),
+      partLimitMb: env.number('VIDEO_PART_LIMIT_MB', 20),
     },
     image: {
       quality: env.enum('IMAGE_QUALITY', qualities, 'best'),

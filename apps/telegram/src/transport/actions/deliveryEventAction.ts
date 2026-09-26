@@ -4,6 +4,7 @@ import type { TransportContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
 import { actualizeEventMedia } from '../mixins/actualizeEventMedia'
 import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
+import { deliverClipParts } from '../mixins/deliverClipParts'
 import {
   shouldOfferClip,
   shouldSayClipless,
@@ -16,7 +17,7 @@ export const deliveryEventAction = async (
   context: TransportContext,
 ): Promise<void> => {
   const { logger, db, s3, config } = context
-  const { eventId, event, action, clipKey, snapshotKey } = delivery
+  const { eventId, event, action, clipKey, clipParts, snapshotKey } = delivery
 
   if (action === 'create' || action === 'update') {
     const messages = eventMessagesRepo.find(db, eventId)
@@ -79,15 +80,29 @@ export const deliveryEventAction = async (
   context.clips.complete(eventId)
 
   if (clipKey) {
+    const presign = (key: string): string =>
+      s3.presign(key, { expiresIn: config.presignExpiry })
+    // A clip over Telegram's limit arrives cut: part 1 takes the message's
+    // place, the rest follow as replies.
+    const [head, ...rest] = clipParts ?? [clipKey]
+
     // The clip supersedes the snapshot: video replaces the photo, button gone.
     const video: InputMediaVideo = {
       type: 'video',
-      media: s3.presign(clipKey, { expiresIn: config.presignExpiry }),
+      media: presign(head ?? clipKey),
       // A clip arrived, so whatever the event advertised, it is not clipless.
-      caption: renderEvent(event, context, { media: 'ready' }),
+      caption: renderEvent(event, context, {
+        media: 'ready',
+        parts: rest.length + 1,
+      }),
       parse_mode: 'HTML',
     }
     await actualizeEventMedia(eventId, messages, video, undefined, context)
+
+    if (rest.length > 0) {
+      await deliverClipParts(eventId, event, rest.map(presign), context)
+    }
+
     logger.debug(`deliveryEvent (media/clip) processed for ${eventId}`)
     return
   }

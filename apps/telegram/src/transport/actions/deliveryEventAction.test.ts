@@ -5,7 +5,12 @@ import path from 'node:path'
 import type { DeliveryEvent, SpotterEvent } from '@spotter/transport'
 import type { TransportContext } from '../../context'
 import { createDatabase, type TelegramDatabase } from '../../db/client'
-import { eventMessagesRepo, tgChatsRepo } from '../../db/repository'
+import {
+  eventClipPartsRepo,
+  eventMessagesRepo,
+  tgChatsRepo,
+} from '../../db/repository'
+import type { InnoxiousMedia } from '../../extension/innoxious/InnoxiousMedia'
 import { deliveryEventAction } from './deliveryEventAction'
 
 let db: TelegramDatabase
@@ -27,8 +32,10 @@ const event = (type: 'start' | 'end', hasClip = false): SpotterEvent => ({
 
 const makeContext = () => {
   const editMessageText = mock(async () => undefined)
-  const editMessageMedia = mock(async () => undefined)
+  const editMessageMedia = mock(async (..._args: unknown[]) => undefined)
   const sendMessage = mock(async () => ({ message_id: 7 }))
+  let nextId = 20
+  const sendVideo = mock(async () => ({ message_id: nextId++ }))
 
   return {
     db,
@@ -43,20 +50,31 @@ const makeContext = () => {
       cameraLabel: (_s: string, code: string) => code,
     },
     clips: { fail: mock(() => undefined), complete: mock(() => undefined) },
-    s3: { presign: () => 'https://example.test/x.jpg' },
+    // A path, not a URL: a URL would be probed for its size over the network.
+    s3: { presign: (key: string) => `/presigned/${key}` },
     bot: {
       api: {
         editMessageText,
-        editMessageMedia,
         sendMessage,
-        innoxious: { sendPhoto: mock(async () => ({ message_id: 8 })) },
+        innoxious: {
+          sendPhoto: mock(async () => ({ message_id: 8 })),
+          sendVideo,
+          editMessageMedia: async (
+            chatId: string,
+            messageId: number,
+            media: InnoxiousMedia<{ type: 'photo'; media: string }>,
+            other: unknown,
+          ) => editMessageMedia(chatId, messageId, await media.naive(), other),
+        },
       },
     },
     editMessageText,
     editMessageMedia,
+    sendVideo,
   } as unknown as TransportContext & {
     editMessageText: ReturnType<typeof mock>
     editMessageMedia: ReturnType<typeof mock>
+    sendVideo: ReturnType<typeof mock>
   }
 }
 
@@ -241,6 +259,90 @@ describe('deliveryEventAction clip marker', () => {
 
     const text = context.editMessageText.mock.calls[0][2] as string
     expect(text).toContain('🙈 Без снимка и видео')
+    cleanup()
+  })
+})
+
+describe('deliveryEventAction clip parts', () => {
+  const delivery: DeliveryEvent = {
+    eventId: 'cam-htriyg-1',
+    event: event('end', true),
+    action: 'media',
+    clipKey: 'event-media/clip.mp4',
+    clipParts: [
+      'event-media/clip.part1.mp4',
+      'event-media/clip.part2.mp4',
+      'event-media/clip.part3.mp4',
+    ],
+  }
+
+  const sentCaptions = (context: ReturnType<typeof makeContext>) =>
+    context.sendVideo.mock.calls.map(
+      (call) => (call[2] as { caption: string }).caption,
+    )
+
+  test('part 1 takes the message, the rest follow as replies in order', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(delivery, context)
+
+    const [, messageId, main] = context.editMessageMedia.mock.calls[0] as [
+      string,
+      number,
+      { media: unknown; caption: string },
+    ]
+    expect(messageId).toBe(5)
+    expect(main.caption).toContain('Часть 1 из 3')
+
+    expect(sentCaptions(context)).toEqual([
+      expect.stringContaining('Часть 2 из 3'),
+      expect.stringContaining('Часть 3 из 3'),
+    ])
+    for (const call of context.sendVideo.mock.calls) {
+      expect(call[2]).toMatchObject({ reply_parameters: { message_id: 5 } })
+    }
+    cleanup()
+  })
+
+  test('a retry does not send a part a chat already has', async () => {
+    const context = makeContext()
+    eventClipPartsRepo.record(db, 'cam-htriyg-1', 2, [
+      { id: 11, chatId: '100' },
+    ])
+
+    await deliveryEventAction(delivery, context)
+
+    expect(sentCaptions(context)).toEqual([
+      expect.stringContaining('Часть 3 из 3'),
+    ])
+    cleanup()
+  })
+
+  test('a failed part stops the later ones so the retry keeps the order', async () => {
+    const context = makeContext()
+    context.sendVideo.mockImplementationOnce(async () => {
+      throw new Error('400: Bad Request')
+    })
+
+    await expect(deliveryEventAction(delivery, context)).rejects.toThrow(
+      'clip part 2 of 3',
+    )
+
+    expect(context.sendVideo).toHaveBeenCalledTimes(1)
+    expect(eventClipPartsRepo.find(db, 'cam-htriyg-1', 3)).toEqual([])
+    cleanup()
+  })
+
+  test('an uncut clip is delivered whole, with no part mark', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction({ ...delivery, clipParts: undefined }, context)
+
+    const main = context.editMessageMedia.mock.calls[0][2] as {
+      caption: string
+    }
+    expect(main.caption).not.toContain('Часть')
+    expect(context.sendVideo).not.toHaveBeenCalled()
     cleanup()
   })
 })

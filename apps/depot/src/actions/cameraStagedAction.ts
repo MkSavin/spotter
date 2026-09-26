@@ -17,7 +17,7 @@ export const cameraStagedAction = async (
 
   // Transient failures escape so the regulator retries; permanent ones are
   // logged and reported as a miss to the waiting frontend.
-  const { value: frameKey, error } = await settle(() =>
+  const { value: processed, error } = await settle(() =>
     processStaged('image', rawFrameKey, {
       ...context,
       processedPath: 'camera-media',
@@ -33,6 +33,7 @@ export const cameraStagedAction = async (
     context.logger.error(error)
   }
 
+  const frameKey = processed?.key
   if (!frameKey) {
     return undefined
   }

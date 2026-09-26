@@ -27,13 +27,15 @@ spotter.delivery.event ──▶ deliveryEventController ──▶ deliveryEvent
    action create|update  → renderEvent → actualizeSentMessages (send/edit + кнопка «Видео»)
    action media (snapshot)→ editMessageMedia(текст→фото) + кнопка «Видео» (если есть клип)
    action media (clip)    → editMessageMedia(→видео), кнопка убирается
+                            клип порезан: часть 1 в сообщении, части 2…N — ответами
 ```
 
 - **Медиа крепится «на оригинальное сообщение» edit-in-place**, а не отдельным media group. `editMessageMedia` (Bot API ≥ 7.11) добавляет медиа к текстовому сообщению и меняет фото→видео — один `message_id` морфится текст → фото → видео. ([actualizeEventMedia.ts](src/transport/mixins/actualizeEventMedia.ts)).
 - **Кнопка «Видео»** ([eventKeyboard.ts](src/transport/view/eventKeyboard.ts)): появляется на фото/тексте, когда событие завершилось и имеет клип (`shouldOfferClip`). Нажатие → [clipCallback.ts](src/callback/clipCallback.ts): ack, кнопка → «⏳ запрошено» (защита от повторов), RPC `event.clip`. Готовый клип прилетает `delivery.event (media)` и через **fan-out по `eventId`** проставляется видео всем подписчикам этого события. Жать может любой в авторизованном чате (роль не проверяется).
 - **Стадии ожидания клипа** ([ClipTracker](src/clip/ClipTracker.ts)): `spotter.media.progress` двигает кнопку «запрошено → скачивается → конвертируется». Стадии приходят только для клипов, которые бот реально ждёт — обычные события медиа-конвейера кнопку не рисуют. Каждая стадия перезапускает таймаут (`CLIP_TIMEOUT_MS`, 5 мин); истёк или пришёл `failed` — кнопка становится «повторить» с причиной, чтобы зависший запрос можно было перезапустить.
 - [deliveryEventAction.ts](src/transport/actions/deliveryEventAction.ts): сопоставляет подписанные чаты с уже отправленными `event_messages` через [supplySubscribers.ts](src/transport/helpers/supplySubscribers.ts) (create/update/remove), message-id хранит **локально** (server присылает только intent + recipients).
-- `media`-экшен пресайнит S3-ключи (`s3.presign`, `S3_PRESIGN_EXPIRY`) — server байты не отдаёт. `InnoxiousMedia` доставляет с fallback (naive URL → accurate buffer). Видео **заменяет** фото (Telegram не держит фото+видео в одном сообщении).
+- `media`-экшен пресайнит S3-ключи (`s3.presign`, `S3_PRESIGN_EXPIRY`) — server байты не отдаёт. `InnoxiousMedia` доставляет с fallback (naive URL → accurate buffer) через `InnoxiousExecutor` — и отправка, и `editMessageMedia`. Файл больше лимита Telegram на скачивание по ссылке сразу уходит байтами, упавшее скачивание не кэшируется. Видео **заменяет** фото (Telegram не держит фото+видео в одном сообщении).
+- Клип больше `VIDEO_PART_LIMIT_MB` приходит с `clipParts`: часть 1 встаёт в сообщение события, остальные [deliverClipParts.ts](src/transport/mixins/deliverClipParts.ts) шлёт ответами по порядку. Первая неудавшаяся часть останавливает остальные — повтор продолжит с неё, и порядок в чате не нарушится.
 - [deliveryRecipientController.ts](src/transport/controllers/deliveryRecipientController.ts) держит кэш `tg_bindings.role` в синхроне: `update` меняет роль, `revoke` сносит биндинги и осиротевшие чаты.
 
 ## Команды и RPC
@@ -55,6 +57,7 @@ Telegram-локальный стейт — **никакого домена/ро�
 - `tg_chats (id PK)` — авторизованные чаты (получают уведомления через supplySubscribers).
 - `tg_bindings ((tg_user_id, tg_chat_id) PK, recipient_uuid, username?, role)` — маппинг uuid↔chat + кэш роли для сессии (роль — копия, истина в server).
 - `event_messages ((event_id, tg_chat_id) PK, message_id)` — какой message-id отправлен в какой чат (для edits и медиа-ответов).
+- `event_clip_parts ((event_id, tg_chat_id, part) PK, message_id)` — ответы с частями 2…N клипа; запись не даёт повтору отправить часть второй раз. Чистится вместе с `event_messages`.
   Пишется **только через `record` (upsert-слияние)**, никогда не перезаписывается целиком: при
   частичном или полном провале доставки список успешных чатов обязан пережить ретрай, иначе
   повторная доставка не увидит уже отправленное сообщение и пришлёт дубль. Удаление — точечное,

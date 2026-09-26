@@ -68,6 +68,27 @@ export const eventMessages = sqliteTable(
 )
 
 /**
+ * Replies carrying parts 2…N of a clip that was cut to fit Telegram. Part 1
+ * lives in the event message itself; recording each reply is what keeps a
+ * retried delivery from sending the same part twice.
+ */
+export const eventClipParts = sqliteTable(
+  'event_clip_parts',
+  {
+    eventId: text('event_id').notNull(),
+    tgChatId: text('tg_chat_id').notNull(),
+    part: integer('part').notNull(),
+    messageId: integer('message_id').notNull(),
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    primaryKey({ columns: [table.eventId, table.tgChatId, table.part] }),
+  ],
+)
+
+/**
  * Exports the bot is waiting on, so `/timelapse_status` can answer after a
  * restart. Rows are dropped when the export resolves either way — this is a
  * work list, not a history.

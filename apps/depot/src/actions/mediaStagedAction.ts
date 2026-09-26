@@ -57,8 +57,9 @@ export const mediaStagedAction = async (
     if (error) context.logger.error(error)
   }
 
-  const clipKey = clip.value
-  const snapshotKey = snapshot.value
+  const clipKey = clip.value?.key
+  const clipParts = clip.value?.parts
+  const snapshotKey = snapshot.value?.key
 
   if (!clipKey && !snapshotKey) {
     context.logger.warn('No media returned in result of conversion')
@@ -69,5 +70,5 @@ export const mediaStagedAction = async (
     `Media successfully converted: ${[clipKey && 'clip', snapshotKey && 'snapshot'].filter(Boolean).join(', ')}`,
   )
 
-  return { eventId, clipKey, snapshotKey }
+  return { eventId, clipKey, clipParts, snapshotKey }
 }

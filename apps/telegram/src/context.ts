@@ -92,6 +92,18 @@ export type InnoxiousApiFlavor<A extends Api> = A & {
       signal?: AbortSignal,
     ) => Promise<Message.VideoMessage>
 
+    editMessageMedia: (
+      chatId: ChatId,
+      messageId: number,
+      media: InnoxiousMedia<any>,
+      other?: Other<
+        RawApi,
+        'editMessageMedia',
+        'chat_id' | 'message_id' | 'inline_message_id' | 'media'
+      >,
+      signal?: AbortSignal,
+    ) => Promise<true | Message>
+
     sendMediaGroup: (
       chatId: ChatId,
       media: InnoxiousMediaGroup<any>,
