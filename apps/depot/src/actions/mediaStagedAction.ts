@@ -15,6 +15,8 @@ import { settle, TransientError } from '../processing/TransientError'
 export const mediaStagedAction = async (
   payload: MediaStaged,
   context: CoreContext,
+  /** Injected so a test can stand in for the transcoding. */
+  process: typeof processStaged = processStaged,
 ): Promise<MediaProcessed | undefined> => {
   const { eventId, rawClipKey, rawSnapshotKey } = payload
 
@@ -41,9 +43,9 @@ export const mediaStagedAction = async (
   // transient one is rethrown below so the entry stays pending for a retry.
   const [clip, snapshot] = await Promise.all([
     settle(() =>
-      processStaged('video', rawClipKey, processingContext, reportProgress),
+      process('video', rawClipKey, processingContext, reportProgress),
     ),
-    settle(() => processStaged('image', rawSnapshotKey, processingContext)),
+    settle(() => process('image', rawSnapshotKey, processingContext)),
   ])
 
   const retryable = [clip, snapshot].find(

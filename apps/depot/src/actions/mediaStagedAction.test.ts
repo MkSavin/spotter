@@ -3,12 +3,14 @@ import type { MediaStaged } from '@spotter/transport'
 import { defaultLogger } from 'stenograph'
 import { TransientError } from '../processing/TransientError'
 
-// The action is exercised through a stubbed processStaged: the decision under
-// test is which failures escape, not the transcoding itself.
-const processStaged = mock()
-mock.module('../processing/processStaged', () => ({ processStaged }))
+import { mediaStagedAction as action } from './mediaStagedAction'
 
-const { mediaStagedAction } = await import('./mediaStagedAction')
+// The action is exercised through a stubbed processStaged: the decision under
+// test is which failures escape, not the transcoding itself. Injected, not
+// module-mocked: `mock.module` would leak into processStaged.test.ts.
+const processStaged = mock()
+const mediaStagedAction = (payload: MediaStaged, context: never) =>
+  action(payload, context, processStaged as never)
 
 const payload: MediaStaged = {
   eventId: 'cam-1700000000.123-abc',

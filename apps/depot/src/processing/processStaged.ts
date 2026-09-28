@@ -17,6 +17,17 @@ export type ProcessedMedia = {
   parts?: string[]
 }
 
+/** The conversions themselves, injected so a test can stand in for them. */
+export type Transcoders = {
+  video: typeof transcodeVideo
+  image: typeof transcodeImage
+}
+
+const transcoders: Transcoders = {
+  video: transcodeVideo,
+  image: transcodeImage,
+}
+
 export type ProcessStagedContext = CoreContext & {
   /** S3 prefix under which the transcoded result is stored. */
   processedPath: string
@@ -44,6 +55,7 @@ export const processStaged = async (
   rawKey: string | undefined,
   context: ProcessStagedContext,
   onProgress?: ProgressReporter,
+  transcode: Transcoders = transcoders,
 ): Promise<ProcessedMedia | undefined> => {
   if (!rawKey) {
     return undefined
@@ -87,9 +99,9 @@ export const processStaged = async (
 
   try {
     if (kind === 'video') {
-      await transcodeVideo(raw, processed, config.video, logger, onProgress)
+      await transcode.video(raw, processed, config.video, logger, onProgress)
     } else {
-      await transcodeImage(raw, processed, config.image, logger, onProgress)
+      await transcode.image(raw, processed, config.image, logger, onProgress)
     }
 
     const processedKey = path.join(

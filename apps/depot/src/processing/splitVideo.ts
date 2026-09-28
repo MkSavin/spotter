@@ -132,7 +132,7 @@ export const splitVideo = async (
   logger: Stenograph,
 ): Promise<string[]> => {
   const size = Bun.file(file).size
-  if (limitBytes <= 0 || size <= limitBytes) return []
+  if (!(limitBytes > 0) || size <= limitBytes) return []
 
   const duration = await probeDuration(file, timeoutMs)
 

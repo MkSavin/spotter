@@ -4,13 +4,15 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { defaultLogger } from 'stenograph'
 
-const transcodeVideo = mock()
-mock.module('./transcode', () => ({
-  transcodeVideo,
-  transcodeImage: mock(async () => undefined),
-}))
+import { processStaged, type Transcoders } from './processStaged'
 
-const { processStaged } = await import('./processStaged')
+// Injected rather than module-mocked: `mock.module` is process-wide and would
+// hand this stub to transcode.test.ts whenever it happens to run later.
+const transcodeVideo = mock()
+const transcode = {
+  video: transcodeVideo,
+  image: mock(async () => undefined),
+} as unknown as Transcoders
 
 let directory = ''
 
@@ -21,7 +23,7 @@ const makeContext = () =>
     filePrefix: 'event-abc',
     directory: { temp: { directory } },
     config: {
-      video: {},
+      video: { partLimitMb: 0 },
       image: {},
       directory: { cleanupStrategy: 'file-processed' },
     },
@@ -51,7 +53,13 @@ describe('processStaged', () => {
       },
     )
 
-    await processStaged('video', 'staging/clip.mp4', makeContext())
+    await processStaged(
+      'video',
+      'staging/clip.mp4',
+      makeContext(),
+      undefined,
+      transcode,
+    )
 
     expect(readdirSync(directory)).toEqual([])
   })
@@ -64,7 +72,13 @@ describe('processStaged', () => {
     })
 
     await expect(
-      processStaged('video', 'staging/clip.mp4', makeContext()),
+      processStaged(
+        'video',
+        'staging/clip.mp4',
+        makeContext(),
+        undefined,
+        transcode,
+      ),
     ).rejects.toThrow(/timed out/)
 
     expect(readdirSync(directory)).toEqual([])
