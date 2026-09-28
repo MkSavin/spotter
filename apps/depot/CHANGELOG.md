@@ -1,5 +1,25 @@
 # @spotter/depot
 
+## 1.4.0
+
+### Minor Changes
+
+- 7f7e994: Deliver clips larger than Telegram accepts. Telegram fetches at most 20 MB by URL and takes 50 MB as an upload, so a 60 MB clip hung on the last progress step: every delivery failed with `failed to get HTTP URL content` until the entry went to the dead-letter stream.
+  
+  Depot now also cuts a clip above `VIDEO_PART_LIMIT_MB` (default 20, `0` disables) into parts no larger, by stream copy on keyframes. The whole clip stays in `clipKey` for consumers without a limit; the parts travel in the new optional `clipParts` field of `mediaProcessed` and `deliveryEvent`. A failed cut still delivers the whole clip.
+  
+  Telegram puts part 1 in the event message and sends the rest as replies, in order. Each sent part is recorded in the new `event_clip_parts` table, so a retry resumes at the first missing part instead of sending any twice.
+  
+  `editMessageMedia` now goes through `InnoxiousExecutor` like every send, instead of a single hand-rolled fallback. Media over Telegram's URL limit is uploaded as bytes without first wasting an attempt on the URL, sized with a one-byte ranged GET because a presigned URL may refuse HEAD. A failed download is no longer cached, so a later attempt can succeed.
+
+### Patch Changes
+
+- 74a80ea: Stop the depot tests from depending on file order. `mock.module` in Bun replaces a module for the whole process and never resets between files, so the stubs of `processStaged` and `transcode` leaked into the tests of the real modules whenever those ran later; a new test file shifting the order was enough to fail seven of them in CI. Both stubs are now injected, as `TranscodeQueue` already does, and no `mock.module` is left in the repository.
+  
+  `splitVideo` also treats a missing part limit as "never cut": `NaN` passed the `<= 0` check and started an ffprobe run on every clip.
+- Updated dependencies [7f7e994]
+  - @spotter/transport@1.12.0
+
 ## 1.3.4
 
 ### Patch Changes
