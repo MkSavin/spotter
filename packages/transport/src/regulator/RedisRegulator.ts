@@ -43,6 +43,12 @@ export type RegulatorOptions = {
   maxDeliveries?: number
   /** Delay between XGROUP retries while Redis replays its AOF. Tests shorten it. */
   loadingRetryDelayMs?: number
+  /**
+   * Resolves with how many entries the consumer can start now, once that is at
+   * least one; the next read takes no more. Without it a busy replica keeps
+   * taking work that an idle one could have started.
+   */
+  admit?: () => Promise<number>
 }
 
 export type RegulatorHandle = {
@@ -292,12 +298,17 @@ export class RedisRegulator<Context extends BaseContext> {
     }, reaperIntervalMs)
 
     let running = true
-    const readArgs = [
+    let halt: () => void = () => undefined
+    const halted = new Promise<undefined>((resolve) => {
+      halt = () => resolve(undefined)
+    })
+
+    const readArgs = (limit: number): string[] => [
       'GROUP',
       group,
       consumer,
       'COUNT',
-      String(count),
+      String(limit),
       'BLOCK',
       String(blockMs),
       'STREAMS',
@@ -305,18 +316,24 @@ export class RedisRegulator<Context extends BaseContext> {
       ...streams.map(() => '>'),
     ]
 
+    /** Raced with `stop()`: a full consumer may stay full for hours. */
+    const admitted = async (): Promise<number | undefined> =>
+      options.admit
+        ? Promise.race([options.admit(), halted])
+        : Promise.resolve(count)
+
     /**
      * A read in flight when the server dies never settles, parking the loop.
      * See docs/foundings/redis-streams.md.
      */
     const readDeadlineMs = blockMs + READ_DEADLINE_GRACE_MS
 
-    const readWithDeadline = async (): Promise<unknown> => {
+    const readWithDeadline = async (limit: number): Promise<unknown> => {
       let timer: ReturnType<typeof setTimeout> | undefined
 
       try {
         return await Promise.race([
-          subscriber.send('XREADGROUP', readArgs),
+          subscriber.send('XREADGROUP', readArgs(limit)),
           new Promise((_resolve, reject) => {
             timer = setTimeout(
               () => reject(new Error(STALLED_READ)),
@@ -332,7 +349,13 @@ export class RedisRegulator<Context extends BaseContext> {
     const loop = async (): Promise<void> => {
       while (running) {
         try {
-          const reply = await readWithDeadline()
+          const room = await admitted()
+          if (room === undefined || !running) break
+
+          // Floored at one: Redis reads `COUNT 0` as no limit at all.
+          const reply = await readWithDeadline(
+            Math.max(1, Math.min(count, room)),
+          )
           for (const record of parseReadGroupReply(reply)) {
             await dispatch(record)
           }
@@ -380,6 +403,7 @@ export class RedisRegulator<Context extends BaseContext> {
       streams,
       stop: async () => {
         running = false
+        halt()
         clearInterval(reaper)
         await looping.catch(() => {})
       },

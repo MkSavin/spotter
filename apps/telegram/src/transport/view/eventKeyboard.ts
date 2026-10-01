@@ -38,7 +38,7 @@ export const STAGE_LABELS = {
 export type ClipStage = keyof typeof STAGE_LABELS
 
 /** Percent turns the transcoding label into a progress one. */
-const stageLabel = (stage: ClipStage, percent?: number): string =>
+export const stageLabel = (stage: ClipStage, percent?: number): string =>
   stage === 'staged' && percent !== undefined
     ? `⏳ Конвертируется… ${percent}%`
     : STAGE_LABELS[stage]

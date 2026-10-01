@@ -248,7 +248,7 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - [docs/foundings/frigate-event-media.md](docs/foundings/frigate-event-media.md) — когда Frigate пишет снимок и клип, а когда не напишет никогда.
 - [docs/foundings/frigate-api-quirks.md](docs/foundings/frigate-api-quirks.md) — JWT, адрес NVR, MQTT по умолчанию выключен, экспорт.
 - [docs/foundings/silent-failures.md](docs/foundings/silent-failures.md) — отказы, при которых всё выглядит здоровым; пороги тишины.
-- [docs/foundings/redis-streams.md](docs/foundings/redis-streams.md) — зависшее блокирующее чтение, `-LOADING`, клиенты Bun.
+- [docs/foundings/redis-streams.md](docs/foundings/redis-streams.md) — зависшее блокирующее чтение, `-LOADING`, раннее подтверждение без допуска по слотам.
 - [docs/foundings/ffmpeg-hardware-transcode.md](docs/foundings/ffmpeg-hardware-transcode.md) — NVENC, пресеты, откат на CPU.
 - [docs/foundings/http-and-push.md](docs/foundings/http-and-push.md) — пресайн S3 в браузере, HTTP/1.0, коалесцирование push, лимиты размера Telegram.
 - [docs/foundings/env-and-config.md](docs/foundings/env-and-config.md) — `# hint` из примера, ставший значением.

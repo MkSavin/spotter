@@ -172,6 +172,7 @@ const run = async (): Promise<void> => {
       reclaimMinIdleMs: config.redis.reclaimMinIdleMs,
       reaperIntervalMs: config.redis.reaperIntervalMs,
       maxDeliveries: config.redis.maxDeliveries,
+      admit: () => queue.vacancy(),
     },
   )
 

@@ -393,3 +393,97 @@ describe('RedisRegulator stalled reads', () => {
     expect(reads).toBeGreaterThan(1)
   }, 15_000)
 })
+
+describe('RedisRegulator admission', () => {
+  /** Answers every read empty, after a short block like a real one. */
+  const idleSubscriber = () =>
+    new FakeRedis().on(
+      'XREADGROUP',
+      () => new Promise((resolve) => setTimeout(() => resolve([]), 5)),
+    )
+
+  test('does not read while the consumer has no room', async () => {
+    const subscriber = idleSubscriber()
+    let open: (room: number) => void = () => undefined
+    const admit = mock(
+      () =>
+        new Promise<number>((resolve) => {
+          open = resolve
+        }),
+    )
+
+    const handle = await new RedisRegulator()
+      .message('spotter.media.staged.clip', handlerMock())
+      .run(buildContext(subscriber, new FakeRedis()), {
+        group: 'g',
+        consumer: 'c',
+        reaperIntervalMs: 999999,
+        admit,
+      })
+    handles.push(handle)
+
+    await Bun.sleep(20)
+    // A busy replica leaves the clip in the stream for an idle one.
+    expect(subscriber.callsOf('XREADGROUP')).toEqual([])
+
+    open(1)
+    await Bun.sleep(20)
+    const [first] = subscriber.callsOf('XREADGROUP')
+    expect(first?.[first.indexOf('COUNT') + 1]).toBe('1')
+  })
+
+  test('reads no more than the room the consumer reports', async () => {
+    const subscriber = idleSubscriber()
+
+    const handle = await new RedisRegulator()
+      .message('spotter.media.staged.clip', handlerMock())
+      .run(buildContext(subscriber, new FakeRedis()), {
+        group: 'g',
+        consumer: 'c',
+        count: 10,
+        reaperIntervalMs: 999999,
+        admit: async () => 2,
+      })
+    handles.push(handle)
+
+    await Bun.sleep(20)
+    const [first] = subscriber.callsOf('XREADGROUP')
+    expect(first?.[first.indexOf('COUNT') + 1]).toBe('2')
+  })
+
+  test('never asks Redis for everything when room comes back as zero', async () => {
+    // `COUNT 0` is no limit to Redis, the opposite of what zero room means.
+    const subscriber = idleSubscriber()
+
+    const handle = await new RedisRegulator()
+      .message('spotter.media.staged.clip', handlerMock())
+      .run(buildContext(subscriber, new FakeRedis()), {
+        group: 'g',
+        consumer: 'c',
+        reaperIntervalMs: 999999,
+        admit: async () => 0,
+      })
+    handles.push(handle)
+
+    await Bun.sleep(20)
+    const [first] = subscriber.callsOf('XREADGROUP')
+    expect(first?.[first.indexOf('COUNT') + 1]).toBe('1')
+  })
+
+  test('stops without waiting for room that may take hours to free', async () => {
+    const handle = await new RedisRegulator()
+      .message('spotter.media.staged.clip', handlerMock())
+      .run(buildContext(idleSubscriber(), new FakeRedis()), {
+        group: 'g',
+        consumer: 'c',
+        reaperIntervalMs: 999999,
+        admit: () => new Promise<number>(() => undefined),
+      })
+
+    const stopped = await Promise.race([
+      handle.stop().then(() => true),
+      Bun.sleep(200).then(() => false),
+    ])
+    expect(stopped).toBe(true)
+  })
+})

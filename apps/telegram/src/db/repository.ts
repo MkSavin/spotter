@@ -172,6 +172,23 @@ export const tgBindingsRepo = {
 }
 
 export const eventMessagesRepo = {
+  /** The event a message belongs to; its buttons carry no id of their own. */
+  findEventId: (
+    db: TelegramDatabase,
+    chatId: string,
+    messageId: number,
+  ): string | undefined =>
+    db
+      .select({ eventId: eventMessages.eventId })
+      .from(eventMessages)
+      .where(
+        and(
+          eq(eventMessages.tgChatId, chatId),
+          eq(eventMessages.messageId, messageId),
+        ),
+      )
+      .get()?.eventId,
+
   find: (db: TelegramDatabase, eventId: string): EventMessage[] =>
     db
       .select({ id: eventMessages.messageId, chatId: eventMessages.tgChatId })

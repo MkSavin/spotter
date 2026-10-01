@@ -8,6 +8,14 @@ export type ClipOutcome =
   | { stage: ClipStage; percent?: number }
   | { failed: string }
 
+/** A clip still awaited: where it is, since when, and when the wait ends. */
+export type ClipStatus = {
+  stage: ClipStage
+  percent?: number
+  since: number
+  deadline: number
+}
+
 type Options = {
   timeoutMs?: number
   /** Repaints the event's messages; `undefined` reason means still working. */
@@ -23,11 +31,7 @@ type Options = {
 export class ClipTracker {
   private readonly waiting = new Map<
     string,
-    {
-      stage: ClipStage
-      percent?: number
-      timer: ReturnType<typeof setTimeout>
-    }
+    ClipStatus & { timer: ReturnType<typeof setTimeout> }
   >()
 
   constructor(
@@ -62,15 +66,31 @@ export class ClipTracker {
     this.finish(eventId)
   }
 
+  /** `undefined` once nothing awaits the clip: done, failed, or forgotten. */
+  status(eventId: string): ClipStatus | undefined {
+    const entry = this.waiting.get(eventId)
+    if (!entry) return undefined
+    const { stage, percent, since, deadline } = entry
+    return { stage, percent, since, deadline }
+  }
+
   private arm(eventId: string, stage: ClipStage, percent?: number): void {
     clearTimeout(this.waiting.get(eventId)?.timer)
     // Each stage restarts the clock: progress means it is still alive.
+    const timeoutMs = this.options.timeoutMs ?? CLIP_TIMEOUT_MS
     const timer = setTimeout(() => {
       this.logger.warn(`Clip for ${eventId} timed out at stage "${stage}"`)
       this.fail(eventId, 'Видео готовилось слишком долго')
-    }, this.options.timeoutMs ?? CLIP_TIMEOUT_MS)
+    }, timeoutMs)
     timer.unref?.()
-    this.waiting.set(eventId, { stage, percent, timer })
+    const since = Date.now()
+    this.waiting.set(eventId, {
+      stage,
+      percent,
+      since,
+      deadline: since + timeoutMs,
+      timer,
+    })
     this.options.store?.save(eventId, stage)
   }
 

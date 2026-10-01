@@ -154,6 +154,48 @@ describe('TranscodeQueue', () => {
     expect(queue.depth).toBe(1)
   })
 
+  test('занятая реплика не объявляет свободных слотов, пока кодирует', async () => {
+    // Reported room is what the regulator reads: none while busy leaves the
+    // next clip in the stream for an idle replica instead of queued here.
+    let finish = (): void => undefined
+    run.mockImplementation(
+      () => new Promise((resolve) => (finish = () => resolve(undefined))),
+    )
+
+    const { context } = makeContext()
+    const queue = new TranscodeQueue({ context, store: makeStore(), run })
+
+    expect(await queue.vacancy()).toBe(1)
+    await queue.accept(staged, defaultLogger)
+
+    let room: number | undefined
+    void queue.vacancy().then((value) => (room = value))
+    await Bun.sleep(10)
+    expect(room).toBeUndefined()
+
+    finish()
+    await Bun.sleep(10)
+    expect(room).toBe(1)
+  })
+
+  test('восстановленные задания занимают слоты до чтения новых', async () => {
+    run.mockImplementation(() => new Promise(() => undefined))
+
+    const store = makeStore([
+      { jobId: 'a', staged: { ...staged, eventId: 'a' }, startedAt: 0 },
+      { jobId: 'b', staged: { ...staged, eventId: 'b' }, startedAt: 0 },
+    ])
+    const { context } = makeContext()
+    const queue = new TranscodeQueue({ context, store, concurrency: 2, run })
+
+    await queue.recover(defaultLogger)
+
+    let room: number | undefined
+    void queue.vacancy().then((value) => (room = value))
+    await Bun.sleep(10)
+    expect(room).toBeUndefined()
+  })
+
   test('параллелизм ограничен настройкой', async () => {
     let running = 0
     let peak = 0

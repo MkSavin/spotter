@@ -42,6 +42,7 @@ export class TranscodeQueue {
   private readonly run: TranscodeRunner
   private stopped = false
   private idle: (() => void) | undefined
+  private waiters: Array<() => void> = []
 
   constructor(private readonly options: TranscodeQueueOptions) {
     this.concurrency = options.concurrency ?? 1
@@ -65,7 +66,20 @@ export class TranscodeQueue {
 
     await this.remember(record, logger)
     this.pending.push(record)
+    logger.info(`Transcode accepted, ${this.claimed.size} in this replica`)
     this.pump(logger)
+  }
+
+  /**
+   * Resolves with the free slots once there is at least one. The regulator
+   * reads no more than that, so a clip waits in the stream for any replica
+   * instead of behind an hour-long encode on this one.
+   */
+  async vacancy(): Promise<number> {
+    while (this.free <= 0) {
+      await new Promise<void>((resolve) => this.waiters.push(resolve))
+    }
+    return this.free
   }
 
   /** Re-queues jobs a previous process accepted but never finished. */
@@ -97,6 +111,10 @@ export class TranscodeQueue {
 
   get depth(): number {
     return this.pending.length + this.running.size
+  }
+
+  private get free(): number {
+    return this.concurrency - this.claimed.size
   }
 
   private claim(jobId: string): boolean {
@@ -149,6 +167,7 @@ export class TranscodeQueue {
     } finally {
       this.running.delete(record.jobId)
       this.claimed.delete(record.jobId)
+      for (const wake of this.waiters.splice(0)) wake()
       if (!this.stopped) this.pump(logger)
       if (this.running.size === 0) this.idle?.()
     }
