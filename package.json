@@ -9,7 +9,7 @@
     "start:all": "bun --filter '*' start",
     "start:all:watch": "bun --filter '*' start:watch",
     "pretest": "bun .integration/rerun.ts --out=apps/pwa/web/dist/index.html --src='apps/pwa/web/src/**/*' --src='apps/pwa/web/index.html' --src='apps/pwa/web/vite.config.ts' -- bun --filter '@spotter/pwa' web:build",
-    "test": "bun test apps packages",
+    "test": "bun test apps packages ./.integration/workspaceDependencies.test.ts",
     "test:coverage": "bun run pretest && bun test apps packages --coverage",
     "build": "bun --filter '*' build",
     "typecheck": "tsc --noEmit",

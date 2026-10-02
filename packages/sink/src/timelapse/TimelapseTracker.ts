@@ -1,11 +1,11 @@
 import {
+  type JobStore,
   type StreamProducer,
   type TimelapseRequest,
   timelapseStreams,
 } from '@spotter/transport'
 import type { S3Client } from 'bun'
 import type { Stenograph } from 'stenograph'
-import type { JobStore } from '../jobs/FileJobStore'
 import { stageMedia } from '../media/stageMedia'
 import type { TimelapseProvider } from './TimelapseProvider'
 

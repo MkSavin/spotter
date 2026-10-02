@@ -1,5 +1,5 @@
-import type { JobStore } from '@spotter/sink'
 import {
+  type JobStore,
   type MediaProcessed,
   type MediaStaged,
   mediaStreams,

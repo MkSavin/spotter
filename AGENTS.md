@@ -235,6 +235,7 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 ## Подводные камни
 
 - **Только Bun.** Скрипты, S3-клиент (`Bun.S3Client`), тест-раннер — всё на Bun API.
+- **Импорт пакета = запись в `package.json` этого пакета.** Образ ставит зависимости через `bun install --filter <app>`, то есть только объявленные; локально и в CI установлено всё, и необъявленный импорт ломает только сборку образа. Ловит [.integration/workspaceDependencies.test.ts](.integration/workspaceDependencies.test.ts).
 - **БД — локальный SQLite-файл** (`DATABASE_PATH`, cwd-относительно). Отдельного сервиса БД нет; миграции применяются на старте. Папка `drizzle/` каждого сервиса обязана ехать рядом с приложением (см. [apps/server/Dockerfile](apps/server/Dockerfile) / [apps/telegram/Dockerfile](apps/telegram/Dockerfile)).
 - **Frigate шлёт «грязные» события** — контроллеры/парсеры делают ранний `return`/`throw`; сохраняй эту защиту.
 - **Креды NVR — только в адаптере** (`apps/frigate`). По сети ходят S3-ключи, не байты и не токены. В `server`/`telegram`/`depot` не должно быть `frigate`/`jwt`/`clipUrl`/`cameraLabels`.

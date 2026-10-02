@@ -3,20 +3,14 @@ import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { defaultLogger } from 'stenograph'
-import type { TimelapseJobRecord } from '../timelapse/TimelapseTracker'
 import { FileJobStore } from './FileJobStore'
 
 defaultLogger.disable()
 
-const record = (jobId: string): TimelapseJobRecord => ({
+type JobRecord = { jobId: string; startedAt: number }
+
+const record = (jobId: string): JobRecord => ({
   jobId,
-  request: {
-    source: 'frigate',
-    camera: 'front',
-    start: 1_700_000_000,
-    end: 1_700_003_600,
-    speed: 'timelapse',
-  },
   startedAt: Date.now(),
 })
 
@@ -92,7 +86,7 @@ describe('FileJobStore concurrency', () => {
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, JSON.stringify([record('front_a')]), 'utf8')
 
-    const store = new FileJobStore<TimelapseJobRecord>(file, defaultLogger)
+    const store = new FileJobStore<JobRecord>(file, defaultLogger)
     const [first, second] = await Promise.all([store.list(), store.list()])
 
     expect(first.map((entry) => entry.jobId)).toEqual(['front_a'])

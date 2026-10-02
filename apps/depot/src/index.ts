@@ -1,6 +1,6 @@
 import process from 'node:process'
-import { FileJobStore } from '@spotter/sink'
 import {
+  FileJobStore,
   guardRejections,
   mediaStreams,
   RedisConnection,

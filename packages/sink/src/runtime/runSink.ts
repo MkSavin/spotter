@@ -1,6 +1,7 @@
 import process from 'node:process'
 import {
   catalogRequestStream,
+  FileJobStore,
   guardRejections,
   mediaStreams,
   notificationStreams,
@@ -22,7 +23,6 @@ import {
 } from '../catalog/keepCatalogPublished'
 import type { SinkConfig } from '../config/sinkConfig'
 import { publishEvent } from '../helpers/publishEvent'
-import { FileJobStore } from '../jobs/FileJobStore'
 import { createCameraController } from '../media/createCameraController'
 import { createMediaController } from '../media/createMediaController'
 import type { MediaProvider } from '../media/MediaProvider'
