@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -12,6 +12,7 @@ import {
   TranscodeError,
   toProgressStep,
   transcodeImage,
+  transcodeVideo,
 } from './transcode'
 
 defaultLogger.disable()
@@ -243,4 +244,63 @@ describe('transcodeImage', () => {
       transcodeImage(raw, processed, config(), defaultLogger),
     ).rejects.toThrow()
   })
+})
+
+// Real ffmpeg: an encoder rejects an unknown preset only at runtime, and the
+// rejection looks like any other frame-0 failure. CI has no ffmpeg.
+describe.skipIf(!Bun.which('ffmpeg'))('transcodeVideo on the CPU', () => {
+  const qualities = ['best', 'good', 'normal', 'bad', 'awful'] as const
+  let workdir = ''
+  let source = ''
+
+  beforeAll(async () => {
+    workdir = mkdtempSync(path.join(tmpdir(), 'spotter-cpu-'))
+    source = path.join(workdir, 'source.mp4')
+    const child = Bun.spawn({
+      cmd: [
+        'ffmpeg',
+        '-v',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'testsrc=duration=1:size=320x240:rate=10',
+        '-pix_fmt',
+        'yuv420p',
+        '-y',
+        source,
+      ],
+    })
+    await child.exited
+  })
+
+  afterAll(() => rmSync(workdir, { recursive: true, force: true }))
+
+  for (const codec of ['h264', 'hevc'] as const) {
+    for (const quality of qualities) {
+      test(`${codec} at "${quality}" encodes`, async () => {
+        const processed = Bun.file(
+          path.join(workdir, `${codec}-${quality}.mp4`),
+        )
+
+        await transcodeVideo(
+          Bun.file(source),
+          processed,
+          {
+            acceleration: 'cpu',
+            codec,
+            quality,
+            device: 0,
+            skipConversion: false,
+            timeoutMs: 60_000,
+            concurrency: 1,
+            partLimitMb: 0,
+          },
+          defaultLogger,
+        )
+
+        expect(processed.size).toBeGreaterThan(0)
+      })
+    }
+  }
 })

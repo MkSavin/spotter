@@ -40,6 +40,10 @@ RUN apt-get update \
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/dist/index.js ./
 COPY --from=bundle /app/${APP_RELATIVE_PATH}/package.json ./
 
+# Owned by bun: Docker gives an empty named volume this owner, and accepted
+# transcodes are persisted here so a restart does not drop them.
+RUN mkdir /data && chown bun:bun /data
+
 USER bun
 EXPOSE 4000
 CMD ["bun", "index.js"]

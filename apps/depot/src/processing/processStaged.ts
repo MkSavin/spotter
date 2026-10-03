@@ -1,8 +1,9 @@
 import path from 'node:path'
 import Bun, { type BunFile } from 'bun'
 import type { CoreContext } from '../context'
+import { download, exists, upload } from './s3Transfer'
 import { MB, splitVideo } from './splitVideo'
-import { TransientError, transient } from './TransientError'
+import { TransientError } from './TransientError'
 import {
   type ProgressReporter,
   transcodeImage,
@@ -68,18 +69,12 @@ export const processStaged = async (
 
   const rawObject = s3.file(rawKey)
 
+  const stallMs = config.s3StallMs
+
   // Staging and transcoding race: the object may not be visible yet, so a miss
   // is retryable rather than a verdict on the media.
-  if (!(await transient('s3 head', () => rawObject.exists()))) {
+  if (!(await exists(rawObject, stallMs))) {
     throw new TransientError(`Staged object not found in s3: ${rawKey}`)
-  }
-
-  const rawBuffer = await transient('s3 get', () => rawObject.arrayBuffer())
-
-  // Also retryable: an empty read usually means the upload is still in flight.
-  // If it really is a zero-byte object the DLQ bounds the retries.
-  if (rawBuffer.byteLength === 0) {
-    throw new TransientError(`Staged object is empty: ${rawKey}`)
   }
 
   const hash = Bun.hash(rawKey)
@@ -91,13 +86,17 @@ export const processStaged = async (
     `${directory.temp.directory}/${filePrefix}-${hash}-processed.${extension}`,
   )
 
-  await Bun.write(raw, rawBuffer, { createPath: true })
-
-  logger.debug(`Processing staged ${kind} from ${rawKey}`)
-
   let partFiles: string[] = []
 
   try {
+    // Also retryable: an empty read usually means the upload is still in
+    // flight. If it really is a zero-byte object the DLQ bounds the retries.
+    if ((await download(rawObject, raw, stallMs)) === 0) {
+      throw new TransientError(`Staged object is empty: ${rawKey}`)
+    }
+
+    logger.debug(`Processing staged ${kind} from ${rawKey}`)
+
     if (kind === 'video') {
       await transcode.video(raw, processed, config.video, logger, onProgress)
     } else {
@@ -109,9 +108,7 @@ export const processStaged = async (
       `${filePrefix}-${hash}.${extension}`,
     )
 
-    await transient('s3 put', () =>
-      s3.file(processedKey).write(processed, { type: contentType }),
-    )
+    await upload(processed, s3.file(processedKey), contentType, stallMs)
 
     logger.debug(`Uploaded processed ${kind} to s3://${processedKey}`)
 
@@ -126,9 +123,7 @@ export const processStaged = async (
           processedPath,
           `${filePrefix}-${hash}.part${index + 1}.${extension}`,
         )
-        await transient('s3 put', () =>
-          s3.file(partKey).write(Bun.file(file), { type: contentType }),
-        )
+        await upload(Bun.file(file), s3.file(partKey), contentType, stallMs)
         return partKey
       }),
     )

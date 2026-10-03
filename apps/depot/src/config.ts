@@ -59,6 +59,11 @@ export type CoreConfig = {
   transcodeStatePath: string
 
   s3: S3Config
+  /**
+   * How long an S3 transfer may go without progress. Silence, not duration: a
+   * long clip on a slow link may take hours and is never cut while it moves.
+   */
+  s3StallMs: number
 
   directory: {
     cleanupStrategy: (typeof cleanupStrategies)[number]
@@ -80,6 +85,7 @@ export const resolveConfig = (): CoreConfig => {
       '/data/transcode-jobs.json',
     ),
     s3: resolveS3Config(),
+    s3StallMs: env.number('S3_STALL_MS', 120_000),
     directory: {
       cleanupStrategy: env.enum(
         'DIRECTORY_CLEANUP',

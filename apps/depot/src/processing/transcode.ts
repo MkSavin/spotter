@@ -99,7 +99,8 @@ export const resolveVideoPreset = (
   switch (acceleration) {
     case 'cpu': {
       const map: Record<PresetQuality, string[]> = {
-        best: ['-preset:v normal'], //, '-crf 26'],
+        // x264/x265 have no `normal`; `medium` is their own default.
+        best: ['-preset:v medium'], //, '-crf 26'],
         good: ['-preset:v fast'], //, '-crf 26'],
         normal: ['-preset:v fast'], //, '-crf 28'],
         bad: ['-preset:v veryfast'], //, '-crf 30'],

@@ -24,14 +24,19 @@ const makeContext = () =>
     directory: { temp: { directory } },
     config: {
       video: { partLimitMb: 0 },
+      s3StallMs: 1000,
       image: {},
       directory: { cleanupStrategy: 'file-processed' },
     },
     s3: {
       file: () => ({
         exists: async () => true,
-        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-        write: async () => undefined,
+        stream: () => new Response(new Uint8Array([1, 2, 3])).body,
+        writer: () => ({
+          write: (chunk: Uint8Array) => chunk.byteLength,
+          flush: async () => 0,
+          end: async () => 0,
+        }),
       }),
     },
   }) as never
