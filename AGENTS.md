@@ -153,7 +153,8 @@ const handle = await new RedisRegulator<Context>()
 **после** успешной обработки. Упавшее/зависшее сообщение остаётся в PEL; reaper (стартовый +
 по таймеру) берёт зависшие записи через `XPENDING IDLE` → `XCLAIM` и повторяет. Группы создаются
 с позиции `$` — на рестарте старые события заново не пересылаются. Heartbeat'ов нет (в отличие
-от Kafka): держи `REDIS_RECLAIM_MIN_IDLE_MS` выше самой долгой операции (транскодинг).
+от Kafka): обработчик держит запись не дольше `REDIS_RECLAIM_MIN_IDLE_MS`, поэтому долгая работа
+(транскодинг, экспорт таймлапса) идёт вне записи — см. «Инварианты».
 
 **Рестарт Redis:** durable-инстанс на старте отвечает `-LOADING`, пока проигрывает AOF.
 `XGROUP CREATE` ждёт этого (до 2 минут), а не падает — иначе сервис умирал ровно на том
@@ -165,10 +166,11 @@ const handle = await new RedisRegulator<Context>()
 битое сообщение не крутилось в PEL вечно. DLQ не подрезается: разбирай вручную (`XRANGE <stream>.dead - +`).
 
 **Транзиентные vs окончательные ошибки:** ретрай работает только если обработчик **бросает**.
-Проглоченная ошибка = `XACK` = потеря. Поэтому в depot сбои S3 и таймаут ffmpeg завёрнуты в
-`TransientError` ([apps/depot/src/processing/TransientError.ts](apps/depot/src/processing/TransientError.ts))
-и пробрасываются наружу — запись остаётся в PEL и уходит к reaper'у. Окончательный брак
-(битый кодек, нечитаемое медиа) логируется и отвечает пустым результатом: ретраить нечего.
+Проглоченная ошибка = `XACK` = потеря. Сбои S3 в depot завёрнуты в `TransientError`
+([apps/depot/src/processing/TransientError.ts](apps/depot/src/processing/TransientError.ts)) и
+пробрасываются наружу. Транскодинг подтверждает запись сразу, поэтому упавшее задание повторяет
+не reaper, а очередь заданий на следующем старте. Окончательный брак (битый кодек, нечитаемое
+медиа) логируется и отвечает пустым результатом: ретраить нечего.
 
 ### Паттерн Controller → Action
 - **Controller** (`*Controller.ts`): парсит сырьё (`bufferToJson(message.value)`), ранний `return` на мусоре,
@@ -180,7 +182,8 @@ const result = await someAction(payload, { ...context, logger })
 if (!result) return
 await producer.publish('...processed', result) // XADD в стрим; ack делает регулятор
 ```
-Долгая работа безопасна: запись остаётся pending до `XACK`, никто не вытесняет consumer.
+Долгую работу так не делают: запись, которую держат дольше `REDIS_RECLAIM_MIN_IDLE_MS`, reaper
+отдаст другой реплике. Такую работу принимают, подтверждают и ведут вне записи (`TranscodeQueue`).
 
 ### Логирование (stenograph)
 ```ts
@@ -241,6 +244,35 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 - **Креды NVR — только в адаптере** (`apps/frigate`). По сети ходят S3-ключи, не байты и не токены. В `server`/`telegram`/`depot` не должно быть `frigate`/`jwt`/`clipUrl`/`cameraLabels`.
 - **Домен/фронтенд не смешивать**: в `server` не должно быть grammy/рендера/Telegram-стейта; в `telegram` — доменной истины (роли/события как источник). Мутации домена из telegram — только через `command.request`.
 - `DIRECTORY_CLEANUP` (depot) меняет очистку temp-файлов; `S3_PRESIGN_EXPIRY` (telegram) — срок жизни пресайн-URL — см. AGENTS.md сервисов.
+
+## Инварианты
+
+Решения, которые уже стоили сломанного прода. Правка, нарушающая инвариант, — это смена решения: её согласовывают с владельцем, а не делают молча. Рядом с каждым — тест, который его держит.
+
+- **Длительность не ограничивает работу.** Длинное событие кодируется часами и передаётся медленно: транскодинг ограничен только `VIDEO_TIMEOUT_MS` как защитой от зависшего ffmpeg, передача S3 обрывается по тишине (`S3_STALL_MS`), а не по времени. [s3Transfer.test.ts](apps/depot/src/processing/s3Transfer.test.ts)
+- **Долгая работа идёт вне записи Redis.** Задание сохраняется до запуска и подтверждается сразу; reclaim-окно означает «реплика умерла» и с длительностью работы не связано. [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts)
+- **Реплика читает только под свободный слот**, иначе занятая копит клипы, пока свободная простаивает. [RedisRegulator.test.ts](packages/transport/src/regulator/RedisRegulator.test.ts), [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts)
+- **Одно событие — одно кодирование на реплике**: id захватывается до первого `await`. [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts)
+- **Каждый файл, отданный Telegram, в его лимитах**: по ссылке не больше 20 МБ (фото — 5 МБ), иначе байтами; клип больше `VIDEO_PART_LIMIT_MB` режется на части. [InnoxiousMedia.test.ts](apps/telegram/src/extension/innoxious/InnoxiousMedia.test.ts), [deliveryEventAction.test.ts](apps/telegram/src/transport/actions/deliveryEventAction.test.ts)
+- **Каждое значение качества реально кодируется** настоящим ffmpeg. [transcode.test.ts](apps/depot/src/processing/transcode.test.ts) — в CI пока пропускается: там нет ffmpeg.
+- **Пакет объявляет всё, что импортирует** — образ ставит только объявленное. [workspaceDependencies.test.ts](.integration/workspaceDependencies.test.ts)
+- **Образ, чей сервис монтирует том на `/data`, отдаёт его `bun`**, иначе хранилище заданий не пишется. [invariants.test.ts](.integration/invariants.test.ts)
+- **Каждая точка входа логирует unhandled rejection** — иначе процесс Bun умирает молча. [invariants.test.ts](.integration/invariants.test.ts)
+- **Никакого `mock.module`**: подмена живёт во всём процессе, и тесты зависят от порядка файлов. Зависимости внедряются параметром. [invariants.test.ts](.integration/invariants.test.ts)
+- **Креды NVR читает только адаптер.** [invariants.test.ts](.integration/invariants.test.ts)
+- **Прод управляется только через `./spotter`** (`update`, `logs`, `exec`, `doctor`, …; список — в [.integration/cli.ts](.integration/cli.ts)). Голый `docker`/`docker compose` на узле не работает или бьёт не туда.
+
+## Готово — только с доказательством
+
+Правка не считается сделанной, пока не пройдено всё, что к ней относится:
+
+1. **Сверка с инвариантами и находками** — до написания кода, а не после.
+2. **Тест, который падает без правки.** Проверяй откатом: убери правку — тест обязан упасть. Зелёный тест, не ловящий поломку, ничего не доказывает.
+3. **Настоящий компонент на стыке с внешней системой.** Docker, ffmpeg, S3, Redis, Telegram, NVR проверяются на настоящих: заглушка повторяет моё представление о системе, а ломается как раз оно. Затронут образ — собрать его так, как собирает Dockerfile (`bun install --filter`).
+4. **`bun run green`** по всему репозиторию.
+5. **`/code-review`** диффа перед коммитом.
+6. **Одна проблема — один коммит.** Рискованную правку начинай с падающего сквозного теста.
+7. **Не проверено — так и говори.** Утверждение о проде без логов с прода — гипотеза, и подаётся как гипотеза.
 
 ## Находки
 
