@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { defaultLogger } from 'stenograph'
-import { splitVideo } from './splitVideo'
+import { planCuts, splitVideo } from './splitVideo'
 
 defaultLogger.disable()
 
@@ -13,9 +13,20 @@ const missing = !Bun.which('ffmpeg') || !Bun.which('ffprobe')
 
 let directory: string
 
-/** Noise keeps the bitrate up, so a short clip is still worth cutting. */
-const makeClip = async (name: string, gop: number): Promise<string> => {
+/**
+ * Noise keeps the bitrate up, so a short clip is still worth cutting. Noise on
+ * the first half only gives the uneven bitrate of a real event: motion, then
+ * a still scene.
+ */
+const makeClip = async (
+  name: string,
+  gop: number,
+  uneven = false,
+): Promise<string> => {
   const file = path.join(directory, name)
+  const noise = uneven
+    ? 'noise=alls=40:allf=t:enable=lt(t\\,6)'
+    : 'noise=alls=40:allf=t'
   const child = Bun.spawn({
     cmd: [
       'ffmpeg',
@@ -24,7 +35,7 @@ const makeClip = async (name: string, gop: number): Promise<string> => {
       '-f',
       'lavfi',
       '-i',
-      'testsrc2=duration=12:size=640x360:rate=25,noise=alls=40:allf=t',
+      `testsrc2=duration=12:size=640x360:rate=25,${noise}`,
       '-c:v',
       'libx264',
       '-preset',
@@ -116,5 +127,45 @@ describe.skipIf(missing)('splitVideo', () => {
     const clip = await makeClip('off.mp4', 25)
 
     expect(await splitVideo(clip, 0, 60_000, defaultLogger)).toEqual([])
+  })
+
+  test('cuts an uneven clip into the fewest parts the keyframes allow', async () => {
+    // Guessing one part duration for the whole clip and shrinking it on
+    // every overshoot made the still half pay for the busy one: a six-minute
+    // event came out as forty parts. Packing by size cannot.
+    const clip = await makeClip('uneven.mp4', 25, true)
+    const size = Bun.file(clip).size
+    const limit = Math.ceil(size / 3)
+
+    const parts = await splitVideo(clip, limit, 60_000, defaultLogger)
+
+    // Three is the floor; one more is the price of a keyframe grid.
+    expect(parts.length).toBeLessThanOrEqual(4)
+    for (const part of parts) {
+      expect(Bun.file(part).size).toBeLessThanOrEqual(limit)
+    }
+  })
+})
+
+describe('planCuts', () => {
+  const interval = (time: number, bytes: number) => ({ time, bytes })
+
+  test('starts a new part only when the next interval would not fit', () => {
+    expect(
+      planCuts(
+        [interval(0, 4), interval(2, 4), interval(4, 4), interval(6, 4)],
+        9,
+      ),
+    ).toEqual([4])
+  })
+
+  test('an oversized interval gets a part of its own rather than none', () => {
+    expect(
+      planCuts([interval(0, 2), interval(2, 20), interval(4, 2)], 9),
+    ).toEqual([2, 4])
+  })
+
+  test('nothing to cut when everything fits', () => {
+    expect(planCuts([interval(0, 2), interval(2, 2)], 9)).toEqual([])
   })
 })

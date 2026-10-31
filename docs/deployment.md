@@ -201,6 +201,7 @@ sudo ./spotter install ingest
 | --- | --- |
 | `--pwa` | поднять веб-приложение с уведомлениями |
 | `--email` | поднять рассылку на почту |
+| `--botapi` | свой Bot API-сервер: видео целиком вместо частей (см. [telegram-bot-api.md](telegram-bot-api.md)) |
 | `--no-gpu` | не использовать видеокарту (ingest) |
 | `--no-watchtower` | не обновляться автоматически |
 
@@ -243,6 +244,8 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 | «Список камер пока недоступен» | адаптер не достучался до Frigate — `./spotter doctor` на ingest |
 | `client version 1.25 is too old` | старый образ watchtower — `git pull` и `./spotter update` |
 | Нет видео в сообщениях | не заполнены `S3_*` или бакет недоступен |
+| Видео приходит частями или «не влезает в Telegram» | лимит Bot API 50 МБ — поставь свой сервер: [telegram-bot-api.md](telegram-bot-api.md) |
+| `401 Unauthorized` от своего Bot API | бот ещё числится в облаке — `./spotter botapi-logout` |
 | `401` от Frigate, каталог и медиа пусты | `FRIGATE_AUTH_SECRET` разошёлся с JWT-секретом NVR (см. выше) |
 | `port is already allocated` (1883) | у тебя уже есть свой MQTT — выбери «готовый брокер» |
 | `getaddrinfo ESERVFAIL` | адаптер не видит брокер по имени — укажи `MQTT_NETWORK` (сеть брокера) |
@@ -253,5 +256,6 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 ## Дальше
 
 - [tunnel.md](tunnel.md) — канал между машинами, ручная настройка
+- [telegram-bot-api.md](telegram-bot-api.md) — свой Bot API-сервер, видео до 2 ГБ одним файлом
 - [operations.md](operations.md) — обновления, авто-деплой, ручные операции
 - [../README.md](../README.md) — архитектура и схемы

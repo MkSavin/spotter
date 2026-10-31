@@ -154,6 +154,94 @@ describe('resolveVideoPreset', () => {
     expect(preset.outputParameters).toContain('-preset:v ultrafast')
     expect(preset.outputParameters).toContain('-c:v libx264')
   })
+
+  test('cpu bounds the size with a CRF, and hevc gets its own scale', () => {
+    // Without a CRF x264 encodes at its default 23 in the camera's own
+    // resolution: a six-minute event came out at hundreds of megabytes.
+    expect(
+      resolveVideoPreset('cpu', 'h264', 'normal').outputParameters,
+    ).toContain('-crf:v 26')
+    // x265 rates the same look several points higher than x264.
+    expect(
+      resolveVideoPreset('cpu', 'hevc', 'normal').outputParameters,
+    ).toContain('-crf:v 30')
+  })
+
+  test('no streaming tune: it drops B-frames and lookahead for nothing', () => {
+    for (const codec of ['h264', 'hevc'] as const) {
+      expect(
+        resolveVideoPreset('cpu', codec, 'normal').outputParameters,
+      ).not.toContain('-tune:v zerolatency')
+    }
+  })
+
+  test('every preset puts a keyframe every two seconds and the index up front', () => {
+    for (const acceleration of ['cpu', 'cuda', 'vaapi', 'videotoolbox']) {
+      const { outputParameters } = resolveVideoPreset(
+        acceleration,
+        'h264',
+        'normal',
+      )
+      // Where a part can be cut without a re-encode. By time, not frames:
+      // the frame rate may be capped or left alone.
+      expect(outputParameters).toContain(
+        '-force_key_frames expr:gte(t,n_forced*2)',
+      )
+      // Telegram starts playing a video only once it has the index.
+      expect(outputParameters).toContain('-movflags +faststart')
+    }
+  })
+
+  test('the shape caps height and frame rate, scaling down but never up', () => {
+    const { outputParameters } = resolveVideoPreset(
+      'cpu',
+      'h264',
+      'normal',
+      0,
+      {
+        maxHeight: 720,
+        maxFps: 15,
+      },
+    )
+
+    expect(outputParameters).toContain(
+      '-vf fps=15,scale=-2:trunc(min(720\\,ih)/2)*2',
+    )
+  })
+
+  test('vaapi scales on the device, where its frames live', () => {
+    const { outputParameters } = resolveVideoPreset(
+      'vaapi',
+      'h264',
+      'normal',
+      0,
+      {
+        maxHeight: 720,
+        maxFps: 15,
+      },
+    )
+
+    expect(outputParameters).toContain(
+      '-vf fps=15,scale_vaapi=w=-2:h=trunc(min(720\\,ih)/2)*2',
+    )
+    // Software pixel formats mean nothing to a VAAPI surface.
+    expect(outputParameters).not.toContain('-pix_fmt yuv420p')
+  })
+
+  test('a zero cap leaves that dimension alone', () => {
+    expect(
+      resolveVideoPreset('cpu', 'h264', 'normal', 0, {
+        maxHeight: 0,
+        maxFps: 10,
+      }).outputParameters,
+    ).toContain('-vf fps=10')
+    expect(
+      resolveVideoPreset('cpu', 'h264', 'normal', 0, {
+        maxHeight: 0,
+        maxFps: 0,
+      }).outputParameters.some((option) => option.startsWith('-vf')),
+    ).toBe(false)
+  })
 })
 
 describe('transcodeImage', () => {
@@ -295,6 +383,8 @@ describe.skipIf(!Bun.which('ffmpeg'))('transcodeVideo on the CPU', () => {
             timeoutMs: 60_000,
             concurrency: 1,
             partLimitMb: 0,
+            maxHeight: 0,
+            maxFps: 0,
           },
           defaultLogger,
         )
@@ -303,4 +393,101 @@ describe.skipIf(!Bun.which('ffmpeg'))('transcodeVideo on the CPU', () => {
       })
     }
   }
+
+  const probe = async (
+    file: string,
+  ): Promise<{ height: number; fps: number; keyframes: number[] }> => {
+    const child = Bun.spawn({
+      cmd: [
+        'ffprobe',
+        '-v',
+        'error',
+        '-select_streams',
+        'v:0',
+        '-show_entries',
+        'stream=height,avg_frame_rate:packet=pts_time,flags',
+        '-of',
+        'json',
+        file,
+      ],
+      stdout: 'pipe',
+    })
+    const report = JSON.parse(await new Response(child.stdout).text())
+    const [num, den] = String(report.streams[0].avg_frame_rate).split('/')
+    return {
+      height: report.streams[0].height,
+      fps: Number(num) / Number(den || 1),
+      keyframes: (report.packets as { pts_time: string; flags: string }[])
+        .filter((packet) => packet.flags.startsWith('K'))
+        .map((packet) => Number(packet.pts_time)),
+    }
+  }
+
+  test('the shape is applied: 720p source lands at 480p and 10 fps, keyframes 2 s apart', async () => {
+    const tall = path.join(workdir, 'tall.mp4')
+    const made = Bun.spawn({
+      cmd: [
+        'ffmpeg',
+        '-v',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'testsrc=duration=6:size=1280x720:rate=25',
+        '-pix_fmt',
+        'yuv420p',
+        '-y',
+        tall,
+      ],
+    })
+    await made.exited
+    const processed = Bun.file(path.join(workdir, 'shaped.mp4'))
+
+    await transcodeVideo(
+      Bun.file(tall),
+      processed,
+      {
+        acceleration: 'cpu',
+        codec: 'h264',
+        quality: 'awful',
+        device: 0,
+        skipConversion: false,
+        timeoutMs: 60_000,
+        concurrency: 1,
+        partLimitMb: 0,
+        maxHeight: 480,
+        maxFps: 10,
+      },
+      defaultLogger,
+    )
+
+    const shaped = await probe(processed.name as string)
+    expect(shaped.height).toBe(480)
+    expect(shaped.fps).toBeCloseTo(10, 1)
+    expect(shaped.keyframes).toEqual([0, 2, 4])
+  })
+
+  test('a small source is never scaled up', async () => {
+    const processed = Bun.file(path.join(workdir, 'kept.mp4'))
+
+    await transcodeVideo(
+      Bun.file(source),
+      processed,
+      {
+        acceleration: 'cpu',
+        codec: 'h264',
+        quality: 'awful',
+        device: 0,
+        skipConversion: false,
+        timeoutMs: 60_000,
+        concurrency: 1,
+        partLimitMb: 0,
+        maxHeight: 720,
+        maxFps: 15,
+      },
+      defaultLogger,
+    )
+
+    expect((await probe(processed.name as string)).height).toBe(240)
+  })
 })

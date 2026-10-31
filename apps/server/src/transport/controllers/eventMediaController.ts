@@ -49,6 +49,8 @@ export const eventMediaController: StreamMessageController<
     event: spotterEvent,
     clipKey: processed.clipKey,
     clipParts: processed.clipParts,
+    clipBytes: processed.clipBytes,
+    clipPartBytes: processed.clipPartBytes,
     snapshotKey: processed.snapshotKey,
     action: 'media',
   }

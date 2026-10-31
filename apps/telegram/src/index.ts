@@ -5,6 +5,7 @@ import { run, sequentialize } from '@grammyjs/runner'
 import {
   CatalogCache,
   CommandBus,
+  FileJobStore,
   guardRejections,
   HeartbeatRegistry,
   probeRedisVersion,
@@ -45,6 +46,7 @@ import {
   tgBindingsRepo,
   timelapseWaitsRepo,
 } from './db/repository'
+import { ClipDeliveryQueue } from './delivery/ClipDeliveryQueue'
 import { DIALOG_TTL_MS } from './dialog/Dialog'
 import { DialogRegistry } from './dialog/DialogRegistry'
 import { attachInnoxious } from './extension/innoxious/attachInnoxious'
@@ -280,6 +282,11 @@ const polling = async (): Promise<void> => {
   )
   commandBus.start()
 
+  const deliveryLogger = applicationLogger.sub('delivery')
+  const deliveries = new ClipDeliveryQueue(deliveryLogger, {
+    store: new FileJobStore(config.clipDeliveryStatePath, deliveryLogger),
+  })
+
   const coreContext: CoreContext = {
     config,
     logger: applicationLogger,
@@ -289,6 +296,7 @@ const polling = async (): Promise<void> => {
     rollouts,
     sources,
     clips,
+    deliveries,
     s3,
     producer,
     subscriber,
@@ -312,6 +320,7 @@ const polling = async (): Promise<void> => {
     clips.stop()
     commandBus.stop()
     await transport?.stop()
+    await deliveries.stop()
     subscriber.close()
     commandSubscriber.close()
     producer.disconnect()
@@ -354,6 +363,15 @@ const polling = async (): Promise<void> => {
   await timeout(500)
 
   transport = await telegramTransport(bot, coreContext)
+
+  // What a previous process accepted and never finished: the stream will not
+  // offer it again.
+  const resumed = await deliveries.recover({
+    ...coreContext,
+    bot,
+    logger: deliveryLogger,
+  })
+  if (resumed > 0) deliveryLogger.info(`Resumed ${resumed} clip deliveries`)
 
   applicationLogger.debug('Bot is successfully connected to message transport!')
 }

@@ -1,0 +1,43 @@
+# Self-hosted Telegram Bot API (OPTIONAL add-on), for clips over the 50 MB the
+# public Bot API takes as an upload: a local server takes 2000 MB, so a long
+# event arrives as one video instead of a chain of parts.
+#
+# Loaded by `./spotter` only while the add-on is on (`./spotter up --botapi`,
+# persisted to SPOTTER_PROFILES): the file also points spotter-telegram at the
+# local server, which must not happen without it. Needs TELEGRAM_API_ID and
+# TELEGRAM_API_HASH in .env, and the bot logged out of the public server once
+# (`./spotter up --botapi` does that). Walkthrough: docs/telegram-bot-api.md.
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
+services:
+  telegram-bot-api:
+    <<: *logging
+    image: aiogram/telegram-bot-api:latest
+    container_name: telegram-bot-api
+    restart: unless-stopped
+    networks:
+      - spotter
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      # Empty is ignored by the image; set when Telegram is unreachable directly.
+      TELEGRAM_PROXY: ${TELEGRAM_PROXY:-}
+    volumes:
+      # Session and the files it relays; a named volume, as the image's own
+      # user owns it and a bind mount would not.
+      - botapi-data:/var/lib/telegram-bot-api
+
+  spotter-telegram:
+    environment:
+      TELEGRAM_API_ROOT: http://telegram-bot-api:8081
+      TELEGRAM_UPLOAD_LIMIT_MB: 2000
+    depends_on:
+      - telegram-bot-api
+
+volumes:
+  botapi-data:

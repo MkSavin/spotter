@@ -1,7 +1,11 @@
 import type { DeliveryEvent } from '@spotter/transport'
 import type { InputMediaPhoto, InputMediaVideo } from 'grammy/types'
+import { pwaUrl } from '../../auth/pwaLink'
 import type { TransportContext } from '../../context'
 import { eventMessagesRepo } from '../../db/repository'
+import type { EventMessage } from '../../db/schema'
+import { MediaTooLargeError } from '../../extension/innoxious/InnoxiousMedia'
+import { actualizeEventCaption } from '../mixins/actualizeEventCaption'
 import { actualizeEventMedia } from '../mixins/actualizeEventMedia'
 import { actualizeSentMessages } from '../mixins/actualizeSentMessages'
 import { deliverClipParts } from '../mixins/deliverClipParts'
@@ -9,8 +13,44 @@ import {
   shouldOfferClip,
   shouldSayClipless,
   videoButtonKeyboard,
+  watchInAppKeyboard,
 } from '../view/eventKeyboard'
 import { renderEvent } from '../view/renderEvent'
+
+/**
+ * A clip this Bot API will not take as an upload is not sent at all: the
+ * message keeps its photo, says why there is no video, and links to the web
+ * app when one is up. Attaches the snapshot first when the same delivery
+ * carried it.
+ */
+const deliverOversized = async (
+  delivery: DeliveryEvent,
+  messages: EventMessage[],
+  context: TransportContext,
+): Promise<void> => {
+  const { eventId, event, snapshotKey } = delivery
+  const { s3, config, logger } = context
+  const keyboard = watchInAppKeyboard(pwaUrl(context.heartbeats.all()), eventId)
+  // The photo is on the message, or coming with this delivery, or never was.
+  const caption = renderEvent(event, context, {
+    media: snapshotKey || event.hasSnapshot ? 'ready' : 'absent',
+    oversized: true,
+  })
+
+  if (snapshotKey) {
+    const photo: InputMediaPhoto = {
+      type: 'photo',
+      media: s3.presign(snapshotKey, { expiresIn: config.presignExpiry }),
+      caption,
+      parse_mode: 'HTML',
+    }
+    await actualizeEventMedia(eventId, messages, photo, keyboard, context)
+  } else {
+    await actualizeEventCaption(eventId, messages, caption, keyboard, context)
+  }
+
+  logger.debug(`deliveryEvent (media/clip) too large to send for ${eventId}`)
+}
 
 export const deliveryEventAction = async (
   delivery: DeliveryEvent,
@@ -80,11 +120,26 @@ export const deliveryEventAction = async (
   context.clips.complete(eventId)
 
   if (clipKey) {
+    const { uploadLimit } = config.telegram
     const presign = (key: string): string =>
       s3.presign(key, { expiresIn: config.presignExpiry })
-    // A clip over Telegram's limit arrives cut: part 1 takes the message's
+    // A clip over the part limit arrives cut: part 1 takes the message's
     // place, the rest follow as replies.
     const [head, ...rest] = clipParts ?? [clipKey]
+    // Sizes are trusted only when they line up with the keys they describe.
+    const sizes: (number | undefined)[] = clipParts
+      ? delivery.clipPartBytes?.length === clipParts.length
+        ? delivery.clipPartBytes
+        : []
+      : [delivery.clipBytes]
+    const [headBytes, ...restBytes] = sizes
+
+    // Known not to fit, in whole or in any part: no upload is attempted at
+    // all. Half a clip would be worse than a link to the whole one.
+    if (sizes.some((size) => size !== undefined && size > uploadLimit)) {
+      await deliverOversized(delivery, messages, context)
+      return
+    }
 
     // The clip supersedes the snapshot: video replaces the photo, button gone.
     const video: InputMediaVideo = {
@@ -97,10 +152,39 @@ export const deliveryEventAction = async (
       }),
       parse_mode: 'HTML',
     }
-    await actualizeEventMedia(eventId, messages, video, undefined, context)
+    // Telegram got the clip in pieces: the whole one is a tap away.
+    const keyboard =
+      rest.length > 0
+        ? watchInAppKeyboard(pwaUrl(context.heartbeats.all()), eventId)
+        : undefined
+
+    try {
+      await actualizeEventMedia(eventId, messages, video, keyboard, context, {
+        size: headBytes,
+        uploadLimit,
+      })
+    } catch (error) {
+      // The size was learnt only on download: same outcome, later.
+      if (!(error instanceof MediaTooLargeError)) throw error
+      await deliverOversized(delivery, messages, context)
+      return
+    }
 
     if (rest.length > 0) {
-      await deliverClipParts(eventId, event, rest.map(presign), context)
+      try {
+        await deliverClipParts(
+          eventId,
+          event,
+          rest.map(presign),
+          restBytes,
+          context,
+        )
+      } catch (error) {
+        // Learnt only on download. The parts sent stay, and the message
+        // already links to the whole clip where there is a web app.
+        if (!(error instanceof MediaTooLargeError)) throw error
+        logger.warn(`A later part of ${eventId} is over the upload limit`)
+      }
     }
 
     logger.debug(`deliveryEvent (media/clip) processed for ${eventId}`)

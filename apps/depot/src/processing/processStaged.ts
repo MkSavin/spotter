@@ -12,10 +12,16 @@ import {
 
 export type StagedKind = 'video' | 'image'
 
-/** The processed object, plus its parts when a clip was over the part limit. */
+/**
+ * The processed object, plus its parts when a clip was over the part limit.
+ * Sizes travel along so a frontend can judge its own limit without a round
+ * trip to the storage.
+ */
 export type ProcessedMedia = {
   key: string
+  bytes: number
   parts?: string[]
+  partBytes?: number[]
 }
 
 /** The conversions themselves, injected so a test can stand in for them. */
@@ -112,10 +118,12 @@ export const processStaged = async (
 
     logger.debug(`Uploaded processed ${kind} to s3://${processedKey}`)
 
-    if (kind !== 'video') return { key: processedKey }
+    const bytes = processed.size
+
+    if (kind !== 'video') return { key: processedKey, bytes }
 
     partFiles = await cutParts(processed, context, logger)
-    if (partFiles.length === 0) return { key: processedKey }
+    if (partFiles.length === 0) return { key: processedKey, bytes }
 
     const parts = await Promise.all(
       partFiles.map(async (file, index) => {
@@ -127,10 +135,11 @@ export const processStaged = async (
         return partKey
       }),
     )
+    const partBytes = partFiles.map((file) => Bun.file(file).size)
 
     logger.debug(`Uploaded ${parts.length} parts of ${processedKey}`)
 
-    return { key: processedKey, parts }
+    return { key: processedKey, bytes, parts, partBytes }
   } finally {
     // Also on failure: a timed-out transcode is retried, and leaving both files
     // behind each time fills the disk the NVR records onto.

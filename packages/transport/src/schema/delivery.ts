@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { clipPartsSchema } from './mediaPipeline'
+import {
+  byteSizeSchema,
+  clipPartsSchema,
+  partBytesLineUp,
+} from './mediaPipeline'
 import { spotterEventSchema } from './spotterEvent'
 
 /**
@@ -9,14 +13,18 @@ import { spotterEventSchema } from './spotterEvent'
  * `update` — event updated (e.g. start→end), edit existing messages.
  * `media`  — transcoded media ready; send media group to subscribers.
  */
-export const deliveryEventSchema = z.object({
-  eventId: z.string().min(1),
-  event: spotterEventSchema,
-  clipKey: z.string().min(1).optional(),
-  clipParts: clipPartsSchema.optional(),
-  snapshotKey: z.string().min(1).optional(),
-  action: z.enum(['create', 'update', 'media']),
-})
+export const deliveryEventSchema = z
+  .object({
+    eventId: z.string().min(1),
+    event: spotterEventSchema,
+    clipKey: z.string().min(1).optional(),
+    clipParts: clipPartsSchema.optional(),
+    clipBytes: byteSizeSchema.optional(),
+    clipPartBytes: z.array(byteSizeSchema).optional(),
+    snapshotKey: z.string().min(1).optional(),
+    action: z.enum(['create', 'update', 'media']),
+  })
+  .refine(partBytesLineUp, { message: 'clipPartBytes must match clipParts' })
 export type DeliveryEvent = z.infer<typeof deliveryEventSchema>
 
 /**

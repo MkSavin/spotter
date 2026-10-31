@@ -60,7 +60,9 @@ export const mediaStagedAction = async (
   }
 
   const clipKey = clip.value?.key
+  const clipBytes = clip.value?.bytes
   const clipParts = clip.value?.parts
+  const clipPartBytes = clip.value?.partBytes
   const snapshotKey = snapshot.value?.key
 
   if (!clipKey && !snapshotKey) {
@@ -72,5 +74,5 @@ export const mediaStagedAction = async (
     `Media successfully converted: ${[clipKey && 'clip', snapshotKey && 'snapshot'].filter(Boolean).join(', ')}`,
   )
 
-  return { eventId, clipKey, clipParts, snapshotKey }
+  return { eventId, clipKey, clipBytes, clipParts, clipPartBytes, snapshotKey }
 }

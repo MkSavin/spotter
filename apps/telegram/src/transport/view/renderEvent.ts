@@ -30,12 +30,20 @@ const NO_CLIP_MARK = '🎞️ Без видео'
 /** Neither one: said once instead of twice on the same line. */
 const NOTHING_MARK = '🙈 Без снимка и видео'
 
+/**
+ * The clip exists but is over what this Bot API takes as an upload. Said on
+ * the photo, so the missing video reads as a limit rather than a failure.
+ */
+const OVERSIZED_MARK = '🎞️ Видео не влезает в Telegram'
+
 export type RenderEventOptions = {
   media?: MediaState
   /** Whether to say the event has no clip. Only meaningful once it has ended. */
   clipless?: boolean
   /** How many parts the clip was cut into; the message itself carries part 1. */
   parts?: number
+  /** Whether the clip is there but too large to send at all. */
+  oversized?: boolean
 }
 
 const renderPartMark = (part: number, total: number): string =>
@@ -83,6 +91,7 @@ export const renderEvent = (
           options.parts && options.parts > 1
             ? renderPartMark(1, options.parts)
             : undefined,
+          options.oversized ? OVERSIZED_MARK : undefined,
         ].filter(Boolean)
 
   return `<b>${title}</b> <code>${code}</code>

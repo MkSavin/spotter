@@ -39,13 +39,32 @@ export type MediaStaged = z.infer<typeof mediaStagedSchema>
  */
 export const clipPartsSchema = z.array(z.string().min(1)).min(2)
 
+/**
+ * Sizes in bytes, so a frontend can tell what fits its limit without asking
+ * the storage: the delivery node may well be the one with the flaky link.
+ */
+export const byteSizeSchema = z.number().int().nonnegative()
+
 /** Published to `spotter.event.media_processed`. */
-export const mediaProcessedSchema = z.object({
-  eventId: z.string().min(1),
-  clipKey: z.string().min(1).optional(),
-  clipParts: clipPartsSchema.optional(),
-  snapshotKey: z.string().min(1).optional(),
-})
+/** One size per part, or none: a count that disagrees describes nothing. */
+export const partBytesLineUp = (value: {
+  clipParts?: string[]
+  clipPartBytes?: number[]
+}): boolean =>
+  value.clipPartBytes === undefined ||
+  value.clipPartBytes.length === (value.clipParts?.length ?? 0)
+
+export const mediaProcessedSchema = z
+  .object({
+    eventId: z.string().min(1),
+    clipKey: z.string().min(1).optional(),
+    clipParts: clipPartsSchema.optional(),
+    clipBytes: byteSizeSchema.optional(),
+    /** Parallel to `clipParts`. */
+    clipPartBytes: z.array(byteSizeSchema).optional(),
+    snapshotKey: z.string().min(1).optional(),
+  })
+  .refine(partBytesLineUp, { message: 'clipPartBytes must match clipParts' })
 export type MediaProcessed = z.infer<typeof mediaProcessedSchema>
 
 /** Progress of an event's media. Success is `mediaProcessed`, not a stage. */

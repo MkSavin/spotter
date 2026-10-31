@@ -20,11 +20,57 @@ type ProcessorPreset = {
   inputParameters: string[]
 }
 
+/** Output caps; `0` leaves that dimension as the source has it. */
+export type VideoShape = { maxHeight: number; maxFps: number }
+
+/**
+ * How far apart keyframes are, in seconds: a stream-copy cut can land only on
+ * one, so this is the resolution of the part cutter.
+ */
+export const KEYFRAME_SECONDS = 2
+
+/**
+ * x264 CRF per quality step. Without one x264 encodes at 23 in the camera's
+ * own resolution, and a six-minute event came out at hundreds of megabytes.
+ */
+const CRF: Record<PresetQuality, number> = {
+  best: 22,
+  good: 24,
+  normal: 26,
+  bad: 28,
+  awful: 30,
+}
+
+/** x265 rates the same look about this many points higher than x264. */
+const HEVC_CRF_OFFSET = 4
+
+const pick = <T>(map: Record<PresetQuality, T>, quality: string): T =>
+  quality in map ? map[quality as PresetQuality] : map.normal
+
+/**
+ * Frame rate first, so fewer frames are scaled. The height expression keeps
+ * the source when it is already smaller, and stays even for yuv420p.
+ */
+const shapeFilters = (shape: VideoShape, scaler: string): string[] => {
+  const filters: string[] = []
+  if (shape.maxFps > 0) filters.push(`fps=${shape.maxFps}`)
+  if (shape.maxHeight > 0) {
+    const height = `trunc(min(${shape.maxHeight}\\,ih)/2)*2`
+    filters.push(
+      scaler === 'scale_vaapi'
+        ? `scale_vaapi=w=-2:h=${height}`
+        : `scale=-2:${height}`,
+    )
+  }
+  return filters.length > 0 ? [`-vf ${filters.join(',')}`] : []
+}
+
 export const resolveVideoPreset = (
   acceleration: PresetAcceleration | string,
   codec: PresetCodec | string,
   quality: PresetQuality | string,
   device = 0,
+  shape: VideoShape = { maxHeight: 0, maxFps: 0 },
 ): ProcessorPreset => {
   // Info: look https://github.com/blakeblackshear/frigate/blob/dev/frigate/ffmpeg_presets.py
 
@@ -57,12 +103,10 @@ export const resolveVideoPreset = (
       encoder = 'hevc_videotoolbox'
       break
     case 'cpu-hevc':
-      outputParameters = ['-tune:v zerolatency']
       encoder = 'libx265'
       break
     /** case 'cpu-h264': */
     default:
-      outputParameters = ['-tune:v zerolatency']
       encoder = 'libx264'
       break
   }
@@ -100,15 +144,14 @@ export const resolveVideoPreset = (
     case 'cpu': {
       const map: Record<PresetQuality, string[]> = {
         // x264/x265 have no `normal`; `medium` is their own default.
-        best: ['-preset:v medium'], //, '-crf 26'],
-        good: ['-preset:v fast'], //, '-crf 26'],
-        normal: ['-preset:v fast'], //, '-crf 28'],
-        bad: ['-preset:v veryfast'], //, '-crf 30'],
-        awful: ['-preset:v ultrafast'], //, '-crf 30'],
+        best: ['-preset:v medium'],
+        good: ['-preset:v fast'],
+        normal: ['-preset:v fast'],
+        bad: ['-preset:v veryfast'],
+        awful: ['-preset:v ultrafast'],
       }
-      const qualityParameters =
-        quality in map ? map[quality as keyof typeof map] : map.normal
-      outputParameters.push(...qualityParameters)
+      const crf = pick(CRF, quality) + (codec === 'hevc' ? HEVC_CRF_OFFSET : 0)
+      outputParameters.push(...pick(map, quality), `-crf:v ${crf}`)
       break
     }
     case 'videotoolbox': {
@@ -119,9 +162,7 @@ export const resolveVideoPreset = (
         bad: ['-q:v 65'],
         awful: ['-q:v 45'],
       }
-      const qualityParameters =
-        quality in map ? map[quality as keyof typeof map] : map.normal
-      outputParameters.push(...qualityParameters)
+      outputParameters.push(...pick(map, quality))
       break
     }
     case 'cuda': {
@@ -136,9 +177,7 @@ export const resolveVideoPreset = (
         bad: ['-preset:v p1', '-cq:v 32'],
         awful: ['-preset:v p1', '-cq:v 36'],
       }
-      const qualityParameters =
-        quality in map ? map[quality as keyof typeof map] : map.normal
-      outputParameters.push(...qualityParameters, '-tune:v ll', '-rc:v vbr')
+      outputParameters.push(...pick(map, quality), '-tune:v ll', '-rc:v vbr')
       break
     }
     case 'vaapi': {
@@ -150,15 +189,21 @@ export const resolveVideoPreset = (
         bad: ['-global_quality 32'],
         awful: ['-global_quality 36'],
       }
-      const qualityParameters =
-        quality in map ? map[quality as keyof typeof map] : map.normal
-      outputParameters.push(...qualityParameters)
+      outputParameters.push(...pick(map, quality))
       break
     }
     // no default
   }
 
-  outputParameters.push(`-c:v ${encoder}`)
+  // A VAAPI surface takes no software pixel format and is scaled on the device.
+  const onDevice = acceleration === 'vaapi'
+  outputParameters.push(
+    ...shapeFilters(shape, onDevice ? 'scale_vaapi' : 'scale'),
+    ...(onDevice ? [] : ['-pix_fmt yuv420p']),
+    `-force_key_frames expr:gte(t,n_forced*${KEYFRAME_SECONDS})`,
+    '-movflags +faststart',
+    `-c:v ${encoder}`,
+  )
 
   return {
     name: preset,
@@ -238,7 +283,7 @@ export const describeFailure = (
 
 /** CPU fallback for when the configured hardware encoder is missing. */
 const cpuFallbackPreset = (video: VideoConfig): ProcessorPreset =>
-  resolveVideoPreset('cpu', video.codec, video.quality)
+  resolveVideoPreset('cpu', video.codec, video.quality, 0, video)
 
 /** Reports transcoding completeness, already rounded to tens. */
 export type ProgressReporter = (percent: number) => void
@@ -269,6 +314,7 @@ export const transcodeVideo = async (
     video.codec,
     video.quality,
     video.device,
+    video,
   )
   const fallback = cpuFallbackPreset(video)
 

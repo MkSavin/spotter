@@ -25,10 +25,18 @@ export type Config = {
      * BotFather, nothing shared with real chats. Off unless asked for.
      */
     testEnvironment: boolean
+    /**
+     * The most the Bot API behind `apiRoot` takes as an upload, in bytes:
+     * 50 MB on Telegram's own servers, 2000 MB on a self-hosted one. Anything
+     * larger is not sent at all but offered as a link to the web app.
+     */
+    uploadLimit: number
   }
   database: {
     path: string
   }
+  /** Where accepted-but-unfinished clip deliveries survive a restart. */
+  clipDeliveryStatePath: string
   s3: S3Config
   source: string
   presignExpiry: number
@@ -49,10 +57,15 @@ export const resolveConfig = (): Config => {
       token: env.string('TELEGRAM_TOKEN', ''),
       apiRoot: env.string('TELEGRAM_API_ROOT', ''),
       testEnvironment: env.boolean('TELEGRAM_TEST_ENVIRONMENT', false),
+      uploadLimit: env.number('TELEGRAM_UPLOAD_LIMIT_MB', 50) * 1_000_000,
     },
     database: {
       path: env.string('DATABASE_PATH', './data/telegram.sqlite'),
     },
+    clipDeliveryStatePath: env.string(
+      'CLIP_DELIVERY_STATE_PATH',
+      './data/clip-deliveries.json',
+    ),
     s3: resolveS3Config(),
     source: env.string('SOURCE_ID', 'frigate'),
     presignExpiry: env.number('S3_PRESIGN_EXPIRY', 3600),

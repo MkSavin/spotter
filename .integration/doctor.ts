@@ -496,13 +496,12 @@ export const diagnose = async (
     env.MQTT_NETWORK_EXTERNAL !== 'true' &&
     (!env.MQTT_BROKER || /^mqtts?:\/\/mosquitto[:/]?/.test(env.MQTT_BROKER))
 
-  // Opt-in frontends: expected only once .env says they were switched on.
-  const frontends = ['pwa', 'email'].filter((name) =>
-    (env.SPOTTER_PROFILES ?? '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .includes(name),
-  )
+  // Opt-in add-ons: expected only once .env says they were switched on.
+  const profiles = (env.SPOTTER_PROFILES ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+  const frontends = ['pwa', 'email'].filter((name) => profiles.includes(name))
+  const botApi = profiles.includes('botapi') ? ['telegram-bot-api'] : []
 
   const expected =
     mode === 'ingest'
@@ -517,6 +516,7 @@ export const diagnose = async (
             'redis',
             'spotter-server',
             'spotter-telegram',
+            ...botApi,
             ...frontends.map((name) => `spotter-${name}`),
           ]
         : [
@@ -525,6 +525,7 @@ export const diagnose = async (
             'spotter-frigate',
             'spotter-server',
             'spotter-telegram',
+            ...botApi,
             ...frontends.map((name) => `spotter-${name}`),
           ]
 

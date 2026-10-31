@@ -30,8 +30,16 @@ const event = (type: 'start' | 'end', hasClip = false): SpotterEvent => ({
   type,
 })
 
+/** What the PWA announces in its heartbeat; empty means no web app is up. */
+let pwaServices: {
+  service: string
+  online: boolean
+  details?: { url: string }
+}[] = []
+
 const makeContext = () => {
   const editMessageText = mock(async () => undefined)
+  const editMessageCaption = mock(async () => undefined)
   const editMessageMedia = mock(async (..._args: unknown[]) => undefined)
   const sendMessage = mock(async () => ({ message_id: 7 }))
   let nextId = 20
@@ -44,7 +52,13 @@ const makeContext = () => {
       warn: mock(() => undefined),
       sub: () => ({ debug: mock(() => undefined) }),
     },
-    config: { source: 'frigate', presignExpiry: 60, timezone: 'UTC' },
+    config: {
+      source: 'frigate',
+      presignExpiry: 60,
+      timezone: 'UTC',
+      telegram: { uploadLimit: 50_000_000 },
+    },
+    heartbeats: { all: () => pwaServices },
     catalog: {
       objectLabel: (_s: string, code: string) => code,
       cameraLabel: (_s: string, code: string) => code,
@@ -55,6 +69,7 @@ const makeContext = () => {
     bot: {
       api: {
         editMessageText,
+        editMessageCaption,
         sendMessage,
         innoxious: {
           sendPhoto: mock(async () => ({ message_id: 8 })),
@@ -69,16 +84,19 @@ const makeContext = () => {
       },
     },
     editMessageText,
+    editMessageCaption,
     editMessageMedia,
     sendVideo,
   } as unknown as TransportContext & {
     editMessageText: ReturnType<typeof mock>
+    editMessageCaption: ReturnType<typeof mock>
     editMessageMedia: ReturnType<typeof mock>
     sendVideo: ReturnType<typeof mock>
   }
 }
 
 beforeEach(() => {
+  pwaServices = []
   directory = path.join(tmpdir(), `spotter-delivery-${crypto.randomUUID()}`)
   db = createDatabase(path.join(directory, 'telegram.sqlite'))
   tgChatsRepo.upsert(db, '100')
@@ -343,6 +361,232 @@ describe('deliveryEventAction clip parts', () => {
     }
     expect(main.caption).not.toContain('Часть')
     expect(context.sendVideo).not.toHaveBeenCalled()
+    cleanup()
+  })
+})
+
+describe('deliveryEventAction clip over the upload limit', () => {
+  const delivery: DeliveryEvent = {
+    eventId: 'cam-htriyg-1',
+    event: event('end', true),
+    action: 'media',
+    clipKey: 'event-media/clip.mp4',
+    clipBytes: 60_000_000,
+  }
+
+  const online = () => {
+    pwaServices = [
+      {
+        service: 'pwa',
+        online: true,
+        details: { url: 'https://spotter.example.com/' },
+      },
+    ]
+  }
+
+  test('is not uploaded: the message says so and links to the web app', async () => {
+    online()
+    const context = makeContext()
+
+    await deliveryEventAction(delivery, context)
+
+    // No video edit was even attempted: the size came with the contract.
+    expect(context.editMessageMedia).not.toHaveBeenCalled()
+    const [, , options] = context.editMessageCaption.mock.calls[0] as [
+      string,
+      number,
+      {
+        caption: string
+        reply_markup: { inline_keyboard: { url?: string }[][] }
+      },
+    ]
+    expect(options.caption).toContain('Видео не влезает в Telegram')
+    expect(options.reply_markup.inline_keyboard[0]?.[0]?.url).toBe(
+      'https://spotter.example.com/event/cam-htriyg-1',
+    )
+    cleanup()
+  })
+
+  test('without a web app the message only says why there is no video', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(delivery, context)
+
+    const [, , options] = context.editMessageCaption.mock.calls[0] as [
+      string,
+      number,
+      { caption: string; reply_markup?: unknown },
+    ]
+    expect(options.caption).toContain('Видео не влезает в Telegram')
+    expect(options.reply_markup).toBeUndefined()
+    cleanup()
+  })
+
+  test('a snapshot in the same delivery is still attached', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      { ...delivery, snapshotKey: 'event-media/snap.jpg' },
+      context,
+    )
+
+    const [, , media] = context.editMessageMedia.mock.calls[0] as [
+      string,
+      number,
+      { type: string; caption: string },
+    ]
+    expect(media.type).toBe('photo')
+    expect(media.caption).toContain('Видео не влезает в Telegram')
+    cleanup()
+  })
+
+  test('a text message with no caption is edited as text', async () => {
+    const context = makeContext()
+    context.editMessageCaption.mockImplementationOnce(async () => {
+      throw new Error('400: there is no caption in the message to edit')
+    })
+
+    await deliveryEventAction(delivery, context)
+
+    expect(context.editMessageText).toHaveBeenCalledTimes(1)
+    cleanup()
+  })
+
+  test('a cut clip whose first part fits is delivered, linking to the whole', async () => {
+    online()
+    const context = makeContext()
+
+    await deliveryEventAction(
+      {
+        ...delivery,
+        clipParts: ['event-media/clip.part1.mp4', 'event-media/clip.part2.mp4'],
+        clipPartBytes: [40_000_000, 20_000_000],
+      },
+      context,
+    )
+
+    const [, , main, options] = context.editMessageMedia.mock.calls[0] as [
+      string,
+      number,
+      { type: string },
+      { reply_markup: { inline_keyboard: { url?: string }[][] } },
+    ]
+    expect(main.type).toBe('video')
+    expect(options.reply_markup.inline_keyboard[0]?.[0]?.url).toBe(
+      'https://spotter.example.com/event/cam-htriyg-1',
+    )
+    expect(context.sendVideo).toHaveBeenCalledTimes(1)
+    cleanup()
+  })
+
+  test('a self-hosted Bot API takes the whole clip', async () => {
+    const context = makeContext()
+    ;(context.config.telegram as { uploadLimit: number }).uploadLimit =
+      2_000_000_000
+
+    await deliveryEventAction(delivery, context)
+
+    const [, , main] = context.editMessageMedia.mock.calls[0] as [
+      string,
+      number,
+      { type: string },
+    ]
+    expect(main.type).toBe('video')
+    expect(context.editMessageCaption).not.toHaveBeenCalled()
+    cleanup()
+  })
+})
+
+describe('deliveryEventAction oversized edge cases', () => {
+  const base: DeliveryEvent = {
+    eventId: 'cam-htriyg-1',
+    event: event('end', true),
+    action: 'media',
+    clipKey: 'event-media/clip.mp4',
+  }
+
+  test('any part over the upload limit keeps the whole clip off Telegram', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      {
+        ...base,
+        clipParts: ['event-media/clip.part1.mp4', 'event-media/clip.part2.mp4'],
+        // Part 1 would fit; sending it alone is half a clip, not a clip.
+        clipPartBytes: [40_000_000, 60_000_000],
+      },
+      context,
+    )
+
+    expect(context.editMessageMedia).not.toHaveBeenCalled()
+    expect(context.sendVideo).not.toHaveBeenCalled()
+    expect(context.editMessageCaption).toHaveBeenCalledTimes(1)
+    cleanup()
+  })
+
+  test('sizes that do not line up with the parts are not trusted', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      {
+        ...base,
+        clipParts: ['event-media/clip.part1.mp4', 'event-media/clip.part2.mp4'],
+        // Whole-clip size only: says nothing about either part.
+        clipBytes: 90_000_000,
+      },
+      context,
+    )
+
+    const [, , main] = context.editMessageMedia.mock.calls[0] as [
+      string,
+      number,
+      { type: string },
+    ]
+    expect(main.type).toBe('video')
+    cleanup()
+  })
+
+  test('a redelivery that changes nothing is not a failure', async () => {
+    const context = makeContext()
+    context.editMessageCaption.mockImplementationOnce(async () => {
+      throw new Error('400: Bad Request: message is not modified')
+    })
+
+    await deliveryEventAction({ ...base, clipBytes: 60_000_000 }, context)
+
+    expect(context.editMessageText).not.toHaveBeenCalled()
+    cleanup()
+  })
+
+  test('a message that never had a photo keeps saying so', async () => {
+    const context = makeContext()
+
+    await deliveryEventAction(
+      {
+        ...base,
+        event: { ...event('end', true), hasSnapshot: false },
+        clipBytes: 60_000_000,
+      },
+      context,
+    )
+
+    const [, , options] = context.editMessageCaption.mock.calls[0] as [
+      string,
+      number,
+      { caption: string },
+    ]
+    expect(options.caption).toContain('Без снимка')
+    expect(options.caption).toContain('Видео не влезает в Telegram')
+    cleanup()
+  })
+
+  test('a muted chat is left alone', async () => {
+    const context = makeContext()
+    tgChatsRepo.setMuted(db, '100', new Date(Date.now() + 60_000))
+
+    await deliveryEventAction({ ...base, clipBytes: 60_000_000 }, context)
+
+    expect(context.editMessageCaption).not.toHaveBeenCalled()
     cleanup()
   })
 })

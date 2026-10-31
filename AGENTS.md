@@ -42,7 +42,7 @@ Frigate ─MQTT─▶ frigate ─Redis(spotter.event)─▶ server ─delivery.e
 доставки (рендер, отправка/редактирование сообщений, Telegram-локальный стейт, presign).
 Контракт между ними — `spotter.delivery.*` (downstream) и `spotter.command.*` (upstream).
 
-Деплой-профили (dev / single / ingest / cloud) — в [docs/deployment.md](docs/deployment.md).
+Деплой-профили (dev / single / ingest / cloud) — в [docs/deployment.md](docs/deployment.md). Свой Bot API-сервер для видео до 2 ГБ одним файлом — в [docs/telegram-bot-api.md](docs/telegram-bot-api.md).
 
 Как проверить, что всё работает — unit, стенд с настоящим NVR, команда `/test` на живом узле — в [docs/testing.md](docs/testing.md).
 
@@ -250,10 +250,11 @@ const sub = logger.sub('action', topic, event.id)      // контекстный
 Решения, которые уже стоили сломанного прода. Правка, нарушающая инвариант, — это смена решения: её согласовывают с владельцем, а не делают молча. Рядом с каждым — тест, который его держит.
 
 - **Длительность не ограничивает работу.** Длинное событие кодируется часами и передаётся медленно: транскодинг ограничен только `VIDEO_TIMEOUT_MS` как защитой от зависшего ffmpeg, передача S3 обрывается по тишине (`S3_STALL_MS`), а не по времени. [s3Transfer.test.ts](apps/depot/src/processing/s3Transfer.test.ts)
-- **Долгая работа идёт вне записи Redis.** Задание сохраняется до запуска и подтверждается сразу; reclaim-окно означает «реплика умерла» и с длительностью работы не связано. [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts)
+- **Долгая работа идёт вне записи Redis.** Задание сохраняется до запуска и подтверждается сразу; reclaim-окно означает «реплика умерла» и с длительностью работы не связано. Это и транскодинг в depot, и отправка клипа байтами в telegram. [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts), [ClipDeliveryQueue.test.ts](apps/telegram/src/delivery/ClipDeliveryQueue.test.ts)
 - **Реплика читает только под свободный слот**, иначе занятая копит клипы, пока свободная простаивает. [RedisRegulator.test.ts](packages/transport/src/regulator/RedisRegulator.test.ts), [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts)
 - **Одно событие — одно кодирование на реплике**: id захватывается до первого `await`. [TranscodeQueue.test.ts](apps/depot/src/jobs/TranscodeQueue.test.ts)
-- **Каждый файл, отданный Telegram, в его лимитах**: по ссылке не больше 20 МБ (фото — 5 МБ), иначе байтами; клип больше `VIDEO_PART_LIMIT_MB` режется на части. [InnoxiousMedia.test.ts](apps/telegram/src/extension/innoxious/InnoxiousMedia.test.ts), [deliveryEventAction.test.ts](apps/telegram/src/transport/actions/deliveryEventAction.test.ts)
+- **Каждый файл, отданный Telegram, в его лимитах**: по ссылке не больше 20 МБ (фото — 5 МБ), иначе байтами до лимита загрузки (`TELEGRAM_UPLOAD_LIMIT_MB`: 50 у Telegram, 2000 у своего Bot API); клип больше `VIDEO_PART_LIMIT_MB` режется на части; то, что не влезает и так, не отправляется, а ссылается на PWA. Размеры едут в контракте — бот не спрашивает их у S3. [InnoxiousMedia.test.ts](apps/telegram/src/extension/innoxious/InnoxiousMedia.test.ts), [deliveryEventAction.test.ts](apps/telegram/src/transport/actions/deliveryEventAction.test.ts)
+- **Видео кодируется под экран, а не под камеру**: высота и частота кадров ограничены (`VIDEO_MAX_HEIGHT`/`VIDEO_MAX_FPS`), CRF задан, ключевой кадр каждые 2 с — иначе шестиминутное событие весило сотни мегабайт и уезжало сорока частями. [transcode.test.ts](apps/depot/src/processing/transcode.test.ts), [splitVideo.test.ts](apps/depot/src/processing/splitVideo.test.ts)
 - **Каждое значение качества реально кодируется** настоящим ffmpeg. [transcode.test.ts](apps/depot/src/processing/transcode.test.ts) — в CI пока пропускается: там нет ffmpeg.
 - **Пакет объявляет всё, что импортирует** — образ ставит только объявленное. [workspaceDependencies.test.ts](.integration/workspaceDependencies.test.ts)
 - **Образ, чей сервис монтирует том на `/data`, отдаёт его `bun`**, иначе хранилище заданий не пишется. [invariants.test.ts](.integration/invariants.test.ts)

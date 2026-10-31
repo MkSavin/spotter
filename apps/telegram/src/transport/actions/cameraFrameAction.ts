@@ -86,5 +86,7 @@ export const cameraFrameAction = async (
     }
   }
 
+  await media.dispose()
+
   logger.debug('Camera frame successfully sent')
 }

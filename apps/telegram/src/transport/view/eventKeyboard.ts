@@ -56,3 +56,22 @@ export const videoProcessingKeyboard = (
 /** Offers another go after a clip failed or took too long. */
 export const videoRetryKeyboard = (eventId: string): InlineKeyboard =>
   new InlineKeyboard().text('🎬 Видео — повторить', `${CLIP_PREFIX}${eventId}`)
+
+/** Where the web app shows the event, whole clip included. */
+export const eventPageUrl = (pwa: string, eventId: string): string =>
+  `${pwa}/event/${encodeURIComponent(eventId)}`
+
+/**
+ * A link to the whole clip in the web app, for an event Telegram got only in
+ * parts or not at all. `null` when there is no web app to link to.
+ */
+export const watchInAppKeyboard = (
+  pwa: string | null,
+  eventId: string,
+): InlineKeyboard | undefined =>
+  pwa
+    ? new InlineKeyboard().url(
+        '▶️ Смотреть в приложении',
+        eventPageUrl(pwa, eventId),
+      )
+    : undefined

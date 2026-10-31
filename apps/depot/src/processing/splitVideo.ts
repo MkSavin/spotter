@@ -4,10 +4,15 @@ import type { Stenograph } from 'stenograph'
 /** Decimal, not binary: a limit stated in MB must not be read generously. */
 export const MB = 1_000_000
 
-/** Aim below the limit: stream copy can only cut on a keyframe. */
-const HEADROOM = 0.9
-const SHRINK = 0.7
-const ATTEMPTS = 4
+/** Room for each part's own container index, which the packet sizes omit. */
+const HEADROOM = 0.97
+
+/**
+ * A cut time is handed back to ffmpeg slightly early: it splits at the first
+ * keyframe at or after the time, and a printed timestamp may round up past
+ * the frame it names.
+ */
+const EPSILON = 0.001
 
 type Finished = { exitCode: number; stdout: string; stderr: string }
 
@@ -32,36 +37,74 @@ const fail = (tool: string, { exitCode, stderr }: Finished): Error =>
     `${tool} exited with code ${exitCode}: ${stderr.trim().split('\n').slice(-3).join(' | ')}`,
   )
 
-const probeDuration = async (
+/** A run of frames that stream copy cannot split: a keyframe and what follows it. */
+export type KeyframeInterval = { time: number; bytes: number }
+
+type Packet = { pts_time?: string; pos?: string; flags?: string }
+
+/** Keyframe intervals of the only stream, by byte position in the file. */
+const probeIntervals = async (
   file: string,
+  size: number,
   timeoutMs: number,
-): Promise<number> => {
+): Promise<KeyframeInterval[]> => {
   const result = await spawn(
     [
       'ffprobe',
       '-v',
       'error',
+      '-select_streams',
+      'v:0',
       '-show_entries',
-      'format=duration',
+      'packet=pts_time,pos,flags',
       '-of',
-      'default=noprint_wrappers=1:nokey=1',
+      'json',
       file,
     ],
     timeoutMs,
   )
   if (result.exitCode !== 0) throw fail('ffprobe', result)
 
-  const duration = Number.parseFloat(result.stdout)
-  if (!Number.isFinite(duration) || duration <= 0) {
-    throw new Error(`ffprobe reported no duration for ${file}`)
-  }
-  return duration
+  const packets = (JSON.parse(result.stdout).packets ?? []) as Packet[]
+  const keys = packets
+    .filter((packet) => packet.flags?.startsWith('K'))
+    .map((packet) => ({
+      time: Number.parseFloat(packet.pts_time ?? ''),
+      pos: Number.parseInt(packet.pos ?? '', 10),
+    }))
+    .filter((key) => Number.isFinite(key.time) && Number.isFinite(key.pos))
+
+  return keys.map((key, index) => ({
+    time: key.time,
+    bytes: (keys[index + 1]?.pos ?? size) - key.pos,
+  }))
 }
 
-/** Cuts into parts of about `seconds` each; returns their paths in order. */
+/**
+ * Packs intervals into the fewest parts of at most `budget` bytes, in order.
+ * Returns the times the later parts start at. An interval over the budget
+ * gets a part of its own: only a re-encode could make it smaller.
+ */
+export const planCuts = (
+  intervals: KeyframeInterval[],
+  budget: number,
+): number[] => {
+  const cuts: number[] = []
+  let filled = 0
+  for (const { time, bytes } of intervals) {
+    if (filled > 0 && filled + bytes > budget) {
+      cuts.push(time)
+      filled = 0
+    }
+    filled += bytes
+  }
+  return cuts
+}
+
+/** Cuts at the given times; returns the parts' paths in order. */
 const segment = async (
   file: string,
-  seconds: number,
+  cuts: number[],
   timeoutMs: number,
 ): Promise<string[]> => {
   const directory = path.dirname(file)
@@ -82,8 +125,8 @@ const segment = async (
         'copy',
         '-f',
         'segment',
-        '-segment_time',
-        seconds.toFixed(3),
+        '-segment_times',
+        cuts.map((time) => Math.max(0, time - EPSILON).toFixed(3)).join(','),
         '-reset_timestamps',
         '1',
         '-segment_format_options',
@@ -110,20 +153,11 @@ const segment = async (
   }
 }
 
-const removeAll = (files: string[]): Promise<unknown> =>
-  Promise.all(
-    files.map((file) =>
-      Bun.file(file)
-        .delete()
-        .catch(() => 0),
-    ),
-  )
-
 /**
- * Cuts a clip larger than `limitBytes` into parts that fit it, without
- * re-encoding. Returns nothing when the clip fits or cannot be cut in two.
- * A part may still overshoot when one keyframe interval alone is larger than
- * the limit; that is reported, not fixed, since only a re-encode could.
+ * Cuts a clip larger than `limitBytes` into the fewest parts that fit it,
+ * without re-encoding. Returns nothing when the clip fits or cannot be cut in
+ * two. A part may still overshoot when one keyframe interval alone is larger
+ * than the limit; that is reported, not fixed, since only a re-encode could.
  */
 export const splitVideo = async (
   file: string,
@@ -134,28 +168,16 @@ export const splitVideo = async (
   const size = Bun.file(file).size
   if (!(limitBytes > 0) || size <= limitBytes) return []
 
-  const duration = await probeDuration(file, timeoutMs)
+  const intervals = await probeIntervals(file, size, timeoutMs)
+  const cuts = planCuts(intervals, limitBytes * HEADROOM)
 
-  let budget = HEADROOM
-  let parts: string[] = []
-  let largest = 0
-
-  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-    await removeAll(parts)
-
-    const seconds = Math.max(1, (duration * limitBytes * budget) / size)
-    parts = await segment(file, seconds, timeoutMs)
-    largest = Math.max(0, ...parts.map((part) => Bun.file(part).size))
-
-    if (largest <= limitBytes) break
-    budget *= SHRINK
-  }
-
-  if (parts.length < 2) {
-    await removeAll(parts)
+  if (cuts.length === 0) {
     logger.warn(`Clip of ${size} bytes could not be cut: too few keyframes`)
     return []
   }
+
+  const parts = await segment(file, cuts, timeoutMs)
+  const largest = Math.max(0, ...parts.map((part) => Bun.file(part).size))
 
   if (largest > limitBytes) {
     logger.warn(

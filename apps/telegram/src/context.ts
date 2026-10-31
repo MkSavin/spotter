@@ -24,6 +24,7 @@ import type { Stenograph } from 'stenograph'
 import type { ClipTracker } from './clip/ClipTracker'
 import type { Config } from './config'
 import type { TelegramDatabase } from './db/client'
+import type { ClipDeliveryQueue } from './delivery/ClipDeliveryQueue'
 import type {
   InnoxiousMedia,
   InnoxiousMediaGroup,
@@ -56,6 +57,8 @@ export type CoreContext = {
   rollouts: RolloutWatcher
   sources: SourceWatcher
   clips: ClipTracker
+  /** Clip deliveries that travel as bytes, run outside the stream entry. */
+  deliveries: ClipDeliveryQueue
   s3: S3Client
   subscriber: RedisConnection
   producer: StreamProducer

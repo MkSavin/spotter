@@ -358,8 +358,6 @@ if (mode === 'single' || mode === 'cloud') {
       'PUBLIC_URL',
       await ask('PUBLIC_URL (за TLS-прокси)', 'https://spotter.example.com'),
     )
-    // Persisted, not just passed to `up`: every later `update` reads it back.
-    env = setEnv(env, 'SPOTTER_PROFILES', 'pwa')
     say('  Генерирую VAPID-ключи…')
     try {
       const { publicKey, privateKey } = await generateVapidKeys()
@@ -372,6 +370,37 @@ if (mode === 'single' || mode === 'cloud') {
     }
   }
 }
+
+// 6a. Self-hosted Bot API (opt-in): one video instead of a chain of parts.
+let wantBotApi = false
+if (mode === 'single' || mode === 'cloud') {
+  step('Большие видео (опционально)')
+  say('  Обычный Bot API берёт файл не больше 50 МБ, и клип длинного события')
+  say('  приходит частями. Свой Bot API-сервер (контейнер рядом с ботом)')
+  say('  поднимает лимит до 2 ГБ. Нужны api_id и api_hash с')
+  say('  https://my.telegram.org → API development tools.')
+  wantBotApi = await askYesNo('Поднять свой Bot API-сервер?', false)
+  if (wantBotApi) {
+    env = setEnv(env, 'TELEGRAM_API_ID', await ask('TELEGRAM_API_ID'))
+    env = setEnv(env, 'TELEGRAM_API_HASH', await ask('TELEGRAM_API_HASH'))
+    if (mode === 'single') {
+      // Nothing to cut any more: the whole clip fits the new limit.
+      env = setEnv(env, 'VIDEO_PART_LIMIT_MB', '2000')
+    } else {
+      say('  На ingest-узле поставь VIDEO_PART_LIMIT_MB=2000 — режет клипы он.')
+    }
+    say('  При первом `./spotter up` бот один раз выйдет из облачного Bot API;')
+    say('  обратно в облако Telegram пустит его только через 10 минут.')
+  }
+}
+
+const profiles = [
+  ...(wantPwa ? ['pwa'] : []),
+  ...(wantBotApi ? ['botapi'] : []),
+]
+// Persisted, not just passed to `up`: every later `update` reads it back.
+if (profiles.length > 0)
+  env = setEnv(env, 'SPOTTER_PROFILES', profiles.join(','))
 
 // 7. Write .env
 step('Записываю .env')
@@ -386,6 +415,7 @@ step('Поднимаю стек')
 const upArgs = [
   ...(mode === 'ingest' && !useGpu ? ['--no-gpu'] : []),
   ...(wantPwa ? ['--pwa'] : []),
+  ...(wantBotApi ? ['--botapi'] : []),
 ]
 const upCommand = ['./spotter up', ...upArgs].join(' ')
 const bringUp = await askYesNo(`Запустить сейчас (${upCommand})?`, true)

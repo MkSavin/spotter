@@ -7,7 +7,13 @@
 //   spotter compose <any docker compose arguments>
 //   spotter install [single|cloud|ingest]
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline/promises'
@@ -57,6 +63,7 @@ const OWN_FLAGS = [
   '--external-mqtt',
   '--pwa',
   '--email',
+  '--botapi',
   '--probe',
 ]
 
@@ -79,23 +86,78 @@ const ownsBroker = (): boolean => {
 }
 
 const FRONTENDS = ['pwa', 'email'] as const
+/** Optional pieces beside the frontends; each one rides SPOTTER_PROFILES too. */
+const ADDONS = [...FRONTENDS, 'botapi'] as const
 
 /**
- * Optional frontends to run. A flag turns one on for this command; without any
+ * Optional add-ons to run. A flag turns one on for this command; without any
  * flag the choice comes from SPOTTER_PROFILES, so `update` and `up` keep what
  * install set up instead of silently dropping it.
  */
-const frontendProfiles = (): string[] => {
+const addonProfiles = (): string[] => {
   const stored = (readEnv('SPOTTER_PROFILES') ?? '')
     .split(',')
     .map((name) => name.trim())
-  const asked = FRONTENDS.filter((name) => has(`--${name}`))
-  if (asked.length === 0)
-    return FRONTENDS.filter((name) => stored.includes(name))
-  // Remember the choice, so the next update does not quietly drop the frontend.
+  const asked = ADDONS.filter((name) => has(`--${name}`))
+  // Added to what install set up, never replacing it: `up --botapi` on a node
+  // with the PWA must not quietly drop the PWA on the next update.
+  const active = ADDONS.filter(
+    (name) => stored.includes(name) || asked.includes(name),
+  )
   if (asked.some((name) => !stored.includes(name)))
-    persistEnv('SPOTTER_PROFILES', asked.join(','))
-  return asked
+    persistEnv('SPOTTER_PROFILES', active.join(','))
+  return active
+}
+
+/** Written once the bot has left the public Bot API; see `logOutOfCloud`. */
+const BOTAPI_MARKER = path.join(root, '.docker', 'botapi-logged-out')
+
+/**
+ * A bot talks to one Bot API at a time: until it logs out of Telegram's own
+ * server, a self-hosted one answers 401 to everything. Done here, on the
+ * first `up --botapi`, rather than by hand: a step in a document is the one
+ * that gets skipped. Telegram will not let the bot back on its server for
+ * ten minutes after this.
+ */
+const logOutOfCloud = async (): Promise<void> => {
+  if (existsSync(BOTAPI_MARKER)) return
+  const token = readEnv('TELEGRAM_TOKEN')
+  if (!token) fail('в .env нет TELEGRAM_TOKEN')
+  for (const key of ['TELEGRAM_API_ID', 'TELEGRAM_API_HASH'])
+    if (!readEnv(key))
+      fail(
+        `в .env нет ${key} — возьми на https://my.telegram.org (API development tools)`,
+      )
+
+  console.log(
+    'Вывожу бота из облачного Bot API (один раз, перед своим сервером)…',
+  )
+  try {
+    // The same way out the server itself will take: on a node where Telegram
+    // is unreachable directly, a direct call is exactly what fails.
+    const proxy = readEnv('TELEGRAM_PROXY')
+    const response = await fetch(
+      `https://api.telegram.org/bot${token}/logOut`,
+      { method: 'POST', ...(proxy ? { proxy } : {}) },
+    )
+    const reply = (await response.json()) as {
+      ok?: boolean
+      description?: string
+    }
+    // Already out is as good as out: Telegram says so with a 401.
+    if (!reply.ok && !/unauthorized/i.test(reply.description ?? ''))
+      throw new Error(reply.description ?? `HTTP ${response.status}`)
+    mkdirSync(path.dirname(BOTAPI_MARKER), { recursive: true })
+    writeFileSync(BOTAPI_MARKER, `${new Date().toISOString()}\n`)
+    console.log('  ✓ Бот вышел из облака; свой сервер залогинит его сам.')
+  } catch (error) {
+    console.warn(
+      `  ! Не вышло: ${(error as Error).message}\n` +
+        '    Пока бот числится в облаке, свой сервер отвечает ему 401.\n' +
+        '    Повтори позже: ./spotter botapi-logout — или вручную:\n' +
+        `    curl -X POST https://api.telegram.org/bot<TELEGRAM_TOKEN>/logOut`,
+    )
+  }
 }
 
 /**
@@ -118,7 +180,15 @@ const composeArgs = (mode: Mode): string[] => {
   // Beside the adapter and the NVR, which is both of these nodes.
   if (mode !== 'cloud')
     files.push(path.join('.deployment', 'compose', 'production.probe.yml'))
-  const profiles = [...frontendProfiles(), ...probeProfile()]
+  const addons = addonProfiles()
+  // A file, not a profile: it also redirects the bot, which only makes sense
+  // with the server actually running.
+  if (mode !== 'ingest' && addons.includes('botapi'))
+    files.push(path.join('.deployment', 'compose', 'production.botapi.yml'))
+  const profiles = [
+    ...addons.filter((name) => (FRONTENDS as readonly string[]).includes(name)),
+    ...probeProfile(),
+  ]
   // From .env, not a flag: chosen once at install, not repeated every `up`.
   if (ownsBroker()) profiles.push('mqtt')
   return [
@@ -144,6 +214,14 @@ const persistEnv = (key: string, value: string): void => {
 
 const compose = async (args: string[]): Promise<never> => {
   const mode = requireMode()
+
+  // Only when bringing the server up: `logs` and `ps` are not the moment.
+  if (
+    mode !== 'ingest' &&
+    ['up', 'restart'].includes(args[0] ?? '') &&
+    addonProfiles().includes('botapi')
+  )
+    await logOutOfCloud()
 
   if (has('--probe')) {
     console.warn(
@@ -221,6 +299,15 @@ const COMMANDS: Record<string, Command> = {
         .cwd(root)
         .nothrow()
       process.exit(exitCode)
+    },
+  },
+
+  'botapi-logout': {
+    about:
+      'Вывести бота из облачного Bot API заново (свой сервер отвечает 401)',
+    run: async () => {
+      if (existsSync(BOTAPI_MARKER)) rmSync(BOTAPI_MARKER)
+      await logOutOfCloud()
     },
   },
 

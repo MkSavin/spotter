@@ -1,8 +1,9 @@
 import { applicationLogger as logger } from '../../log'
-import type {
-  InnoxiousMedia,
-  InnoxiousMediaGroup,
-  MediaInput,
+import {
+  type InnoxiousMedia,
+  type InnoxiousMediaGroup,
+  type MediaInput,
+  MediaTooLargeError,
 } from './InnoxiousMedia'
 
 export class InnoxiousExecutor {
@@ -23,6 +24,8 @@ export class InnoxiousExecutor {
       try {
         return await callback(() => media.naive() as any)
       } catch (error) {
+        // Neither strategy can shrink the file: let the caller offer a link.
+        if (error instanceof MediaTooLargeError) throw error
         logger.warn(
           `Publishing media by public (naive) strategy failed: ${(error as Error)?.message}`,
         )
@@ -34,9 +37,11 @@ export class InnoxiousExecutor {
     try {
       return await callback(() => media.accurate() as any)
     } catch (error) {
-      logger.error(
-        `Publishing media by buffered (accurate) strategy failed: ${(error as Error)?.message}`,
-      )
+      if (!(error instanceof MediaTooLargeError)) {
+        logger.error(
+          `Publishing media by buffered (accurate) strategy failed: ${(error as Error)?.message}`,
+        )
+      }
       throw error
     }
   }
