@@ -1,5 +1,18 @@
 # @spotter/server
 
+## 1.5.0
+
+### Minor Changes
+
+- 7e61456: Long event clips now reach Telegram whole or in a few parts instead of dozens: depot caps resolution, frame rate and CRF, and cuts by keyframe size up to the 50 MB upload limit.
+  Clip sizes travel in the contract, and the bot uploads large clips outside the Redis entry with resumable downloads, because its link to S3 is unstable.
+  An optional self-hosted Bot API (`./spotter up --botapi`) raises the limit to 2 GB; a clip that still does not fit gets a link to the web app.
+
+### Patch Changes
+
+- Updated dependencies [7e61456]
+  - @spotter/transport@1.15.0
+
 ## 1.4.3
 
 ### Patch Changes
