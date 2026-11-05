@@ -225,7 +225,7 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 ./spotter doctor
 ```
 
-Проверяет контейнеры, Redis, доступность Frigate, каталог камер, S3, Telegram API и канал до облака (на ingest). Для каждой проблемы печатает подсказку.
+Проверяет контейнеры, видеокарту (на ingest с GPU), Redis, доступность Frigate, каталог камер, S3, Telegram API и канал до облака (на ingest). Для каждой проблемы печатает подсказку.
 
 Дальше — логи:
 
@@ -250,6 +250,29 @@ PWA нужно ставить за HTTPS — иначе уведомления �
 | `port is already allocated` (1883) | у тебя уже есть свой MQTT — выбери «готовый брокер» |
 | `getaddrinfo ESERVFAIL` | адаптер не видит брокер по имени — укажи `MQTT_NETWORK` (сеть брокера) |
 | События не приходят, всё зелёное | Frigate не публикует в тот брокер — проверь `mqtt` в его `config.yml` |
+| `nvml error: driver/library version mismatch` при `up` | драйвер NVIDIA обновился, а в ядре старый модуль — см. ниже |
+
+### Драйвер NVIDIA обновился, а узел не перезагружен
+
+```
+nvidia-container-cli: initialization error: nvml error: driver/library version mismatch: unknown
+```
+
+Обычно это последствие автоматического `apt upgrade`: пакеты драйвера уже новые, а модуль ядра загружен старый. Пока они не совпадут, не стартует ни один контейнер с GPU — реплики depot и Frigate с `hwaccel`. `./spotter doctor` показывает это строкой «Видеокарта».
+
+Проверить вручную: `nvidia-smi` отвечает `Driver/library version mismatch`, а `cat /proc/driver/nvidia/version` показывает не ту версию, что `dpkg -l | grep nvidia-driver`.
+
+Что делать:
+
+- **Перезагрузить узел**, затем `./spotter up`. Надёжнее всего.
+- **Без перезагрузки** — если карту никто не держит (Frigate тоже остановлен): `sudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia && sudo modprobe nvidia`.
+- **Пока перезагрузить нельзя** — `./spotter up --no-gpu`: depot перекодирует на CPU, медленнее, но клипы идут. Флаг не запоминается, следующий `update` снова попробует GPU.
+
+Чтобы драйвер не обновлялся сам, закрепи его и обновляй вручную вместе с перезагрузкой:
+
+```bash
+sudo apt-mark hold $(dpkg -l | awk '/^ii +(nvidia-|libnvidia-)/{print $2}')
+```
 
 ---
 

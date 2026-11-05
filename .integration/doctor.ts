@@ -483,6 +483,62 @@ const checkS3 = async (env: Record<string, string>): Promise<Check> => {
   }
 }
 
+type Finished = { exitCode: number; out: string }
+
+/**
+ * Reads `nvidia-smi` as the depot replicas will meet the card. The usual
+ * failure is a driver upgraded under a running kernel module: every GPU
+ * container then dies in its prestart hook, and only a reboot reloads it.
+ */
+export const classifyGpu = (result: Finished | undefined): Check => {
+  const name = 'Видеокарта'
+  if (!result) {
+    return {
+      name,
+      status: 'fail',
+      detail: 'nvidia-smi не найден — драйвер NVIDIA не установлен',
+      hint: 'поставь драйвер или подними узел без GPU: ./spotter up --no-gpu',
+    }
+  }
+  if (/version mismatch/i.test(result.out)) {
+    return {
+      name,
+      status: 'fail',
+      detail:
+        'драйвер обновился, а в ядре остался старый модуль — контейнеры с GPU не стартуют',
+      hint: 'перезагрузи узел; до перезагрузки: ./spotter up --no-gpu (docs/deployment.md)',
+    }
+  }
+  if (result.exitCode !== 0) {
+    return {
+      name,
+      status: 'fail',
+      detail: result.out.split('\n')[0] || `nvidia-smi exit ${result.exitCode}`,
+      hint: 'до починки драйвера: ./spotter up --no-gpu',
+    }
+  }
+  const [card, driver] = (result.out.split('\n')[0] ?? '')
+    .split(',')
+    .map((part) => part.trim())
+  return {
+    name,
+    status: 'ok',
+    detail: driver ? `${card}, драйвер ${driver}` : card || 'доступна',
+  }
+}
+
+const checkGpu = async (): Promise<Check> => {
+  if (!Bun.which('nvidia-smi')) return classifyGpu(undefined)
+  const result =
+    await $`nvidia-smi --query-gpu=name,driver_version --format=csv,noheader`
+      .quiet()
+      .nothrow()
+  return classifyGpu({
+    exitCode: result.exitCode,
+    out: (result.stdout.toString() + result.stderr.toString()).trim(),
+  })
+}
+
 export const diagnose = async (
   mode: Mode,
   composeArgs: string[],
@@ -531,6 +587,10 @@ export const diagnose = async (
 
   const checks: Check[] = [
     ...(await checkContainers(composeArgs, expected)),
+    // Right after the containers: a broken driver is why the depot ones are down.
+    ...(composeArgs.some((arg) => arg.endsWith('production.ingest.gpu.yml'))
+      ? [await checkGpu()]
+      : []),
     ...(await checkRedis(composeArgs, redisService)),
   ]
 
