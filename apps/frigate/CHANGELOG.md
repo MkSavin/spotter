@@ -1,5 +1,14 @@
 # @spotter/sink
 
+## 1.7.4
+
+### Patch Changes
+
+- d976de4: Add an optional Appercot bot for Spotter notifications, account access, and camera commands.
+- Updated dependencies [d976de4]
+  - @spotter/transport@1.16.0
+  - @spotter/sink@1.8.0
+
 ## 1.7.3
 
 ### Patch Changes
