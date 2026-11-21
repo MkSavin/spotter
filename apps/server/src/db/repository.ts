@@ -3,7 +3,7 @@ import {
   normalizeUsername,
   type SpotterEvent,
 } from '@spotter/transport'
-import { count, eq, like, lt } from 'drizzle-orm'
+import { and, count, eq, isNotNull, like, lt } from 'drizzle-orm'
 import type { ServerDatabase } from './client'
 import {
   type AccessToken,
@@ -14,6 +14,9 @@ import {
   type Role,
   recipients,
 } from './schema'
+
+export const inTransaction = <T>(db: ServerDatabase, work: () => T): T =>
+  db.$client.transaction(work).immediate()
 
 const total = (
   db: ServerDatabase,
@@ -32,31 +35,27 @@ export const recipientsRepo = {
   ): Recipient | undefined =>
     db.select().from(recipients).where(eq(recipients.tgUserId, tgUserId)).get(),
 
-  /** Resolves by numeric tg_user_id or @username (first match). */
-  /**
-   * Resolves a recipient by whatever identifies it: a Telegram id, a username,
-   * or its uuid. The uuid is what a PWA-created recipient has — it has neither
-   * of the others, so without it such a recipient could never be managed.
-   */
+  /** Resolves by UUID or a legacy Telegram reference. */
   findByRef: (db: ServerDatabase, ref: string): Recipient | undefined => {
     const trimmed = ref.trim()
+    const byUuid = db
+      .select()
+      .from(recipients)
+      .where(eq(recipients.uuid, trimmed))
+      .get()
+    if (byUuid) return byUuid
 
-    const byIdentity = db
+    return db
       .select()
       .from(recipients)
       .where(
         isNumericId(trimmed)
           ? eq(recipients.tgUserId, trimmed)
-          : eq(recipients.username, normalizeUsername(trimmed)),
+          : and(
+              isNotNull(recipients.tgUserId),
+              eq(recipients.username, normalizeUsername(trimmed)),
+            ),
       )
-      .get()
-
-    if (byIdentity) return byIdentity
-
-    return db
-      .select()
-      .from(recipients)
-      .where(eq(recipients.uuid, trimmed))
       .get()
   },
 
@@ -97,6 +96,25 @@ export const recipientsRepo = {
       .returning()
       .get(),
 
+  upsertByAppercotUserId: (
+    db: ServerDatabase,
+    input: {
+      uuid: string
+      appercotUserId: string
+      username: string | null
+      role: Role
+    },
+  ): Recipient =>
+    db
+      .insert(recipients)
+      .values(input)
+      .onConflictDoUpdate({
+        target: recipients.appercotUserId,
+        set: { username: input.username, role: input.role },
+      })
+      .returning()
+      .get(),
+
   setRole: (
     db: ServerDatabase,
     uuid: string,
@@ -118,7 +136,12 @@ export const recipientsRepo = {
 export const tokensRepo = {
   create: (
     db: ServerDatabase,
-    input: { id: string; role: Role; username?: string | null },
+    input: {
+      id: string
+      role: Role
+      username?: string | null
+      platform?: AccessToken['platform']
+    },
   ): AccessToken => db.insert(accessTokens).values(input).returning().get(),
 
   find: (db: ServerDatabase, id: string): AccessToken | undefined =>

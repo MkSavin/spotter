@@ -3,7 +3,7 @@
 # two node profiles cannot drift apart.
 #
 # Each rides a compose profile and is off unless asked for: `./spotter up --pwa`
-# / `--email`, persisted to SPOTTER_PROFILES in .env so later `update` and `up`
+# / `--email` / `--appercot`, persisted to SPOTTER_PROFILES in .env so later `update` and `up`
 # keep them. See .env.example for the settings each one needs.
 # Logs survive a restart and stop eating the disk: the default json-file driver
 # keeps one unbounded file and throws it away when a container is recreated,
@@ -16,6 +16,31 @@ x-logging: &logging
       max-file: '3'
 
 services:
+  spotter-appercot:
+    <<: *logging
+    profiles: [appercot]
+    image: ${APPERCOT_IMAGE:-ghcr.io/mksavin/spotter-appercot:latest}
+    container_name: spotter-appercot
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'find /tmp/spotter-alive -mmin -3 | grep -q .']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - spotter
+    environment:
+      REDIS_URL: redis://redis:6379
+    env_file:
+      - ./.env
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+    volumes:
+      - ./.docker/appercot:/app/data
+    depends_on:
+      - redis
+
   # PWA frontend (OPTIONAL): installable app and Web Push consumer.
   # Set VAPID_* in .env. Service workers and Web Push require HTTPS, so put it
   # behind a TLS reverse proxy.

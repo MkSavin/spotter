@@ -60,6 +60,7 @@ export const createCameraController = <TConfig extends SinkConfig>(
       source: sourceId,
       camera: request.camera,
       rawFrameKey: key,
+      requestId: request.requestId,
       chatId: request.chatId,
       messageId: request.messageId,
     })

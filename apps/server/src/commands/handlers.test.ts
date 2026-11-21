@@ -4,6 +4,7 @@ import { createDatabase, type ServerDatabase } from '../db/client'
 import { recipientsRepo, tokensRepo } from '../db/repository'
 import { applicationLogger } from '../log'
 import {
+  commandHandlers,
   deviceRedeemHandler,
   loginRedeemHandler,
   userListHandler,
@@ -24,6 +25,65 @@ const makeContext = (db: ServerDatabase, codeTtlMs = DAY_MS): ServerContext =>
     logger: applicationLogger,
     config: { auth: { codeTtlMs } },
   }) as unknown as ServerContext
+
+test('Appercot redeems a named code using a platform-specific identity', async () => {
+  const db = createDatabase(':memory:')
+  try {
+    const context = makeContext(db)
+    tokensRepo.create(db, { id: 'telegram', role: 'ADMIN', username: 'alice' })
+    tokensRepo.create(db, {
+      id: 'appercot',
+      role: 'USER',
+      username: 'alice',
+      platform: 'appercot',
+    })
+    const redeem = commandHandlers['appercot.redeem']
+    expect(
+      (
+        await redeem(
+          { code: 'telegram', userId: '42', username: 'alice' },
+          context,
+        )
+      ).ok,
+    ).toBe(false)
+    expect(
+      (
+        await loginRedeemHandler(
+          {
+            code: 'appercot',
+            tgUserId: '42',
+            tgChatId: '42',
+            username: 'alice',
+          },
+          context,
+        )
+      ).ok,
+    ).toBe(false)
+    const telegram = await loginRedeemHandler(
+      { code: 'telegram', tgUserId: '42', tgChatId: '42', username: 'alice' },
+      context,
+    )
+    const args = { code: 'appercot', userId: '42', username: 'bob' }
+    expect(await redeem(args, context)).toEqual({
+      ok: false,
+      error: 'username-mismatch',
+    })
+    const reply = await redeem({ ...args, username: '@Alice' }, context)
+    expect(reply.ok).toBe(true)
+    expect(reply.data).toMatchObject({ role: 'USER' })
+    expect(reply.data).not.toMatchObject({
+      recipientUuid: (telegram.data as { recipientUuid: string }).recipientUuid,
+    })
+    expect(recipientsRepo.findByTgUserId(db, '42')?.role).toBe('ADMIN')
+    expect(recipientsRepo.findByRef(db, '@Alice')?.tgUserId).toBe('42')
+    expect(tokensRepo.find(db, 'appercot')).toBeUndefined()
+    expect((await redeem({ ...args, username: 'alice' }, context)).ok).toBe(
+      false,
+    )
+  } finally {
+    db.$client.close()
+  }
+})
 
 describe('deviceRedeemHandler', () => {
   let db: ServerDatabase

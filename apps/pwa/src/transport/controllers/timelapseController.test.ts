@@ -51,6 +51,25 @@ describe('timelapse controllers', () => {
       requestedBy: 'r-1',
     })
 
+  test('a correlated bot export only reaches its requesting frontend', async () => {
+    startOne()
+    const request = {
+      source: 'frigate',
+      ...span,
+      requestId: 'appercot:request',
+    }
+    await timelapseReadyController(
+      deliver({ ...request, speed: 'timelapse', videoKey: 'staging/tl.mp4' }),
+      context,
+    )
+    await timelapseFailedController(
+      deliver({ ...request, reason: 'empty' }),
+      context,
+    )
+    expect(timelapsesRepo.list(db)[0]?.state).toBe('running')
+    expect(pushed).toHaveLength(0)
+  })
+
   test('a ready export settles the row it belongs to', async () => {
     startOne()
 

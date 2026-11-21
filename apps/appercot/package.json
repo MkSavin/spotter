@@ -1,0 +1,21 @@
+{
+  "name": "@spotter/appercot",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Appercot frontend for Spotter notifications and commands",
+  "scripts": {
+    "start": "bun --env-file=../../.env src/index.ts",
+    "start:watch": "bun --watch --env-file=../../.env src/index.ts",
+    "build": "bun build --entrypoints src/index.ts --outdir ./dist --target bun --env disable"
+  },
+  "dependencies": {
+    "@appercot/chat": "0.1.0-beta.1",
+    "@appercot/protocol": "0.1.0-beta.1",
+    "@spotter/transport": "*",
+    "drizzle-orm": "^0.45.2",
+    "stenograph": "*"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
+  }
+}

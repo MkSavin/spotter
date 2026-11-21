@@ -90,6 +90,7 @@ export type MediaProgress = z.infer<typeof mediaProgressSchema>
 export const cameraRequestSchema = z.object({
   source: z.string().min(1),
   camera: z.string().min(1),
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })
@@ -100,6 +101,7 @@ export const cameraStagedSchema = z.object({
   source: z.string().min(1),
   camera: z.string().min(1),
   rawFrameKey: z.string().min(1),
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })
@@ -109,6 +111,7 @@ export type CameraStaged = z.infer<typeof cameraStagedSchema>
 export const cameraProcessedSchema = z.object({
   camera: z.string().min(1),
   frameKey: z.string().min(1),
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })

@@ -18,7 +18,7 @@ const migrationsFolder =
   path.join(process.cwd(), 'drizzle')
 
 export const createDatabase = (file: string): TelegramDatabase => {
-  mkdirSync(path.dirname(file), { recursive: true })
+  if (file !== ':memory:') mkdirSync(path.dirname(file), { recursive: true })
 
   const sqlite = new Database(file, { create: true })
 

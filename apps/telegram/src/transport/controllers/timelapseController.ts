@@ -59,7 +59,7 @@ export const timelapseReadyController: StreamMessageController<
   if (!value) return
 
   const ready = safeParseTimelapseReady(value)
-  if (!ready) return
+  if (!ready || ready.requestId) return
 
   timelapseWaitsRepo.settle(context.db, ready.camera, ready.start)
 
@@ -97,7 +97,7 @@ export const timelapseFailedController: StreamMessageController<
   if (!value) return
 
   const failed = safeParseTimelapseFailed(value)
-  if (!failed) return
+  if (!failed || failed.requestId) return
 
   // `failed` carries no span, so every wait on that camera is settled: one of
   // them is this, and a wait for an export that failed is not worth keeping.

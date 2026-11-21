@@ -245,6 +245,7 @@ export class TimelapseTracker {
           start: record.request.start,
           end: record.request.end,
           startedAt: record.startedAt,
+          requestId: record.request.requestId,
           chatId: record.request.chatId,
           messageId: record.request.messageId,
         })
@@ -296,6 +297,7 @@ export class TimelapseTracker {
       end: record.request.end,
       speed: record.request.speed,
       videoKey: key,
+      requestId: record.request.requestId,
       chatId: record.request.chatId,
       messageId: record.request.messageId,
     })
@@ -316,6 +318,7 @@ export class TimelapseTracker {
       source: this.options.sourceId,
       camera: request.camera,
       reason,
+      requestId: request.requestId,
       chatId: request.chatId,
       messageId: request.messageId,
     })

@@ -11,7 +11,7 @@ export const cameraStagedAction = async (
   payload: CameraStaged,
   context: CoreContext,
 ): Promise<CameraProcessed | undefined> => {
-  const { camera, rawFrameKey, chatId, messageId } = payload
+  const { camera, rawFrameKey, chatId, messageId, requestId } = payload
 
   context.logger.info('Starting to perform staged camera frame conversion')
 
@@ -40,5 +40,5 @@ export const cameraStagedAction = async (
 
   context.logger.info('Media successfully converted: frame')
 
-  return { camera, frameKey, chatId, messageId }
+  return { camera, frameKey, chatId, messageId, requestId }
 }

@@ -39,6 +39,7 @@ export const createTimelapseController = <TConfig extends SinkConfig>(
         source: sourceId,
         camera: request.camera,
         reason: 'empty',
+        requestId: request.requestId,
         chatId: request.chatId,
         messageId: request.messageId,
       })

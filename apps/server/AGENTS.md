@@ -77,9 +77,9 @@ spotter.event.media_processed ──▶ eventMediaController
 [commands/handlers.ts](src/commands/handlers.ts) и отвечает в `spotter.command.reply`
 (корреляция по `requestId`; неизвестный `kind` и исключения → `ok:false`).
 
-Хендлеры: `login.redeem`, `user.setRole`, `user.revoke`, `user.sign`, `event.info`,
-`event.clear`, `event.clip`. Мутации ролей/доступа дополнительно публикуют
-`spotter.delivery.recipient`, чтобы telegram синхронизировал свой кэш биндингов.
+Хендлеры: `login.redeem`, `appercot.redeem`, `device.redeem`, `user.list`, `user.setRole`,
+`user.revoke`, `user.sign`, `event.info`, `event.clear`, `event.clip`. Мутации ролей/доступа
+публикуют `spotter.delivery.recipient`, чтобы фронтенды синхронизировали локальные роли.
 
 `event.clip` (`{eventId}`) — on-demand клип по кнопке «Видео»: резолвит источник
 сохранённого события и публикует `spotter.media.request.<source>` с `want:[clip]`.
@@ -89,9 +89,10 @@ spotter.event.media_processed ──▶ eventMediaController
 
 Доменная половина бывшей БД бота — **никакого Telegram-специфичного стейта**:
 
-- `recipients (uuid PK, role, tg_user_id?, username?)` — логические получатели; `tg_user_id`
-  и `username` nullable (заполняются при первом логине через telegram).
-- `access_tokens (id PK, role, username?)` — одноразовые коды (consume = delete).
+- `recipients (uuid PK, role, tg_user_id?, appercot_user_id?, device_id?, username?)` —
+  логические получатели; platform-specific identity заполняется при первом входе.
+- `access_tokens (id PK, role, username?, platform?)` — одноразовые коды (consume = delete);
+  именной код Telegram и Appercot привязан к своей платформе.
 - `events` — снапшот событий NVR (без message-id; трекинг сообщений живёт в telegram).
 
 После правок `schema.ts` — `bunx drizzle-kit generate` (миграции в `apps/server/drizzle/`,

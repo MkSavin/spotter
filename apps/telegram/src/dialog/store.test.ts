@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  mock,
+  test,
+} from 'bun:test'
 import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -12,15 +20,29 @@ import type { DialogComplete, DialogDefinition, DialogState } from './types'
 
 let directory: string
 let db: TelegramDatabase
+const directories: string[] = []
 
 beforeEach(() => {
   directory = path.join(tmpdir(), `spotter-dialog-${crypto.randomUUID()}`)
+  directories.push(directory)
   db = createDatabase(path.join(directory, 'telegram.sqlite'))
 })
 
 afterEach(() => {
   db.$client.close()
-  rmSync(directory, { recursive: true, force: true })
+})
+
+afterAll(() => {
+  // The migrator's final statement is released by GC before Windows unlocks it.
+  Bun.gc(true)
+  for (const directory of directories) {
+    rmSync(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 20,
+    })
+  }
 })
 
 /** A context backed by real SQLite, with a fresh in-memory session each time. */

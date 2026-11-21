@@ -13,8 +13,8 @@ export type TimelapseSpeed = z.infer<typeof timelapseSpeedSchema>
 
 /**
  * Asks the `<source>` adapter to export a span of recordings. Routed to
- * `spotter.timelapse.request.<source>`; `chatId`/`messageId` correlate the
- * result back to the interaction that asked for it.
+ * `spotter.timelapse.request.<source>`; `requestId` correlates the outcome with
+ * the requesting frontend. Telegram also supports its numeric chat/message pair.
  */
 export const timelapseRequestSchema = z.object({
   source: z.string().min(1),
@@ -24,6 +24,7 @@ export const timelapseRequestSchema = z.object({
   /** Unix seconds, exclusive. Always greater than `start`. */
   end: z.number().int().positive(),
   speed: timelapseSpeedSchema,
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })
@@ -44,6 +45,7 @@ export const timelapseProgressSchema = z.object({
   end: z.number().int().positive(),
   /** Unix ms when the NVR accepted the export. */
   startedAt: z.number().int().positive(),
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })
@@ -60,6 +62,7 @@ export const timelapseReadySchema = z.object({
   end: z.number().int().positive(),
   speed: timelapseSpeedSchema,
   videoKey: z.string().min(1),
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })
@@ -81,6 +84,7 @@ export const timelapseFailedSchema = z.object({
   source: z.string().min(1),
   camera: z.string().min(1),
   reason: timelapseFailureSchema,
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
   messageId: z.number().optional(),
 })

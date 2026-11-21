@@ -11,7 +11,12 @@ import {
   resolveSource,
 } from '@spotter/transport'
 import type { ServerContext } from '../context'
-import { eventsRepo, recipientsRepo, tokensRepo } from '../db/repository'
+import {
+  eventsRepo,
+  inTransaction,
+  recipientsRepo,
+  tokensRepo,
+} from '../db/repository'
 import { type Role, Role as RoleEnum } from '../db/schema'
 
 export type CommandHandler = (
@@ -65,8 +70,7 @@ export const deviceRedeemHandler: CommandHandler = async (args, context) => {
     return fail('expired')
   }
 
-  // A code minted for a named Telegram user is not for a device: there is no
-  // username here to match it against.
+  // A device has no username to match a named code against.
   if (token.username) return fail('username-mismatch')
 
   const uuid = randomBytes(16).toString('hex')
@@ -108,7 +112,10 @@ export const loginRedeemHandler: CommandHandler = async (args, context) => {
     return fail('expired')
   }
 
-  if (token.username && token.username !== username) {
+  if (
+    token.username &&
+    (token.username !== username || token.platform === 'appercot')
+  ) {
     return fail('username-mismatch')
   }
 
@@ -133,6 +140,39 @@ export const loginRedeemHandler: CommandHandler = async (args, context) => {
   })
 }
 
+export const appercotRedeemHandler: CommandHandler = async (args, context) => {
+  const { db } = context
+  const code = String(args.code ?? '').trim()
+  const userId = String(args.userId ?? '').trim()
+  const username = args.username
+    ? normalizeUsername(String(args.username))
+    : null
+  if (!code || !userId) return fail('Missing required args: code, userId')
+
+  return inTransaction(db, () => {
+    const token = tokensRepo.find(db, code)
+    if (!token) return fail('not-found')
+    if (isExpired(token, context)) {
+      tokensRepo.consume(db, code)
+      return fail('expired')
+    }
+    if (
+      token.username &&
+      (token.username !== username || token.platform !== 'appercot')
+    )
+      return fail('username-mismatch')
+
+    const recipient = recipientsRepo.upsertByAppercotUserId(db, {
+      uuid: randomBytes(16).toString('hex'),
+      appercotUserId: userId,
+      username,
+      role: token.role,
+    })
+    tokensRepo.consume(db, code)
+    return ok({ recipientUuid: recipient.uuid, role: recipient.role })
+  })
+}
+
 /**
  * Everyone who has access. Read-only, so any admin frontend can render the
  * same list the bot would print.
@@ -146,6 +186,7 @@ export const userListHandler: CommandHandler = async (_args, context) => {
       role: recipient.role,
       username: recipient.username,
       tgUserId: recipient.tgUserId,
+      appercotUserId: recipient.appercotUserId,
       deviceId: recipient.deviceId,
       authorizedAt: recipient.authorizedAt?.getTime?.() ?? null,
     })),
@@ -239,7 +280,9 @@ export const userSignHandler: CommandHandler = async (args, context) => {
 
   const code = randomBytes(9).toString('base64url')
 
-  tokensRepo.create(db, { id: code, role, username: usernameArg })
+  const platform =
+    usernameArg && args.platform === 'appercot' ? 'appercot' : null
+  tokensRepo.create(db, { id: code, role, username: usernameArg, platform })
 
   context.logger
     .sub('auth')
@@ -310,6 +353,7 @@ export const eventClipHandler: CommandHandler = async (args, context) => {
 /** Registry mapping command kind → handler. */
 export const commandHandlers: Record<string, CommandHandler> = {
   'login.redeem': loginRedeemHandler,
+  'appercot.redeem': appercotRedeemHandler,
   'device.redeem': deviceRedeemHandler,
   'user.list': userListHandler,
   'user.setRole': userSetRoleHandler,
@@ -327,6 +371,7 @@ export const commandHandlers: Record<string, CommandHandler> = {
  */
 export const commandAccess: Record<string, CommandAccess> = {
   'login.redeem': 'anonymous',
+  'appercot.redeem': 'anonymous',
   'device.redeem': 'anonymous',
   'user.list': RoleEnum.ADMIN,
   'user.setRole': RoleEnum.ADMIN,

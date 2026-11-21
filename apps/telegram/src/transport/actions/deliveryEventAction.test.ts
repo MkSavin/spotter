@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -15,6 +15,7 @@ import { deliveryEventAction } from './deliveryEventAction'
 
 let db: TelegramDatabase
 let directory: string
+const directories: string[] = []
 
 const event = (type: 'start' | 'end', hasClip = false): SpotterEvent => ({
   id: 'cam-htriyg-1',
@@ -98,6 +99,7 @@ const makeContext = () => {
 beforeEach(() => {
   pwaServices = []
   directory = path.join(tmpdir(), `spotter-delivery-${crypto.randomUUID()}`)
+  directories.push(directory)
   db = createDatabase(path.join(directory, 'telegram.sqlite'))
   tgChatsRepo.upsert(db, '100')
   eventMessagesRepo.record(db, 'cam-htriyg-1', [{ id: 5, chatId: '100' }])
@@ -105,8 +107,20 @@ beforeEach(() => {
 
 const cleanup = () => {
   db.$client.close()
-  rmSync(directory, { recursive: true, force: true })
 }
+
+afterAll(() => {
+  // The migrator's final statement is released by GC before Windows unlocks it.
+  Bun.gc(true)
+  for (const directory of directories) {
+    rmSync(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 20,
+    })
+  }
+})
 
 describe('deliveryEventAction media with nothing attached', () => {
   test('marks the event as having no snapshot', async () => {

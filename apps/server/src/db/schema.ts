@@ -16,20 +16,13 @@ const authorizedAt = integer('authorized_at', { mode: 'timestamp_ms' })
   .notNull()
   .default(sql`(unixepoch() * 1000)`)
 
-/**
- * Logical recipients — one row per person, identified by UUID.
- * `tg_user_id` and `username` are nullable because non-TG frontends may
- * not have them; they're populated on first login via the telegram app.
- */
+/** Recipients are keyed by UUID and bound to a frontend account on first login. */
 export const recipients = sqliteTable('recipients', {
   uuid: text('uuid').primaryKey(),
   role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
   tgUserId: text('tg_user_id').unique(),
-  /**
-   * A PWA install that redeemed a code. Mutually exclusive with `tgUserId` in
-   * practice: one identifies a Telegram account, the other a browser install,
-   * and a recipient is created by whichever redeemed the code.
-   */
+  appercotUserId: text('appercot_user_id').unique(),
+  /** A PWA install that redeemed a code. */
   deviceId: text('device_id').unique(),
   username: text('username'),
   authorizedAt,
@@ -43,6 +36,7 @@ export const accessTokens = sqliteTable('access_tokens', {
   id: text('id').primaryKey(),
   role: text('role', { enum: ROLES }).notNull().default('VIEWER'),
   username: text('username'),
+  platform: text('platform', { enum: ['telegram', 'appercot'] }),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

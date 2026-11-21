@@ -23,7 +23,7 @@ export const timelapseReadyController: StreamMessageController<
   if (!value) return
 
   const ready = safeParseTimelapseReady(value)
-  if (!ready) return
+  if (!ready || ready.requestId) return
 
   timelapsesRepo.settle(context.db, {
     camera: ready.camera,
@@ -57,7 +57,7 @@ export const timelapseFailedController: StreamMessageController<
   if (!value) return
 
   const failed = safeParseTimelapseFailed(value)
-  if (!failed) return
+  if (!failed || failed.requestId) return
 
   // `failed` carries no span: the adapter reports the camera and why. Settle
   // every run of that camera still waiting, since one of them is this.

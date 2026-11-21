@@ -63,6 +63,7 @@ const OWN_FLAGS = [
   '--external-mqtt',
   '--pwa',
   '--email',
+  '--appercot',
   '--botapi',
   '--probe',
 ]
@@ -85,7 +86,7 @@ const ownsBroker = (): boolean => {
   return !broker || /^mqtts?:\/\/mosquitto[:/]?/.test(broker)
 }
 
-const FRONTENDS = ['pwa', 'email'] as const
+const FRONTENDS = ['pwa', 'email', 'appercot'] as const
 /** Optional pieces beside the frontends; each one rides SPOTTER_PROFILES too. */
 const ADDONS = [...FRONTENDS, 'botapi'] as const
 
@@ -246,7 +247,7 @@ const compose = async (args: string[]): Promise<never> => {
 }
 
 // Docker creates these as root, but the apps write SQLite as uid 1000.
-const DATA_DIRS = ['server', 'telegram', 'pwa', 'email']
+const DATA_DIRS = ['server', 'telegram', 'pwa', 'email', 'appercot']
 
 const prepareData = async (): Promise<void> => {
   for (const dir of DATA_DIRS) {
@@ -523,6 +524,7 @@ ${NAMES.map((name) => `  ${left(name).padEnd(width)}  ${COMMANDS[name]?.about}`)
   Флаги:
     --pwa                    Поднять PWA-фронтенд (нужны VAPID_* в .env)
     --email                  Поднять email-фронтенд (нужны SMTP_* в .env)
+    --appercot               Поднять Appercot-фронтенд (нужны APPERCOT_TOKEN и APPERCOT_WS_URL)
     --probe                  ⚠️  Поднять фиктивный детектор: РЕАЛЬНАЯ ДЕТЕКЦИЯ
                              ВЫКЛЮЧАЕТСЯ, за участком никто не следит. Только
                              на время проверки; не запоминается между запусками

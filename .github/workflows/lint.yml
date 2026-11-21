@@ -56,3 +56,6 @@ jobs:
 
     - name: 'Run tests'
       run: bun run test
+
+    - name: 'Build Appercot image'
+      run: docker build -f apps/appercot/Dockerfile .

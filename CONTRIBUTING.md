@@ -64,7 +64,7 @@ if (seen.has(event.id)) return
   всему репо).
 
 Подробнее об архитектурных конвенциях (Regulator, Controller → Action,
-логирование, единый `.env`) — в [AGENTS.md](AGENTS.md).
+логирование, единый `.env`) — в [.agents/conventions.md](.agents/conventions.md).
 
 ## Коммиты и релизы
 

@@ -30,6 +30,7 @@ export const probeController: StreamMessageController<CoreContext> = async (
   // event that is never coming.
   await context.producer.publish(probeStreams.result, {
     source: request.source,
+    requestId: request.requestId,
     ...(request.chatId !== undefined ? { chatId: request.chatId } : {}),
     ...(outcome.staged
       ? { staged: true, camera: outcome.camera, frames: outcome.frames }

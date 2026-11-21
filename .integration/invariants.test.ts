@@ -60,7 +60,11 @@ describe('invariants', () => {
   test('only the NVR adapter reads NVR credentials', async () => {
     const offenders: string[] = []
     for (const file of await scan('{apps,packages}/*/src/**/*.ts')) {
-      if (file.startsWith('apps/frigate/') || file.endsWith('.test.ts')) {
+      const normalized = file.replaceAll('\\', '/')
+      if (
+        normalized.startsWith('apps/frigate/') ||
+        normalized.endsWith('.test.ts')
+      ) {
         continue
       }
       if (

@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  mock,
+  test,
+} from 'bun:test'
 import { rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -16,6 +24,7 @@ const EVENT = '1790763801.518861-t660qg'
 let db: TelegramDatabase
 let directory: string
 let clips: ClipTracker
+const directories: string[] = []
 
 type Handler = (context: BotContext) => Promise<void>
 
@@ -53,6 +62,7 @@ const tap = async (data: string, messageId = 5) => {
 
 beforeEach(() => {
   directory = path.join(tmpdir(), `spotter-clip-${crypto.randomUUID()}`)
+  directories.push(directory)
   db = createDatabase(path.join(directory, 'telegram.sqlite'))
   eventMessagesRepo.record(db, EVENT, [{ id: 5, chatId: '100' }])
   clips = new ClipTracker(defaultLogger, { render: () => undefined })
@@ -61,7 +71,19 @@ beforeEach(() => {
 afterEach(() => {
   clips.stop()
   db.$client.close()
-  rmSync(directory, { recursive: true, force: true })
+})
+
+afterAll(() => {
+  // The migrator's final statement is released by GC before Windows unlocks it.
+  Bun.gc(true)
+  for (const directory of directories) {
+    rmSync(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 20,
+    })
+  }
 })
 
 describe('clip processing button', () => {

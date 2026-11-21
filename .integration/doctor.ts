@@ -556,7 +556,9 @@ export const diagnose = async (
   const profiles = (env.SPOTTER_PROFILES ?? '')
     .split(',')
     .map((entry) => entry.trim())
-  const frontends = ['pwa', 'email'].filter((name) => profiles.includes(name))
+  const frontends = ['pwa', 'email', 'appercot'].filter((name) =>
+    profiles.includes(name),
+  )
   const botApi = profiles.includes('botapi') ? ['telegram-bot-api'] : []
 
   const expected =

@@ -21,6 +21,7 @@ export const probeRequestSchema = z.object({
   /** Detection confidence to report, 0..1. */
   score: z.number().min(0).max(1).default(0.9),
   /** Who asked, so the adapter can report back. */
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
 })
 
@@ -44,6 +45,7 @@ export const probeResultSchema = z.object({
   /** Why it was refused, in a form worth showing a person. */
   reason: z.string().min(1).optional(),
   /** Echoed back so the bot can answer in the chat that asked. */
+  requestId: z.string().min(1).optional(),
   chatId: z.number().optional(),
 })
 
