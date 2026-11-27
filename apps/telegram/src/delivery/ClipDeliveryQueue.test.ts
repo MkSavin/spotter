@@ -49,7 +49,7 @@ const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
 describe('ClipDeliveryQueue', () => {
   test('accept returns before the delivery runs, and the record outlives it', async () => {
     const store = memoryStore()
-    let release = () => undefined as void
+    let release: () => void = () => undefined
     const run = mock(
       () =>
         new Promise<void>((resolve) => {
@@ -70,7 +70,7 @@ describe('ClipDeliveryQueue', () => {
   })
 
   test('a redelivery of the same event while it runs is ignored', async () => {
-    let release = () => undefined as void
+    let release: () => void = () => undefined
     const run = mock(
       () =>
         new Promise<void>((resolve) => {
