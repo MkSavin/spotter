@@ -1,169 +1,166 @@
-<div align="center">
+![Spotter alert with a driveway snapshot and a button to request video](assets/readme/banner.svg)
 
 # Spotter
 
-**Alert delivery hub for your NVR.**
+**Self-hosted notification hub for Frigate.** Get a camera alert on your phone, see the snapshot and request the event clip when you need it. Spotter delivers to Telegram, Web Push, Appercot and email. It runs on your hardware and uses your S3 bucket for notification media.
 
-A reliable, all-in-one way to get event alerts into your pocket. Runs on your own hardware. Completely free.
-Works with [Frigate](https://frigate.video/); delivers over Telegram, email and web push.
+[![Bun 1.4](https://img.shields.io/badge/Bun-1.4-1c1c1c?logo=bun&logoColor=d1cfc0)](https://bun.sh/)
+[![TypeScript 7](https://img.shields.io/badge/TypeScript-7-1c1c1c?logo=typescript&logoColor=d1cfc0)](https://www.typescriptlang.org/)
+[![Frigate 0.17](https://img.shields.io/badge/Frigate-0.17-1c1c1c)](https://frigate.video/)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-1c1c1c?logo=docker&logoColor=d1cfc0)](https://docs.docker.com/compose/)
+[![Tests](https://img.shields.io/badge/tests-unit%20%C2%B7%20e2e%20%C2%B7%20smoke-f26a4b)](#tests)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-your%20server-1c1c1c)](docs/deployment.md)
 
-[![Bun](https://img.shields.io/badge/Bun-1.3-000000?logo=bun&logoColor=white)](https://bun.sh)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Frigate](https://img.shields.io/badge/Frigate-0.17-00A8E1?logo=homeassistant&logoColor=white)](https://frigate.video/)
-[![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
-[![Tests](https://img.shields.io/badge/tests-unit%20·%20e2e%20·%20smoke-success)](#tests)
-[![Self-hosted](https://img.shields.io/badge/self--hosted-fully-brightgreen)](docs/deployment.md)
-
-[Install](#install-in-five-minutes) · [What it looks like](#what-it-looks-like) · [Docs](docs/deployment.md) · [Architecture](#how-it-works)
+[Why Spotter](#why-spotter) · [Notifications](#notifications) · [Quick start](#quick-start) · [Architecture](#architecture) · [Operations](#operations) · [Docs](docs/deployment.md)
 
 **English** · [Русский](README.ru.md)
 
-</div>
-
----
-
 ## Why Spotter
 
-Frigate has a web interface, and a good one. But you have to **open it**. Spotter solves a different problem: getting an event to a person who isn't looking at a screen right now, and doing it reliably.
+Frigate detects events and records footage. Spotter gets the event to people who need to act on it. They can check the snapshot in a familiar app, request the clip and access cameras according to the role you give them. You can enable several channels at once, so a browser push or an email can still reach you when Telegram is unavailable.
 
-| | Built-in NVR alerts | Camera cloud services | **Spotter** |
-|---|:---:|:---:|:---:|
-| Footage and snapshots stay yours | ✅ | ❌ | ✅ |
-| Reaches your phone when you're away | ⚠️ | ✅ | ✅ |
-| Several recipients with different rights | ❌ | ⚠️ | ✅ |
-| Survives a connection drop without losing events | ❌ | ⚠️ | ✅ |
-| Fallback channel when the main one is down | ❌ | ❌ | ✅ |
-| Subscription fee | none | yes | none |
+| | Built-in Frigate notifications | Cloud camera service | **Spotter** |
+| --- | :---: | :---: | :---: |
+| Recordings and snapshots in your own storage | ✅ | ❌ | ✅ |
+| Phone alerts when you're away | ⚠️ | ✅ | ✅ |
+| Multiple recipients with roles | ✅ | ⚠️ | ✅ |
+| Delivery recovery after an outage | ⚠️ | ⚠️ | ✅ |
+| Several alert channels in parallel | ❌ | ⚠️ | ✅ |
+| Works without a subscription | ✅ | ⚠️ | ✅ |
 
-Delivery outward does need the internet, of course — but your media stays put, and only what you send yourself ever leaves.
+⚠️ Depends on setup or provider.
 
-## What it looks like
+Sending to an external channel requires an internet connection. Frigate can stay on the local network, and enabled channels receive the media or signed links needed for their alerts.
 
-**In Telegram.** An event arrives as a single message that fills itself in as media becomes ready: text first, then the frame, and behind a "Video" button — the clip in place of the photo. One message, not three.
+[Frigate notifications](https://docs.frigate.video/configuration/notifications/) · [Frigate roles](https://docs.frigate.video/configuration/authentication/#user-roles) · [Ring recording plans](https://ring.com/support/articles/lw54x/Understanding-Ring-Protect-subscriptions)
 
-**Bot commands:**
+## Notifications
 
-| Command | What it does |
-|---|---|
-| `/camera_snapshot` | a frame from a camera, right now |
-| `/camera_list` | which cameras the NVR sees |
-| `/timelapse` | a timelapse over a period — pick camera, dates and speed |
-| `/event_info` | details for an event code |
-| `/status` | what's alive, which versions, uptime |
-| `/user_sign` | grant access: a code and a QR |
+**Telegram.** An event starts as a text alert. The bot updates the same message with a snapshot when it is ready. Tap **Video** to request the clip and play it in place of the snapshot.
 
-No need to memorise arguments: a command without them asks step by step, offering cameras and periods as buttons.
+| I want to… | Telegram command |
+| --- | --- |
+| See the available cameras | `/camera_list` |
+| Get a fresh frame | `/camera_snapshot` |
+| Build a timelapse with your choice of camera, dates and speed | `/timelapse` |
+| Look up an event by code | `/event_info` |
+| Mute this chat for two hours or turn alerts back on | `/mute 2h`, `/unmute` |
+| Check service status, versions and uptime | `/status` |
+| Invite a user with an access code and QR code | `/user_sign` |
 
-**In a browser.** An optional web app (PWA) installs to the home screen on iPhone or Android and delivers push without an App Store. Event feed, cameras, timelapses, user management. Handy as a fallback channel when Telegram is unreachable.
+Start with `/camera_list` to find a camera code. For example, `/camera_snapshot driveway` returns a fresh frame from `driveway`. Send commands without arguments to pick values with buttons.
 
-**By email.** One more optional channel — a message per event, over any SMTP.
+- **Web app (PWA)** brings the event feed, cameras, timelapses and user management to the browser. Add it to the home screen on iPhone or Android directly from your browser to receive Web Push.
+- **Email** sends one message per event over SMTP.
+- **Appercot** delivers alerts to a bot chat and provides links to clips and timelapses. [Appercot setup](docs/appercot.md)
 
-## Install in five minutes
+**Getting too many alerts?** Set `DELIVERY_POLICY=alerts` in `.env` and run `./spotter recreate`. Frigate events marked `detection` stay in the history without sending an alert. Events marked `alert` or without a Frigate verdict still reach your channels. [Delivery settings](.env.example)
 
-You need Docker and a working Frigate. Then one wizard, which asks about S3, your bot token and cameras, brings everything up and prints an access code:
+## Quick start
 
-```bash
-git clone https://github.com/MkSavin/elercam.git && cd elercam
-./spotter install single
-```
+1. Install Docker with Compose and Bun on the Spotter host. Have a running Frigate instance, an S3-compatible bucket and a Telegram bot token from [@BotFather](https://t.me/BotFather).
+2. Clone the project and run the installer. Enter the Frigate connection details, S3 credentials and bot token when prompted.
 
-Send the printed code to your bot with `/login <code>` — that's it, events start flowing.
+   ```bash
+   git clone https://github.com/MkSavin/spotter.git
+   cd spotter
+   ./spotter install single
+   ```
 
-```bash
-./spotter logs server     # what's going on
-./spotter update          # pull fresh images
-./spotter token           # issue another access code
-```
+3. Point Frigate at the MQTT broker selected in the wizard. You can use an existing broker or let Spotter start one. [MQTT setup](docs/deployment.md#про-mqtt--это-важно)
+4. Send `/login <code>` to the bot using the code printed by the installer. Run `/camera_list` to confirm Spotter can see your cameras.
+5. Trigger a real event in a zone where Frigate is configured to alert. Check that Telegram shows the event from that camera and adds the snapshot after the event ends, if Frigate provides one. If the alert is missing, run `./spotter doctor` and check **«События от Frigate»** (Frigate events). [Troubleshooting](#operations)
 
-Details, flags and the two-machine setup are in the [deployment guide](docs/deployment.md).
+[Deployment guide, including MQTT setup and Frigate authentication](docs/deployment.md)
 
-## Two topologies
+### Enable more channels
 
-**Single machine** — everything side by side, the simplest option. Right when the server lives at home.
+- **Web Push.** Set the HTTPS address in `PUBLIC_URL` and the VAPID keys in `.env`, then run `./spotter up --pwa`. Serve the web app over HTTPS. Open it, sign in with a fresh code issued by `/user_sign` without a username, and allow notifications. The installer can generate the keys. [VAPID setup](docs/operations.md#сгенерировать-vapid-пару-для-pwa)
+- **Email.** Set `SMTP_*` and `EMAIL_RECIPIENTS` in `.env`, then run `./spotter up --email`. [Configuration example](.env.example)
+- **Appercot.** Set `APPERCOT_TOKEN` and `APPERCOT_WS_URL` in `.env`, then run `./spotter up --appercot`. Issue a new code with `./spotter token admin` and send `/start <code>` in the Appercot bot chat. [Appercot setup](docs/appercot.md)
 
-**Ingest + cloud** — cameras and transcoding stay home, the bot and domain move to a VPS. An SSH tunnel connects the nodes, and `forwarder` mirrors the bus and **buffers events while the link is down**: if the connection drops, messages pile up at home and arrive once it's back. Nothing is lost.
+## Deployment options
 
-```bash
-./spotter install cloud     # on the VPS
-sudo ./spotter install ingest   # at home, the wizard sets the tunnel up itself
-```
-
-Transcoding is the demanding part, and `depot` is built to be multiplied: it holds no state, so several already share the work through one Redis consumer group. Spreading them across machines — and adding capacity on demand — is planned in the [depot scaling spec](docs/depot-scaling.md).
-
-Switching the NVR between named modes — night, away, guests — over the bus is sketched in the [Frigate profiles spec](docs/frigate-profiles.md); it needs Frigate 0.18, which is still a release candidate.
-
-The test rig fakes the NVR, so the MQTT hop it depends on is never exercised. Driving a real Frigate through a stub detector instead — and what that would take for a genuine end-to-end, Telegram included — is in the [real-NVR testing spec](docs/real-nvr-testing.md).
-
-## How it works
-
-Services know nothing about each other and talk only over Redis Streams. What travels between them is **S3 keys, not bytes and not tokens** — exactly one adapter holds camera access.
-
-```mermaid
-flowchart LR
-    NVR["Frigate NVR"] -- MQTT --> frigate
-    subgraph app[" "]
-        frigate["frigate<br/>NVR adapter"]
-        server["server<br/>domain and roles"]
-        depot["depot ×N<br/>transcoding"]
-        bus[("Redis Streams")]
-        frigate <--> bus
-        server <--> bus
-        depot <--> bus
-    end
-    bus <--> tg["telegram"]
-    bus <--> pwa["pwa"]
-    bus <--> mail["email"]
-    tg --> TG(["Telegram"])
-    pwa --> Push(["Web Push"])
-    depot <--> S3[("S3")]
-```
-
-What that buys you in practice:
-
-- **Delivery doesn't get dropped.** Acknowledgement happens only after successful processing: a message that fails stays in the queue and is retried, while a hopeless one moves to a separate stream for inspection.
-- **Any service can be restarted.** Each one survives the others disappearing — including a total loss of Redis, which automatic image updates arrange on a regular basis.
-- **Heavy work doesn't block urgent work.** Snapshots and video travel in separate queues, so a backlog of clips never delays the frame the notification exists for.
-- **The NVR is replaceable.** Frigate sits behind an adapter port; supporting another one means a new `apps/*`, not edits across every service.
-
-A service-by-service breakdown lives in [AGENTS.md](AGENTS.md) and in the `AGENTS.md` inside each package.
-
-## Tests
+- **One host (`single`).** A single machine runs the Spotter services. Frigate can run on that host or on another machine on your network.
+- **Two hosts (`cloud` + `ingest`).** Cameras and transcoding stay on the local network. The server, bot and web app run on a VPS. An SSH tunnel connects the hosts. The `forwarder` buffers events locally while the link is down and forwards them when it returns.
 
 ```bash
-bun test              # unit tests, a few seconds
-bun run test:e2e      # end-to-end on real Redis, both topologies
-bun run smoke:build && bun run test:smoke   # the real images under compose
+# On the VPS
+./spotter install cloud
+./spotter token
+
+# On the host near the cameras
+sudo ./spotter install ingest
 ```
 
-Three levels, because things break at different ones. Unit tests hold the logic; end-to-end covers the bus and recovery after restarts; smoke brings up **the same images that ship to production** and catches what's only visible once deployed: a broken Dockerfile, a forgotten variable, a healthcheck that never goes green. Details in [.e2e/README.md](.e2e/README.md).
+The ingest wizard sets up the SSH tunnel. On `ingest`, two `depot` workers share the clip queue and a separate worker handles snapshots.
+
+[Two-host setup](docs/deployment.md#вариант-2-две-машины-cloud--ingest) · [SSH tunnel](docs/tunnel.md) · [Depot scaling design](docs/depot-scaling.md)
+
+## Architecture
+
+![On a single host, the frigate adapter, server, depot and four delivery services share one Redis Streams bus. Media is stored in S3.](assets/readme/flow.svg)
+
+1. **Event.** The `frigate` adapter receives the NVR's MQTT event and publishes it to Redis Streams. `server` saves it in SQLite and publishes the initial delivery for Telegram, PWA, Appercot and email.
+2. **Snapshot.** When the event ends, `server` requests a snapshot through Redis. The adapter stages it in S3, `depot` processes it, and `server` publishes the finished media key. Telegram and Appercot update the alert, and PWA refreshes its feed. Email sends once on initial delivery.
+
+All Spotter services in `single` share one Redis instance. Dashed lines show access to the S3 bucket, while Redis carries event data and media keys. Frigate credentials stay inside the adapter.
+
+- **Retries and recovery.** Services acknowledge Redis entries after successful processing. Failed entries are retried or moved to a dead-letter stream for inspection. Services reconnect after a Redis restart and resume work from the stream.
+- **Snapshots stay responsive.** Snapshots and clips use separate queues so a video backlog can be processed independently.
+- **Frigate is behind an adapter.** Supporting another NVR takes a new adapter. The delivery services use the same stream contracts.
+
+[Architecture](.agents/architecture.md) · [Redis Streams and retries](.agents/transport.md) · [Service reference](AGENTS.md)
+
+## Operations
+
+| Task | Command |
+| --- | --- |
+| Start or stop Spotter | `./spotter up`, `./spotter down` |
+| See service status | `./spotter ps` |
+| Diagnose Frigate, MQTT and other connections | `./spotter doctor` |
+| Read server logs | `./spotter logs server` |
+| Issue another access code | `./spotter token` |
+| Restart a service | `./spotter restart frigate` |
+| Apply changes to container configuration | `./spotter recreate` |
+| Pull and apply new images | `./spotter update` |
+
+If the bot responds but alerts are missing, check **Frigate events** in `./spotter doctor` and make sure Frigate publishes to the broker selected during installation. If clips exceed Telegram's upload limit, see the guide to running a local Bot API.
+
+[Operations guide](docs/operations.md) · [Remote access](docs/remote-access.md) · [Self-hosted Telegram Bot API](docs/telegram-bot-api.md)
 
 ## Development
 
 ```bash
 bun install
-bun run docker:dev    # redis + mosquitto + minio
+bun run docker:dev    # Redis, Mosquitto and MinIO
 bun start:watch
-bun run green         # types, tests and lint in one go
+bun run green         # Types, tests, documentation checks and Biome
 ```
 
-Stack: Bun, TypeScript, Redis Streams, SQLite (Drizzle), S3, grammY, React 19. Conventions and process are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Bun, TypeScript, Redis Streams, SQLite (Drizzle), S3, grammY and React 19. [Contributing](CONTRIBUTING.md) · [CI checks](https://github.com/MkSavin/spotter/actions/workflows/lint.yml)
+
+## Tests
+
+```bash
+bun test
+bun run test:e2e
+bun run smoke:build && bun run test:smoke
+```
+
+Unit tests cover service logic. E2E tests exercise delivery and recovery in both topologies with real Redis. Smoke tests run production images under Compose to catch packaging, configuration and startup failures. The dedicated Frigate rig also checks MQTT with a real NVR.
+
+[E2E and smoke tests](.e2e/README.md) · [Frigate test rig](docs/testing.md) · [Rig design](docs/real-nvr-testing.md)
 
 ## Roadmap
 
-- [x] Telegram notifications with a snapshot and a clip on demand
-- [x] Distributed deployment with buffering across outages
-- [x] PWA with Web Push — a fallback channel without app stores
-- [x] Email as an additional channel
-- [x] Timelapses over an arbitrary period
-- [x] Step-by-step argument prompts for commands
-- [ ] SMS as a channel of last resort ([plan](.agents/plans/sms-emergency-channel.md))
-- [ ] Support for other NVRs through the same adapter port
+- [x] Telegram alerts with snapshots and clips on demand
+- [x] Two-node deployment with buffering during link outages
+- [x] PWA with Web Push, email and Appercot
+- [x] Timelapses for a chosen period and guided prompts for bot commands
+- [ ] SMS as a fallback channel
+- [ ] Adapters for other NVRs
 
----
+[Depot scaling design](docs/depot-scaling.md) · [Frigate 0.18 profiles research](docs/frigate-profiles.md)
 
-<div align="center">
-
-Spotter is self-hosted and built on the assumption that you'll run it yourself.
-Questions and ideas — in [issues](https://github.com/MkSavin/elercam/issues).
-
-</div>
+[Questions and feature requests](https://github.com/MkSavin/spotter/issues)

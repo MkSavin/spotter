@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 440" role="img" aria-labelledby="title desc">
+  <title id="title">Spotter</title>
+  <desc id="desc">Reliable notification delivery from Frigate to Telegram, Web Push, Appercot and email. The sample alert shows a vehicle and a button to request video.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#141414"/>
+      <stop offset="1" stop-color="#1c1c1c"/>
+    </linearGradient>
+    <radialGradient id="coral-glow">
+      <stop stop-color="#f26a4b" stop-opacity=".42"/>
+      <stop offset=".42" stop-color="#f26a4b" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#f26a4b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ivory-glow">
+      <stop stop-color="#d1cfc0" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#d1cfc0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#222222"/>
+      <stop offset="1" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+    <clipPath id="clip"><rect width="1280" height="440" rx="8"/></clipPath>
+    <clipPath id="snapshot-clip"><rect x="850" y="170" width="300" height="133" rx="5"/></clipPath>
+    <linearGradient id="asphalt" x2="1" y2="1">
+      <stop stop-color="#45423e"/>
+      <stop offset="1" stop-color="#262524"/>
+    </linearGradient>
+    <linearGradient id="car-body" x2="0" y2="1">
+      <stop stop-color="#d1cfc0"/>
+      <stop offset=".49" stop-color="#a6a298"/>
+      <stop offset="1" stop-color="#6f6c65"/>
+    </linearGradient>
+    <pattern id="pavers" width="24" height="14" patternUnits="userSpaceOnUse">
+      <path d="M0 .5h24m0 7H0M.5 0v7.5m12 0v6.5" fill="none" stroke="#d1cfc0" stroke-opacity=".15"/>
+    </pattern>
+  </defs>
+  <style>
+    .sans { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif }
+    .serif { font-family: "Playfair Display", Georgia, "Times New Roman", serif }
+    .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace }
+    .ambient { animation: breathe 9s ease-in-out infinite; transform-origin: center }
+    .ambient.late { animation-delay: -4.5s }
+    .ember { animation: drift 8s ease-in-out infinite }
+    @keyframes breathe { 50% { opacity: .58; transform: scale(1.08) } }
+    @keyframes drift { 50% { transform: translate(18px, -12px); opacity: .65 } }
+    @media (prefers-reduced-motion: reduce) { .ambient, .ember { animation: none } }
+  </style>
+  <g clip-path="url(#clip)">
+    <rect width="1280" height="440" fill="url(#background)"/>
+    <circle class="ambient" cx="1120" cy="40" r="330" fill="url(#coral-glow)"/>
+    <circle class="ambient late" cx="70" cy="440" r="270" fill="url(#ivory-glow)"/>
+    <circle class="ember" cx="1170" cy="90" r="40" fill="#f26a4b" fill-opacity=".16" filter="url(#blur)"/>
+    <path d="M80 62h46" stroke="#f26a4b" stroke-width="2"/>
+    <text class="mono" x="142" y="67" font-size="15" letter-spacing="3" fill="#d1cfc0">FRIGATE -&gt; YOU</text>
+    <text class="serif" x="76" y="240" font-size="117" font-style="italic" letter-spacing="-3" fill="#e8e3da">Spotter</text>
+    <text class="sans" x="82" y="314" font-size="23" fill="#a49f96">Reliable notification delivery.</text>
+    <g transform="translate(82 350)" class="mono" font-size="13" letter-spacing=".55" text-anchor="middle" fill="#d1cfc0">
+      <g fill="#1c1c1c" stroke="#383532">
+        <rect width="106" height="30" rx="6"/>
+        <rect x="115" width="105" height="30" rx="6"/>
+        <rect x="229" width="106" height="30" rx="6"/>
+        <rect x="344" width="75" height="30" rx="6"/>
+      </g>
+      <text x="53" y="19.5">TELEGRAM</text>
+      <text x="167.5" y="19.5">WEB PUSH</text>
+      <text x="282" y="19.5">APPERCOT</text>
+      <text x="381.5" y="19.5">EMAIL</text>
+    </g>
+    <g filter="url(#shadow)">
+      <rect x="818" y="64" width="364" height="316" rx="8" fill="url(#paper)" stroke="#3a3a3a"/>
+      <rect x="819" y="65" width="362" height="314" rx="7" fill="none" stroke="#d1cfc0" stroke-opacity=".035"/>
+    </g>
+    <text class="mono" x="850" y="99" font-size="12" letter-spacing="1.5" fill="#a49f96">DRIVEWAY · 21:14:08</text>
+    <circle cx="1148" cy="95" r="4" fill="#f26a4b"/>
+    <path d="M850 116h300" stroke="#343434"/>
+    <text class="serif" x="850" y="152" font-size="27" fill="#e8e3da">Vehicle detected</text>
+    <g clip-path="url(#snapshot-clip)">
+      <g transform="translate(1000 236) rotate(-7)">
+        <rect x="-170" y="-90" width="340" height="180" fill="url(#asphalt)"/>
+        <rect x="-170" y="-90" width="340" height="49" fill="#30302e"/>
+        <rect x="-170" y="-90" width="340" height="49" fill="url(#pavers)"/>
+        <path d="M-170-41h340m-340 5h340" stroke="#a49f96" stroke-opacity=".45"/>
+        <path d="M-170 37h78m177 0h85m-340 18h340" stroke="#d1cfc0" stroke-opacity=".27"/>
+        <g transform="scale(.89)">
+          <ellipse cx="1" cy="4" rx="65" ry="23" fill="#141414" opacity=".52"/>
+          <g fill="#242322">
+            <rect x="-43" y="-22" width="19" height="8" rx="2"/>
+            <rect x="-43" y="14" width="19" height="8" rx="2"/>
+            <rect x="29" y="-22" width="19" height="8" rx="2"/>
+            <rect x="29" y="14" width="19" height="8" rx="2"/>
+          </g>
+          <path d="M-47-20h86q15 0 20 10l2 10-2 10q-5 10-20 10h-86q-12-1-13-12V-8q1-11 13-12Z" fill="url(#car-body)" stroke="#d1cfc0" stroke-opacity=".5"/>
+          <path d="M-30-16h55L37 0 25 16h-55L-39 0Z" fill="#383634"/>
+          <path d="M-20-13h35l4 6V7l-4 6h-35l-3-6V-7Z" fill="#77746c"/>
+          <path d="M22-16h4l4-7h-7l-2 2m1 35h4l4 7h-7l-2-2" fill="#a6a39b" stroke="#55524e"/>
+          <path d="M44-14q9 1 12 7M44 14q9-1 12-7" fill="none" stroke="#e8e3da" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M-53-12v5m0 14v5" stroke="#4b3933" stroke-width="3" stroke-linecap="round"/>
+        </g>
+      </g>
+      <path d="M939 216v-13h13m96 0h13v13m0 40v13h-13m-96 0h-13v-13" fill="none" stroke="#f26a4b" stroke-width="1.6"/>
+    </g>
+    <rect x="850.5" y="170.5" width="299" height="132" rx="5" fill="none" stroke="#d1cfc0" stroke-opacity=".18"/>
+    <rect x="850" y="320" width="300" height="36" rx="6" fill="#f26a4b" fill-opacity=".09" stroke="#f26a4b" stroke-opacity=".32"/>
+    <g transform="translate(1000 338)">
+      <path transform="translate(0 1)" d="M-29-1h12v6h-12zm0 0-1-3 11-3 1 3-11 3m2-4 2 2m2-3 2 2" fill="none" stroke="#f26a4b" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+      <text class="sans" x="-9" dominant-baseline="central" font-size="15" font-weight="600" fill="#e8e3da">Video</text>
+    </g>
+  </g>
+  <rect x=".5" y=".5" width="1279" height="439" rx="8" fill="none" stroke="#2c2c2c"/>
+</svg>

@@ -1,0 +1,206 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 666" role="img" aria-labelledby="title desc">
+  <title id="title">Spotter single deployment</title>
+  <desc id="desc">Camera video reaches Frigate NVR, which publishes MQTT events. The frigate adapter publishes through Redis Streams to server, which delivers the event to Telegram, PWA, Appercot and email. Server then requests a snapshot through Redis. The adapter stages it in S3, depot processes it, and server sends the media update to Telegram, PWA and Appercot through Redis. Dashed lines show access to S3.</desc>
+  <defs>
+    <clipPath id="frame"><rect width="1100" height="666" rx="8"/></clipPath>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#141414"/>
+      <stop offset="1" stop-color="#1c1c1c"/>
+    </linearGradient>
+    <radialGradient id="coral-glow">
+      <stop stop-color="#f26a4b" stop-opacity=".37"/>
+      <stop offset=".45" stop-color="#f26a4b" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#f26a4b" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ivory-glow">
+      <stop stop-color="#d1cfc0" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#d1cfc0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x2="0" y2="1">
+      <stop stop-color="#242323"/>
+      <stop offset="1" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 8 8" markerWidth="7" markerHeight="7" refX="7" refY="4" orient="auto">
+      <path d="m1 1 6 3-6 3" fill="none" stroke="#a49f96" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <style>
+    .serif { font-family: "Playfair Display", Georgia, serif }
+    .sans { font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", sans-serif }
+    .mono { font-family: "JetBrains Mono", Consolas, monospace }
+    .card { fill: url(#paper); stroke: #46403d }
+    .name { fill: #e8e3da; font-size: 26px; text-anchor: middle }
+    .detail { fill: #a49f96; font-size: 16px; text-anchor: middle }
+    .label { fill: #a49f96; font-size: 17px }
+    .wire { fill: none; stroke: #8e8a83; stroke-width: 1.5 }
+    .media { fill: none; stroke: #8e8a83; stroke-width: 1.5; stroke-dasharray: 5 6 }
+    .ambient { animation: breathe 9s ease-in-out infinite }
+    .signals { fill: #e8e3da }
+    .signals circle { filter: drop-shadow(0 0 5px #e8e3da) }
+    .signals .snapshot { fill: #f26a4b }
+    .signals .snapshot circle { filter: drop-shadow(0 0 6px #f26a4b) }
+    @keyframes breathe { 50% { opacity: .55 } }
+    @media (prefers-reduced-motion: reduce) {
+      .ambient { animation: none }
+      .signals { display: none }
+    }
+  </style>
+  <g clip-path="url(#frame)">
+    <rect width="1100" height="666" fill="url(#background)"/>
+    <circle class="ambient" cx="1040" cy="43" r="325" fill="url(#coral-glow)"/>
+    <circle cx="100" cy="661" r="290" fill="url(#ivory-glow)"/>
+    <path d="M69 42h30" stroke="#f26a4b" stroke-width="2"/>
+    <text class="mono" x="113" y="48" fill="#d1cfc0" font-size="15" letter-spacing="2">SINGLE DEPLOYMENT</text>
+
+    <rect x="44" y="202" width="992" height="399" rx="8" fill="#1c1c1c" fill-opacity=".72" stroke="#3c3531"/>
+    <text class="serif" x="69" y="252" fill="#e8e3da" font-size="38" font-style="italic">Spotter</text>
+
+    <rect x="69" y="349" width="941" height="77" rx="8" fill="#282421" stroke="#5e4940"/>
+    <text class="sans" x="90" y="383" fill="#e8e3da" font-size="24">Redis Streams</text>
+    <path d="M171 401H908" fill="none" stroke="#7c6860" stroke-width="1.5"/>
+
+    <g class="wire">
+      <path d="M211 104h95" marker-end="url(#arrow)"/>
+      <path d="M415 134v95" marker-end="url(#arrow)"/>
+      <path d="M415 295v198m242-198v198m251-198v198M171 401v92"/>
+    </g>
+    <g fill="#a49f96">
+      <circle cx="171" cy="401" r="2.8"/><circle cx="415" cy="401" r="2.8"/>
+      <circle cx="657" cy="401" r="2.8"/><circle cx="908" cy="401" r="2.8"/>
+    </g>
+    <g class="media">
+      <path d="M485 229v-65h440v-30m-17 30v65"/>
+      <path d="M1010 104h50v476H171v-22m244 22v-22m242 22v-22m251 22v-22"/>
+    </g>
+    <g fill="#8e8a83">
+      <circle cx="908" cy="164" r="2.5"/>
+      <circle cx="415" cy="580" r="2.5"/><circle cx="657" cy="580" r="2.5"/><circle cx="908" cy="580" r="2.5"/>
+    </g>
+
+    <!-- Animate both position and opacity on the SVG timeline for standalone image rendering. -->
+    <g class="signals" aria-hidden="true">
+      <g opacity="0">
+        <animate attributeName="opacity" begin="0s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.01;.155;.166667;1"/>
+        <circle r="4.8">
+          <animateMotion begin="0s" dur="18s" repeatCount="indefinite" path="M140 104H415V401H657V262"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.166667;1"/>
+        </circle>
+      </g>
+      <g opacity="0">
+        <animate attributeName="opacity" begin="3s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.01;.035;.041667;1"/>
+        <circle r="4.8">
+          <animateMotion begin="3s" dur="18s" repeatCount="indefinite" path="M657 262V401"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.041667;1"/>
+        </circle>
+      </g>
+      <g opacity="0">
+        <animate attributeName="opacity" begin="3.75s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.006;.114;.125;1"/>
+        <circle r="4.8">
+          <animateMotion begin="3.75s" dur="18s" repeatCount="indefinite" path="M657 401H171V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+        <circle r="4.8">
+          <animateMotion begin="3.75s" dur="18s" repeatCount="indefinite" path="M657 401H415V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+        <circle r="4.8">
+          <animateMotion begin="3.75s" dur="18s" repeatCount="indefinite" path="M657 401V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+        <circle r="4.8">
+          <animateMotion begin="3.75s" dur="18s" repeatCount="indefinite" path="M657 401H908V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+      </g>
+      <g class="snapshot" opacity="0">
+        <animate attributeName="opacity" begin="6s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.01;.155;.166667;1"/>
+        <circle r="4.8">
+          <animateMotion begin="6s" dur="18s" repeatCount="indefinite" path="M657 262V401H415V262"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.166667;1"/>
+        </circle>
+      </g>
+      <g class="snapshot" opacity="0">
+        <animate attributeName="opacity" begin="9s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.01;.155;.166667;1"/>
+        <circle r="4.8">
+          <animateMotion begin="9s" dur="18s" repeatCount="indefinite" path="M415 262V401H908V262"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.166667;1"/>
+        </circle>
+      </g>
+      <g class="snapshot" opacity="0">
+        <animate attributeName="opacity" begin="12s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.01;.155;.166667;1"/>
+        <circle r="4.8">
+          <animateMotion begin="12s" dur="18s" repeatCount="indefinite" path="M908 262V401H657V262"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.166667;1"/>
+        </circle>
+      </g>
+      <g class="snapshot" opacity="0">
+        <animate attributeName="opacity" begin="15s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.01;.035;.041667;1"/>
+        <circle r="4.8">
+          <animateMotion begin="15s" dur="18s" repeatCount="indefinite" path="M657 262V401"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.041667;1"/>
+        </circle>
+      </g>
+      <g class="snapshot" opacity="0">
+        <animate attributeName="opacity" begin="15.75s" dur="18s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.006;.114;.125;1"/>
+        <circle r="4.8">
+          <animateMotion begin="15.75s" dur="18s" repeatCount="indefinite" path="M657 401H171V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+        <circle r="4.8">
+          <animateMotion begin="15.75s" dur="18s" repeatCount="indefinite" path="M657 401H415V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+        <circle r="4.8">
+          <animateMotion begin="15.75s" dur="18s" repeatCount="indefinite" path="M657 401V525"
+            calcMode="linear" keyPoints="0;1;1" keyTimes="0;.125;1"/>
+        </circle>
+      </g>
+    </g>
+
+    <g class="card">
+      <rect x="69" y="74" width="142" height="60" rx="8"/>
+      <rect x="306" y="74" width="218" height="60" rx="8"/>
+      <rect x="840" y="74" width="170" height="60" rx="8"/>
+      <rect x="306" y="229" width="218" height="66" rx="8"/>
+      <rect x="552" y="229" width="210" height="66" rx="8"/>
+      <rect x="806" y="229" width="204" height="66" rx="8"/>
+      <rect x="69" y="493" width="204" height="65" rx="8"/>
+      <rect x="312" y="493" width="206" height="65" rx="8"/>
+      <rect x="554" y="493" width="206" height="65" rx="8"/>
+      <rect x="806" y="493" width="204" height="65" rx="8"/>
+    </g>
+    <g class="sans name">
+      <text x="140" y="113">Camera</text>
+      <text x="415" y="113">Frigate NVR</text>
+      <text x="925" y="113">S3 storage</text>
+      <text x="415" y="257">frigate</text>
+      <text x="657" y="257">server</text>
+      <text x="908" y="257">depot</text>
+      <text x="171" y="521">telegram</text>
+      <text x="415" y="521">pwa</text>
+      <text x="657" y="521">appercot</text>
+      <text x="908" y="521">email</text>
+    </g>
+    <g class="mono detail">
+      <text x="259" y="92">Video</text>
+      <text x="452" y="175">MQTT</text>
+      <text x="415" y="280">NVR adapter</text>
+      <text x="657" y="280">SQLite</text>
+      <text x="908" y="280">Media worker</text>
+      <text x="171" y="544">Bot API</text>
+      <text x="415" y="544">Web Push</text>
+      <text x="657" y="544">WebSocket</text>
+      <text x="908" y="544">SMTP</text>
+    </g>
+
+    <g class="sans label">
+      <circle cx="75" cy="634" r="4.5" fill="#e8e3da"/>
+      <text x="89" y="640">Event</text>
+      <circle cx="175" cy="634" r="4.5" fill="#f26a4b"/>
+      <text x="189" y="640">Snapshot update</text>
+      <path class="media" d="M343 634h28"/>
+      <text x="382" y="640">S3 media</text>
+    </g>
+  </g>
+  <rect x=".5" y=".5" width="1099" height="665" rx="8" fill="none" stroke="#2c2c2c"/>
+</svg>
